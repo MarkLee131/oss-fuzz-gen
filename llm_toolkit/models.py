@@ -26,6 +26,7 @@ import time
 from abc import abstractmethod
 from typing import Any, Callable, Type
 
+import litellm
 import openai
 import tiktoken
 import vertexai
@@ -39,6 +40,10 @@ from llm_toolkit import prompts
 MAX_TOKENS: int = 2000
 NUM_SAMPLES: int = 1
 TEMPERATURE: float = 0.4
+
+OPENLLM_URL: str = os.getenv('OPENLLM_HOSTNAME', 'http://localhost')
+
+OPENLLM_PORT: str = os.getenv('OPENLLM_PORT', '8080')
 
 
 class LLM:
@@ -358,6 +363,201 @@ class AIBinaryModel(GoogleModel):
   def __init__(self, name: str, *args, **kwargs):
     super().__init__(*args, **kwargs)
     self.name = name
+
+
+class OpenLLM(LLM):
+  """Open LLM model encapsulator using TGI
+  (https://huggingface.co/docs/text-generation-inference/quicktour)
+  and litellm (https://docs.litellm.ai/docs/)."""
+
+  # default model name, which is the best openllm from the recent study: https://arxiv.org/abs/2307.12469
+  name = 'WizardLM/WizardCoder-33B-V1.1'
+  """use the tokenizer to get max_token_length and
+  estimate the number of input tokens
+  """
+  from transformers import AutoTokenizer
+  tokenizer = AutoTokenizer.from_pretrained(name)
+
+  def __init__(self, *args, **kwargs):
+    super().__init__(*args, **kwargs)
+    self.max_tokens = self.tokenizer.model_max_length
+
+  # ================================ Prompt ================================ #
+  def estimate_token_num(self, text) -> int:
+    """Use tokenizer to estimate the number of tokens in |text|."""
+
+    num_tokens = 0
+    for message in text:
+      num_tokens += 3
+
+      ### check the message type
+      if isinstance(message, str):
+        print(f"Message is a string: {message}")
+      else:
+
+        for key, value in message.items():
+          num_tokens += len(self.tokenizer.encode(value))
+          if key == 'name':
+            num_tokens += 1
+    num_tokens += 3
+
+    return num_tokens
+
+  def prompt_type(self) -> type[prompts.Prompt]:
+    """Returns the expected prompt type."""
+    return prompts.OpenAIPrompt
+
+  # ============================== Generation ============================== #
+  def generate_code(self,
+                    prompt: prompts.Prompt,
+                    response_dir: str,
+                    log_output: bool = False) -> None:
+    """Generates code using the TGI and litellm for OpenLLMs."""
+
+    len_inputs = self.estimate_token_num(prompt.get())
+
+    completion = self.with_retry_on_error(
+        lambda: litellm.completion(
+            messages=prompt.get(),
+            model='huggingface/' + str(self.name),
+            n=self.num_samples,
+            temperature=self.temperature,
+            max_tokens=self.max_tokens - len_inputs,
+            api_base=f"{OPENLLM_URL}:{OPENLLM_PORT}/generate",
+        ), litellm.APIError)
+    if log_output:
+      print(completion)
+    for index, choice in enumerate(completion.choices):  # type: ignore
+      content = choice.message['content']
+      self._save_output(index, content, response_dir)
+
+
+############################################################################
+# We first support the top-10 models from the [leaderboard](https://huggingface.co/spaces/bigcode/bigcode-models-leaderboard).
+
+
+class CodeFuseDeepSeek33B(OpenLLM):
+  """codefuse-ai/CodeFuse-DeepSeek-33B model."""
+
+  name = 'codefuse-ai/CodeFuse-DeepSeek-33B'
+
+
+class OpenCodeInterpreter(OpenLLM):
+  """OpenCodeInterpreter-DS-33B model."""
+
+  name = 'm-a-p/OpenCodeInterpreter-DS-33B'
+
+
+class DeepSeekCoder33B(OpenLLM):
+  """deepseek-ai/DeepSeek-Coder-33B model."""
+
+  name = 'deepseek-ai/deepseek-coder-33b-instruct'
+
+
+class OpenCodeInterpreter67B(OpenLLM):
+  """OpenCodeInterpreter-DS-6.7B model."""
+
+  name = 'm-a-p/OpenCodeInterpreter-DS-6.7B'
+
+
+class DeepSeekCoder67B(OpenLLM):
+  """deepseek-ai/DeepSeek-Coder-6.7B model."""
+
+  name = 'deepseek-ai/deepseek-coder-6.7b-instruct'
+
+
+class PhindCodeLlama34BV2(OpenLLM):
+  """Phind/Phind-CodeLlama-34B-v2 model."""
+
+  name = 'Phind/Phind-CodeLlama-34B-v2'
+
+
+class PhindCodeLlama34BV1(OpenLLM):
+  """Phind/Phind-CodeLlama-34B-v1 model."""
+
+  name = 'Phind/Phind-CodeLlama-34B-v1'
+
+
+class PhindCodeLlama34BPythonV1(OpenLLM):
+  """Phind/Phind-CodeLlama-34B-Python-v1 model."""
+
+  name = 'Phind/Phind-CodeLlama-34B-Python-v1'
+
+
+class DeepSeekCoder33BBase(OpenLLM):
+  """deepseek-ai/DeepSeek-Coder-33B-Base model."""
+
+  name = 'deepseek-ai/deepseek-coder-33b-base'
+
+
+class CodeLlama70BHF(OpenLLM):
+  """codellama/CodeLlama-70B-hf model."""
+
+  name = 'codellama/CodeLlama-70b-hf'
+
+
+class AzureGPT(GPT):
+  """Add support for azure-based GPT models."""
+
+  #Note: The openai-python library support for Azure OpenAI is in preview.
+  #Note: This requires OpenAI Python library version 1.0.0 or higher.
+
+  name = 'gpt35-1106'
+
+  # ================================ Prompt ================================ #
+  def estimate_token_num(self, text) -> int:
+    """Estimates the number of tokens in |text|."""
+    # https://cookbook.openai.com/examples/how_to_count_tokens_with_tiktoken
+    try:
+      encoder = tiktoken.encoding_for_model('gpt-3.5-turbo')
+    except KeyError:
+      print(f'Could not get a tiktoken encoding for {self.name}.')
+      encoder = tiktoken.get_encoding('cl100k_base')
+
+    num_tokens = 0
+    for message in text:
+      num_tokens += 3
+      for key, value in message.items():
+        num_tokens += len(encoder.encode(value))
+        if key == 'name':
+          num_tokens += 1
+    num_tokens += 3
+    return num_tokens
+
+  def prompt_type(self) -> type[prompts.Prompt]:
+    """Returns the expected prompt type."""
+    return prompts.OpenAIPrompt
+
+  # ============================== Generation ============================== #
+  def generate_code(self,
+                    prompt: prompts.Prompt,
+                    response_dir: str,
+                    log_output: bool = False) -> None:
+    """Generates code with OpenAI's API."""
+    if self.ai_binary:
+      print(f'OpenAI does not use local AI binary: {self.ai_binary}')
+    client = openai.AzureOpenAI(
+        azure_endpoint="https://gpt4-func-sweden.openai.azure.com/",
+        api_key=os.getenv("AZURE_OPENAI_KEY"),
+        api_version="2024-02-15-preview")
+
+    completion = self.with_retry_on_error(
+        lambda: client.chat.completions.create(messages=prompt.get(),
+                                               model=self.name,
+                                               n=self.num_samples,
+                                               temperature=self.temperature),
+        openai.OpenAIError)
+    if log_output:
+      print(completion)
+    for index, choice in enumerate(completion.choices):  # type: ignore
+      content = choice.message.content
+      self._save_output(index, content, response_dir)
+
+
+class AzureGPT4(AzureGPT):
+  """Azure GPTi-4 model."""
+
+  name = 'TBD'  # TODO: Add the correct model name for Azure GPT-4
 
 
 DefaultModel = VertexAICodeBison32KModel
