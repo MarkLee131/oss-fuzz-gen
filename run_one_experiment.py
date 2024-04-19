@@ -37,7 +37,7 @@ from llm_toolkit import models, output_parser, prompt_builder, prompts
 # experiment, while {run_all_experiments.NUM_EXP, default 2} experiments will
 # run in parallel.
 NUM_EVA = int(os.getenv('LLM_NUM_EVA', '3'))
-DEBUG: bool = False
+DEBUG: bool = True ## Set to True for debugging
 
 # Default LLM hyper-parameters.
 # #182 shows Gemini returns NUM_SAMPLES independent responses via repeated
@@ -216,7 +216,7 @@ def run(benchmark: Benchmark,
         work_dirs: WorkDirs,
         example_pair: Optional[list[list[str]]] = None,
         debug: bool = DEBUG,
-        manual_fix: bool = False,
+        manual_fix: bool = True,
         cloud_experiment_name: str = '',
         cloud_experiment_bucket: str = '',
         use_context: bool = False,
@@ -243,7 +243,7 @@ def run(benchmark: Benchmark,
 
     context_info = None
 
-    if use_context:
+    if use_context: # try to obtain the AST of the project/function from fuzz-introspector
       retriever = ContextRetriever(benchmark)
       try:
         retriever.retrieve_asts()

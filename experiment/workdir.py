@@ -59,7 +59,7 @@ class WorkDirs:
 
   @property
   def prompt(self):
-    return os.path.join(self._base_dir, 'prompt.txt')
+    return os.path.join(self._base_dir, 'prompt.json')
 
   @property
   def raw_targets(self):

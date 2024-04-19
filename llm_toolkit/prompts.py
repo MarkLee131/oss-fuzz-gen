@@ -132,4 +132,4 @@ class OpenAIPrompt(Prompt):
   def save(self, location: str) -> None:
     """Saves the prompt to a filelocation."""
     with open(location, 'w+') as prompt_file:
-      json.dump(self._prompt, prompt_file)
+      json.dump(self._prompt, prompt_file, indent=2)
