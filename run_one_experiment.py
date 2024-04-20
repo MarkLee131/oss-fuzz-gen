@@ -216,7 +216,7 @@ def run(benchmark: Benchmark,
         work_dirs: WorkDirs,
         example_pair: Optional[list[list[str]]] = None,
         debug: bool = DEBUG,
-        manual_fix: bool = True,
+        manual_fix: bool = False,
         cloud_experiment_name: str = '',
         cloud_experiment_bucket: str = '',
         use_context: bool = False,
@@ -253,8 +253,12 @@ def run(benchmark: Benchmark,
         pass
       retriever.generate_lookups()
       context_header = retriever.get_header()
-      print(context_header)
+      if DEBUG:
+        print(f'Context header: {context_header}')
+      # print(context_header)
       context_types = '\n'.join(retriever.get_type_info())
+      if DEBUG:
+        print(f'Context types: {context_types}')
       context_info = (context_header, context_types)
       retriever.cleanup_asts()
 
