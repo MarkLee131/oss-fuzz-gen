@@ -157,6 +157,8 @@ class BuilderRunner:
         'python3', 'infra/helper.py', 'run_fuzzer', '--corpus-dir', corpus_dir,
         generated_project, self.benchmark.target_name, '--'
     ] + self._libfuzzer_args()
+    
+    print(f'Running command: {command}')
 
     with open(log_path, 'w') as f:
       proc = sp.Popen(command,

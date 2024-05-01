@@ -123,6 +123,13 @@ class OpenAIPrompt(Prompt):
         'content': solution_content,
     })
 
+  def add_fuzz_driver_example(self, example_content: str) -> None:
+    """Constructs the prompt problem in the required format."""
+    self._prompt.append({
+        'role': 'user',
+        'content': example_content,
+    })
+  
   def create_prompt_piece(self, content: str, role: str) -> Any:
     """Returns a prompt piece in the format wanted by OpenAI."""
     # TODO(mihaimaruseac): We might want to consider stripping the XML tags

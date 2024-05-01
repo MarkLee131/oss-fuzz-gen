@@ -225,6 +225,17 @@ def run(benchmark: Benchmark,
   model.cloud_setup()
   logging.basicConfig(level=logging.INFO)
 
+  ### check the existence of fuzz driver examples under the fuzz_targets directory
+  if os.path.exists(os.path.join('example_targets', benchmark.project)):
+    benchmark.use_project_examples = True
+    example_pair = []
+    for f in os.listdir(os.path.join('example_targets', benchmark.project)):
+      if benchmarklib.is_c_file(f) or benchmarklib.is_cpp_file(f):
+        f_path = os.path.join('example_targets', benchmark.project, f)
+        print(f'Adding example {f_path}')
+        example_pair.append([f_path.replace('.cc', '.txt'), f_path])
+  print(f'Example pair: {example_pair}')
+
   if example_pair is None:
     example_pair = prompt_builder.EXAMPLES
 
@@ -243,7 +254,9 @@ def run(benchmark: Benchmark,
 
     context_info = None
 
-    if use_context:  # try to obtain the AST of the project/function from fuzz-introspector
+    if use_context:  
+      # try to obtain the AST of the project/function 
+      # from fuzz-introspector
       retriever = ContextRetriever(benchmark)
       try:
         retriever.retrieve_asts()
