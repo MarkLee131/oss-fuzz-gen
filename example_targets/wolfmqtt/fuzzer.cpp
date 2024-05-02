@@ -99,7 +99,7 @@ Topics::~Topics() {
         delete t;
     }
 }
-        
+
 bool Topics::Generate(void) {
     bool ret = false;
 
@@ -126,7 +126,7 @@ MqttTopic* Topics::ToArray(void) {
     }
     return ret;
 }
-        
+
 size_t Topics::Size(void) const {
     return topics.size();
 }
@@ -425,7 +425,7 @@ bool wolfMQTTFuzzer::Initialize(void) {
             connect->client_id = client_id.c_str();
             connect->enable_lwt = ds.Get<bool>() ? 1 : 0;
         }
-            
+
         std::string lwt_topic_name;
         std::vector<uint8_t> lwt_buffer;
 

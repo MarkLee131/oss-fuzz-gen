@@ -61,11 +61,11 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
         UA_delete(dstCopy, &UA_TYPES[typeIndex]);
         return 0;
     }
-    
+
     // compare with copy
     UA_assert(UA_order(dst, dstCopy, &UA_TYPES[typeIndex]) == UA_ORDER_EQ);
     UA_delete(dstCopy, &UA_TYPES[typeIndex]);
-    
+
     // now also test encoding
     size_t encSize = UA_calcSizeBinary(dst, &UA_TYPES[typeIndex]);
     UA_ByteString encoded;

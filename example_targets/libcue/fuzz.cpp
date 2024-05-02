@@ -72,7 +72,7 @@ extern "C" int LLVMFuzzerTestOneInput (const uint8_t *data, size_t size)
 
     Cd *cd = cue_parse_string (str);
     cd_delete (cd);
-    
+
     free (str);
     return 0;
 }

@@ -1,7 +1,7 @@
 
 #include <boost/regex.hpp>
 
-extern "C" int LLVMFuzzerTestOneInput(const uint8_t *Data, size_t Size) 
+extern "C" int LLVMFuzzerTestOneInput(const uint8_t *Data, size_t Size)
 {
   if(Size < 2)
     return 0;

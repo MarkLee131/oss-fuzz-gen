@@ -254,8 +254,8 @@ def run(benchmark: Benchmark,
 
     context_info = None
 
-    if use_context:  
-      # try to obtain the AST of the project/function 
+    if use_context:
+      # try to obtain the AST of the project/function
       # from fuzz-introspector
       retriever = ContextRetriever(benchmark)
       try:

@@ -27,7 +27,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size)
 
         date d1(from_undelimited_string(s));
         to_iso_extended_string(d1);
-        
+
         date::ymd_type ymd = d1.year_month_day();
         greg_weekday wd = d1.day_of_week();
         wd.as_long_string();

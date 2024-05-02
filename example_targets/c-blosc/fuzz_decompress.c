@@ -22,7 +22,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   if (nbytes == 0) {
     return 0;
   }
-  
+
   if (blosc_cbuffer_validate(data, size, &nbytes) != 0) {
     /* Unexpected nbytes specified in blosc header */
     return 0;

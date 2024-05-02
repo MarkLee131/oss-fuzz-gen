@@ -32,9 +32,9 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   malicious_xml[size] = '\0';
 
   xmlnode *isc = xmlnode_from_str(malicious_xml, size+1);
-  if (isc != NULL) {    
+  if (isc != NULL) {
     xmlnode_set_attrib(isc, "name", "query");
-    
+
     // Parse Jabber caps
     JabberCapsClientInfo *info = jabber_caps_parse_client_info(isc);
     gchar *got_hash = jabber_caps_calculate_hash(info, ("sha1"));

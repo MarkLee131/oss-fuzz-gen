@@ -32,7 +32,7 @@ extern const char* pre_expression;
 extern const char* pre_format;
 extern const char* match_against;
 
-extern "C" int LLVMFuzzerTestOneInput(const uint8_t *Data, size_t Size) 
+extern "C" int LLVMFuzzerTestOneInput(const uint8_t *Data, size_t Size)
 {
     FuzzedDataProvider fdp(Data, Size);
     std::string format_string = fdp.ConsumeRemainingBytesAsString();

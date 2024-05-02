@@ -66,7 +66,7 @@ static const std::array<const char*, 45> kConverters = {
 // Entry point for LibFuzzer.
 extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
   auto rng = CreateRng(data, size);
-  icu::UnicodeString str(reinterpret_cast<const char*>(data), size, 
+  icu::UnicodeString str(reinterpret_cast<const char*>(data), size,
       kConverters[rng() % kConverters.size()]);
   return 0;
 }

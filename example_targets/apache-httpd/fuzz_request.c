@@ -73,10 +73,10 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   char *new_str3 = af_gb_get_null_terminated(&data2, &size2);
   char *new_str4 = af_gb_get_null_terminated(&data2, &size2);
   char *new_str5 = af_gb_get_null_terminated(&data2, &size2);
-  if (new_str != NULL && 
-      new_str2 != NULL && 
+  if (new_str != NULL &&
+      new_str2 != NULL &&
       new_str3 != NULL &&
-      new_str4 != NULL && 
+      new_str4 != NULL &&
       new_str5 != NULL) {
 
     /* this is the main fuzzing logic */

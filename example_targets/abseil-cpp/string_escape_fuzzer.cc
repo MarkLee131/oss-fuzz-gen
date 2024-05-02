@@ -14,7 +14,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-#include <string> 
+#include <string>
 
 #include "absl/strings/escaping.h"
 
@@ -35,12 +35,12 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
 	absl::CUnescape(escaped, &unescaped);
 	if (str != unescaped)
 		abort();
-	
+
 	escaped = absl::Utf8SafeCHexEscape(str);
 	absl::CUnescape(escaped, &unescaped);
 	if (str != unescaped)
 		abort();
-	
+
 	std::string encoded, decoded;
 	absl::Base64Escape(str, &encoded);
 	absl::Base64Unescape(encoded, &decoded);

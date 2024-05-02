@@ -96,7 +96,7 @@ exec_deluxe(OnigEncoding pattern_enc, OnigEncoding str_enc,
   return 0;
 }
 
-#define PATTERN_SIZE 48 
+#define PATTERN_SIZE 48
 #define NUM_CONTROL_BYTES 1
 #define MIN_STR_SIZE  2
 int LLVMFuzzerTestOneInput(const uint8_t * Data, size_t Size)

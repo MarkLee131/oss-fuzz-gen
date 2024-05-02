@@ -17,7 +17,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     fwrite(data, size, 1, fp);
     fclose(fp);
 
-    reader.read (filename, cloud_blob); 
+    reader.read (filename, cloud_blob);
     unlink(filename);
     return 0;
 }

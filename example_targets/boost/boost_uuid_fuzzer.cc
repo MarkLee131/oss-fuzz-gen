@@ -22,7 +22,7 @@ using namespace std;
 using namespace boost::uuids;
 
 extern "C" int LLVMFuzzerTestOneInput(const uint8_t *Data, size_t Size){
-    
+
     try{
         FuzzedDataProvider fdp(Data, Size);
         std::string s = fdp.ConsumeRemainingBytesAsString();
@@ -35,7 +35,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t *Data, size_t Size){
 
         u_string = gen_string(s);
         u_name = gen_name(s);
-        
+
         size_t string_hash = hasher(u_string);
         size_t name_hash = hash_value(u_name);
         size_t uuid_hash_value = hasher(boost::uuids::uuid());

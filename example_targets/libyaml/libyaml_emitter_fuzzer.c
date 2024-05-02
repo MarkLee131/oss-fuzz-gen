@@ -28,7 +28,7 @@
 #define MAX_EVENTS 1024
 
 bool events_equal(yaml_event_t *event1, yaml_event_t *event2) {
-  
+
   const bool equal = true;
 
   if (event1->type != event2->type)

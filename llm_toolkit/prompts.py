@@ -129,7 +129,7 @@ class OpenAIPrompt(Prompt):
         'role': 'user',
         'content': example_content,
     })
-  
+
   def create_prompt_piece(self, content: str, role: str) -> Any:
     """Returns a prompt piece in the format wanted by OpenAI."""
     # TODO(mihaimaruseac): We might want to consider stripping the XML tags

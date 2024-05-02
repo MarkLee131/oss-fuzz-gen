@@ -60,7 +60,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t dataSize) {
 
     Exporter exporter;
     exporter.ExportToBlob(sc, "fbx");
-    
+
     aiDetachLogStream(&stream);
 
     return 0;

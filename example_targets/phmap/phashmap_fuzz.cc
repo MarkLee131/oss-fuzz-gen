@@ -26,7 +26,7 @@ void serialise_test(const uint8_t *data, size_t size) {
 
     for (int i=0; i < num_items; ++i)  {
         table.insert(typename phmap::flat_hash_map<unsigned int, int>::value_type(
-                    fuzzed_data.ConsumeIntegral<uint32_t>(), 
+                    fuzzed_data.ConsumeIntegral<uint32_t>(),
                     fuzzed_data.ConsumeIntegral<int32_t>()));
     }
 
@@ -52,7 +52,7 @@ test_assignments(const uint8_t *data, size_t size) {
     const int num_items = fuzzed_data.ConsumeIntegral<int16_t>();
     for (int i=0; i < num_items; ++i) {
             phmap::flat_hash_map<std::string, std::string>::value_type(
-                    fuzzed_data.ConsumeRandomLengthString(), 
+                    fuzzed_data.ConsumeRandomLengthString(),
                     fuzzed_data.ConsumeRandomLengthString());
     }
     // Iterate through all of the items.
