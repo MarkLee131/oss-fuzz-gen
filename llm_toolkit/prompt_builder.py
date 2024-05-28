@@ -118,6 +118,8 @@ class DefaultTemplateBuilder(PromptBuilder):
         template_dir, 'fixer_priming.txt')
     self.fixer_problem_template_file = self._find_template(
         template_dir, 'fixer_problem.txt')
+    self.fuzzer_driver_example_template_file = self._find_template(
+        template_dir, 'fuzzer_driver_example.txt')
 
   def _format_priming(self, target_file_type: FileType) -> str:
     """Formats a priming based on the prompt template."""

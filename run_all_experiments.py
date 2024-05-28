@@ -200,7 +200,7 @@ def parse_args() -> argparse.Namespace:
   parser.add_argument('-w', '--work-dir', default=RESULTS_DIR)
   parser.add_argument('--context',
                       action='store_true',
-                      default=False,
+                      default=True,
                       help='Add context to function under test.')
   parser.add_argument('-e',
                       '--introspector-endpoint',

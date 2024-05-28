@@ -46,7 +46,7 @@ class Benchmark:
   @property
   def prompt(self) -> str:
     """Returns the prompt used by the benchmark."""
-    prompt_path = os.path.join(self.benchmark_dir, 'prompt.txt')
+    prompt_path = os.path.join(self.benchmark_dir, 'prompt.json')
     if not os.path.isfile(prompt_path):
       logging.warning('Prompt does not exist: %s', prompt_path)
       return ''
@@ -84,7 +84,7 @@ class Benchmark:
       code_path = [
           os.path.join(fixed_target_dir, fix_dir, f)
           for f in os.listdir(os.path.join(fixed_target_dir, fix_dir))
-          if not (f == 'prompt.txt' and f.endswith('rawoutput'))
+          if not (f == 'prompt.json' and f.endswith('rawoutput'))
       ][0]
       with open(code_path) as code_file:
         fixed_code = code_file.read()
@@ -124,7 +124,7 @@ class Benchmark:
     """Checks if this has a valid benchmark directory."""
     path = self.benchmark_dir
     expected_components = [
-        'raw_targets', 'status', 'fixed_targets', 'prompt.txt'
+        'raw_targets', 'status', 'fixed_targets', 'prompt.json'
     ]
     return all(
         os.path.exists(os.path.join(path, component))

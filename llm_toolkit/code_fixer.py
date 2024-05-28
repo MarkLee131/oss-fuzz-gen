@@ -346,7 +346,8 @@ def llm_fix(ai_binary: str, target_path: str, benchmark: benchmarklib.Benchmark,
   _, target_ext = os.path.splitext(os.path.basename(target_path))
   response_dir = f'{os.path.splitext(target_path)[0]}-F{llm_fix_id}'
   os.makedirs(response_dir, exist_ok=True)
-  prompt_path = os.path.join(response_dir, 'prompt.txt')
+  prompt_path = os.path.join(
+      response_dir, 'prompt.json')  ### for the convenience of debugging
 
   apply_llm_fix(ai_binary,
                 benchmark,

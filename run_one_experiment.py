@@ -36,7 +36,7 @@ from llm_toolkit import models, output_parser, prompt_builder, prompts
 # experiment, while {run_all_experiments.NUM_EXP, default 2} experiments will
 # run in parallel.
 NUM_EVA = int(os.getenv('LLM_NUM_EVA', '3'))
-DEBUG: bool = False
+DEBUG: bool = True  ## Set to True for debugging
 
 # Default LLM hyper-parameters.
 # #182 shows Gemini returns NUM_SAMPLES independent responses via repeated
@@ -226,6 +226,17 @@ def run(benchmark: Benchmark,
   model.cloud_setup()
   logging.basicConfig(level=logging.INFO)
 
+  ### check the existence of fuzz driver examples under the fuzz_targets directory
+  if os.path.exists(os.path.join('example_targets', benchmark.project)):
+    benchmark.use_project_examples = True
+    example_pair = []
+    for f in os.listdir(os.path.join('example_targets', benchmark.project)):
+      if benchmarklib.is_c_file(f) or benchmarklib.is_cpp_file(f):
+        f_path = os.path.join('example_targets', benchmark.project, f)
+        print(f'Adding example {f_path}')
+        example_pair.append([f_path.replace('.cc', '.txt'), f_path])
+  print(f'Example pair: {example_pair}')
+
   if example_pair is None:
     example_pair = prompt_builder.EXAMPLES[benchmark.language]
 
@@ -245,7 +256,10 @@ def run(benchmark: Benchmark,
       project_examples = []
 
     if use_context:
+      # try to obtain the AST of the project/function
+      # from fuzz-introspector
       retriever = ContextRetriever(benchmark)
+
       context_info = retriever.get_context_info()
     else:
       context_info = {}
@@ -257,6 +271,26 @@ def run(benchmark: Benchmark,
     else:
       # For C/C++ projects
       builder = prompt_builder.DefaultTemplateBuilder(model, template_dir)
+
+
+      try:
+        retriever.retrieve_asts()
+      # GSutil fails on the same project immediately after
+      # it succeeds a batch copy.
+      except subprocess.CalledProcessError:
+        pass
+      retriever.generate_lookups()
+      context_header = retriever.get_header()
+      if DEBUG:
+        print(f'Context header: {context_header}')
+      # print(context_header)
+      context_types = '\n'.join(retriever.get_type_info())
+      if DEBUG:
+        print(f'Context types: {context_types}')
+      context_info = (context_header, context_types)
+      retriever.cleanup_asts()
+
+    builder = prompt_builder.DefaultTemplateBuilder(model, template_dir)
 
     prompt = builder.build(benchmark.function_signature,
                            benchmark.file_type,
