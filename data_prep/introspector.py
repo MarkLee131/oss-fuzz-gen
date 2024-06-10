@@ -159,10 +159,7 @@ def _get_data(resp: Optional[requests.Response], key: str,
 def query_introspector_oracle(project: str, oracle_api: str) -> list[dict]:
   """Queries a fuzz target oracle API from Fuzz Introspector."""
   resp = _query_introspector(oracle_api, {'project': project})
-  functions = _get_data(resp, 'functions', [])
-  if functions:
-    return functions
-  sys.exit(1)
+  return _get_data(resp, 'functions', [])
 
 
 def query_introspector_for_keyword_targets(project: str) -> list[dict]:
@@ -176,10 +173,7 @@ def query_introspector_for_targets(project, target_oracle) -> list[Dict]:
   if not query_func:
     logging.error('No such oracle "%s"', target_oracle)
     sys.exit(1)
-  functions = query_func(project)
-  if functions:
-    return functions
-  sys.exit(1)
+  return query_func(project)
 
 
 def query_introspector_cfg(project: str) -> dict:
@@ -347,14 +341,10 @@ def _get_arg_names(function: dict, project: str, language: str) -> list[str]:
   """Returns the function argument names."""
   if language == 'jvm':
     # The fuzz-introspector front end of JVM projects cannot get the original
-    # argument name. Thus the argument name here uses var_{argument_type} as
-    # argument name reference. Some argument types are full-qualified names of
-    # Java classes with [] and . and that is not allowed for Java variable names
-    # and they are removed and form the temporary argment name for reference.
+    # argument name. Thus the argument name here uses arg{Count} as arugment
+    # name reference.
     jvm_args = _get_clean_arg_types(function, project)
-    arg_names = [
-        f'var_{name.split(".")[-1].replace("[]", "")}' for name in jvm_args
-    ]
+    arg_names = [f'arg{i}' for i in range(len(jvm_args))]
   else:
     arg_names = (function.get('arg-names') or
                  function.get('function_argument_names', []))
