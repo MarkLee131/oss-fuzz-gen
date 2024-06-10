@@ -19,6 +19,6 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
         // 3. must_check_fingerprint: 1
         // 4. fingerprint_present: NULL
     // postcondition: the function should return 0
-    
+
   return 0;
 }
