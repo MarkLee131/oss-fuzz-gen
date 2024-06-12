@@ -382,11 +382,13 @@ class DefaultJvmTemplateBuilder(PromptBuilder):
   def __init__(self,
                model: models.LLM,
                project_name: str,
+               function_args: list[dict[str, str]],
                template_dir: str = DEFAULT_TEMPLATE_DIR):
     super().__init__(model)
     self._template_dir = template_dir
     self.project_name = project_name
     self.project_url = self._find_project_url(project_name)
+    self.function_args = function_args
 
     # Load templates.
     self.base_template_file = self._find_template(template_dir, 'jvm_base.txt')
@@ -400,6 +402,10 @@ class DefaultJvmTemplateBuilder(PromptBuilder):
         template_dir, 'jvm_problem_constructor.txt')
     self.method_template_file = self._find_template(template_dir,
                                                     'jvm_problem_method.txt')
+    self.arg_description_template_file = self._find_template(
+        template_dir, 'jvm_arg_description.txt')
+    self.generic_arg_description_template_file = self._find_template(
+        template_dir, 'jvm_generic_arg_description.txt')
 
   def _find_project_url(self, project_name: str) -> str:
     """Discover project url from project's project.yaml in OSS-Fuzz"""
@@ -446,6 +452,7 @@ class DefaultJvmTemplateBuilder(PromptBuilder):
     problem = problem.replace('{TARGET}', self._format_target(signature))
     problem = problem.replace('{REQUIREMENTS}', self._format_requirement())
     problem = problem.replace('{DATA_MAPPING}', self._format_data_filler())
+    problem = problem.replace('{ARGUMENTS}', self._format_arguments())
     return problem
 
   def _format_target_constructor(self, signature: str) -> str:
@@ -457,6 +464,40 @@ class DefaultJvmTemplateBuilder(PromptBuilder):
     constructor = constructor.replace('{CONSTRUCTOR_SIGNATURE}', signature)
 
     return constructor
+
+  def _format_generic_argument(self, count: int, arg_type: str) -> str:
+    """Formats generic argument description."""
+    arg_split = arg_type.split('<', 1)
+
+    argument = self._get_template(self.generic_arg_description_template_file)
+    argument = argument.replace('{ARG_COUNT}', str(count))
+    arugment = argument.replace('{ARG_TYPE}', arg_split[0])
+    argument = argument.replace('{ARG_GENERIC}', arg_split[1][:-1])
+
+    return argument
+
+  def _format_argument(self, count: int, arg_type: str) -> str:
+    """Formats general argument description."""
+    argument = self._get_template(self.generic_arg_description_template_file)
+    argument = argument.replace('{ARG_COUNT}', str(count))
+    arugment = argument.replace('{ARG_TYPE}', arg_type)
+
+    return argument
+
+  def _format_arguments(self) -> str:
+    """Formats a list of arugment descriptions."""
+    argument_descriptions = []
+
+    for count in range(len(self.function_args)):
+      arg_type = self.function_args[count]['type']
+      if self._has_generic(arg_type):
+        argument = self._format_generic_argument(count, arg_type)
+      else:
+        argument = self._format_argument(count, arg_type)
+
+      argument_descriptions.append(argument)
+
+    return '\n'.join(argument_descriptions)
 
   def _format_target_method(self, signature: str) -> str:
     """Formats a method based on the prompt template."""
@@ -489,6 +530,10 @@ class DefaultJvmTemplateBuilder(PromptBuilder):
     self._prompt.add_priming(base)
     self._prompt.add_problem(final_problem)
 
+  def _has_generic(self, arg: str) -> bool:
+    """Determine if the argument type contains generic type."""
+    return '<' in arg and not arg.startswith('<') and arg.endswith('>')
+
   def build(self,
             function_signature: str,
             target_file_type: FileType,
@@ -502,7 +547,6 @@ class DefaultJvmTemplateBuilder(PromptBuilder):
     base = self._format_base()
     final_problem = self._format_problem(function_signature)
     self._prepare_prompt(base, final_problem)
-
     return self._prompt
 
   def build_fixer_prompt(self, benchmark: Benchmark, raw_code: str,
