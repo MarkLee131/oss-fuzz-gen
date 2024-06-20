@@ -38,17 +38,26 @@ T = TypeVar('T', str, list, dict)  # Generic type.
 TIMEOUT = 45
 MAX_RETRY = 5
 
+# By default exclude static functions when identifying fuzz target candidates
+# to generate benchmarks.
+ORACLE_AVOID_STATIC_FUNCTIONS = bool(
+    int(os.getenv('OSS_FUZZ_AVOID_STATIC_FUNCTIONS', '1')))
+
 DEFAULT_INTROSPECTOR_ENDPOINT = 'https://introspector.oss-fuzz.com/api'
 INTROSPECTOR_ENDPOINT = ''
 INTROSPECTOR_CFG = ''
 INTROSPECTOR_ORACLE_FAR_REACH = ''
 INTROSPECTOR_ORACLE_KEYWORD = ''
+INTROSPECTOR_ORACLE_EASY_PARAMS = ''
 INTROSPECTOR_FUNCTION_SOURCE = ''
 INTROSPECTOR_PROJECT_SOURCE = ''
 INTROSPECTOR_XREF = ''
 INTROSPECTOR_TYPE = ''
 INTROSPECTOR_FUNC_SIG = ''
 INTROSPECTOR_ADDR_TYPE = ''
+INTROSPECTOR_ALL_HEADER_FILES = ''
+INTROSPECTOR_ALL_FUNC_TYPES = ''
+INTROSPECTOR_SAMPLE_XREFS = ''
 
 
 def get_oracle_dict() -> Dict[str, Any]:
@@ -56,7 +65,8 @@ def get_oracle_dict() -> Dict[str, Any]:
   # Do this in a function to allow for forward-declaration of functions below.
   oracle_dict = {
       'far-reach-low-coverage': get_unreached_functions,
-      'low-cov-with-fuzz-keyword': query_introspector_for_keyword_targets
+      'low-cov-with-fuzz-keyword': query_introspector_for_keyword_targets,
+      'easy-params-far-reach': query_introspector_for_easy_param_targets,
   }
   return oracle_dict
 
@@ -66,7 +76,9 @@ def set_introspector_endpoints(endpoint):
   global INTROSPECTOR_ENDPOINT, INTROSPECTOR_CFG, INTROSPECTOR_FUNC_SIG, \
       INTROSPECTOR_FUNCTION_SOURCE, INTROSPECTOR_PROJECT_SOURCE, \
       INTROSPECTOR_XREF, INTROSPECTOR_TYPE, INTROSPECTOR_ORACLE_FAR_REACH, \
-      INTROSPECTOR_ORACLE_KEYWORD, INTROSPECTOR_ADDR_TYPE
+      INTROSPECTOR_ORACLE_KEYWORD, INTROSPECTOR_ADDR_TYPE, \
+      INTROSPECTOR_ALL_HEADER_FILES, INTROSPECTOR_ALL_FUNC_TYPES, \
+      INTROSPECTOR_SAMPLE_XREFS, INTROSPECTOR_ORACLE_EASY_PARAMS
 
   INTROSPECTOR_ENDPOINT = endpoint
   logging.info('Fuzz Introspector endpoint set to %s', INTROSPECTOR_ENDPOINT)
@@ -76,6 +88,8 @@ def set_introspector_endpoints(endpoint):
       f'{INTROSPECTOR_ENDPOINT}/far-reach-but-low-coverage')
   INTROSPECTOR_ORACLE_KEYWORD = (
       f'{INTROSPECTOR_ENDPOINT}/far-reach-low-cov-fuzz-keyword')
+  INTROSPECTOR_ORACLE_EASY_PARAMS = (
+      f'{INTROSPECTOR_ENDPOINT}/easy-params-far-reach')
   INTROSPECTOR_FUNCTION_SOURCE = f'{INTROSPECTOR_ENDPOINT}/function-source-code'
   INTROSPECTOR_PROJECT_SOURCE = f'{INTROSPECTOR_ENDPOINT}/project-source-code'
   INTROSPECTOR_XREF = f'{INTROSPECTOR_ENDPOINT}/all-cross-references'
@@ -83,6 +97,10 @@ def set_introspector_endpoints(endpoint):
   INTROSPECTOR_FUNC_SIG = f'{INTROSPECTOR_ENDPOINT}/function-signature'
   INTROSPECTOR_ADDR_TYPE = (
       f'{INTROSPECTOR_ENDPOINT}/addr-to-recursive-dwarf-info')
+  INTROSPECTOR_ALL_HEADER_FILES = f'{INTROSPECTOR_ENDPOINT}/all-header-files'
+  INTROSPECTOR_ALL_FUNC_TYPES = f'{INTROSPECTOR_ENDPOINT}/func-debug-types'
+  INTROSPECTOR_SAMPLE_XREFS = (
+      f'{INTROSPECTOR_ENDPOINT}/sample-cross-references')
 
 
 def _construct_url(api: str, params: dict) -> str:
@@ -158,13 +176,22 @@ def _get_data(resp: Optional[requests.Response], key: str,
 
 def query_introspector_oracle(project: str, oracle_api: str) -> list[dict]:
   """Queries a fuzz target oracle API from Fuzz Introspector."""
-  resp = _query_introspector(oracle_api, {'project': project})
+  resp = _query_introspector(oracle_api, {
+      'project': project,
+      'exclude-static-functions': ORACLE_AVOID_STATIC_FUNCTIONS
+  })
   return _get_data(resp, 'functions', [])
 
 
 def query_introspector_for_keyword_targets(project: str) -> list[dict]:
   """Queries FuzzIntrospector for targets with interesting fuzz keywords."""
   return query_introspector_oracle(project, INTROSPECTOR_ORACLE_KEYWORD)
+
+
+def query_introspector_for_easy_param_targets(project: str) -> list[dict]:
+  """Queries Fuzz Introspector for targets that have fuzzer-friendly params,
+  such as data buffers."""
+  return query_introspector_oracle(project, INTROSPECTOR_ORACLE_EASY_PARAMS)
 
 
 def query_introspector_for_targets(project, target_oracle) -> list[Dict]:
@@ -205,6 +232,35 @@ def query_introspector_source_code(project: str, filepath: str, begin_line: int,
       })
 
   return _get_data(resp, 'source_code', '')
+
+
+def query_introspector_header_files(project: str) -> List[str]:
+  """Queries for the header files used in a given project."""
+  resp = _query_introspector(INTROSPECTOR_ALL_HEADER_FILES,
+                             {'project': project})
+  all_header_files = _get_data(resp, 'all-header-files', [])
+  return all_header_files
+
+
+def query_introspector_sample_xrefs(project: str, func_sig: str) -> List[str]:
+  """Queries for sample references in the form of source code."""
+  resp = _query_introspector(INTROSPECTOR_SAMPLE_XREFS, {
+      'project': project,
+      'function_signature': func_sig
+  })
+  return _get_data(resp, 'source-code-refs', [])
+
+
+def query_introspector_function_debug_arg_types(project: str,
+                                                func_sig: str) -> List[str]:
+  """Queries FuzzIntrospector function arguments extracted by way of debug
+  info."""
+  resp = _query_introspector(INTROSPECTOR_ALL_FUNC_TYPES, {
+      'project': project,
+      'function_signature': func_sig
+  })
+  arg_types = _get_data(resp, 'arg-types', [])
+  return arg_types
 
 
 def query_introspector_cross_references(project: str,
