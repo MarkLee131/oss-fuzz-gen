@@ -134,13 +134,13 @@ class BuilderRunner:
     # overloaded methods. Thus it need to use the regex to identify
     # if there are method calls with unknown variable names that match
     # the target method.
-    base_arg_regex = r'[a-zA-Z_$][a-zA-Z_$0-9(),.]*'
+    base_arg_regex = r'[\s]*[a-zA-Z_$][a-zA-Z_$0-9(),.]*'
     signature = self.benchmark.function_signature
     name = signature.split('].')[1].split('(')[0]
     arg_count = len(signature.split('(')[1].split(')')[0].split(','))
 
-    pattern = r'(%s\(%s\))' % (name, ', '.join([base_arg_regex] * arg_count))
-    match = re.search(pattern, code)
+    pattern = r'(%s\(%s\))' % (name, ','.join([base_arg_regex] * arg_count))
+    match = re.search(pattern, ''.join(code.splitlines()))
 
     return bool(match)
 
@@ -152,7 +152,8 @@ class BuilderRunner:
     min_func_name = self._get_minimum_func_name(
         self.benchmark.function_signature)
 
-    return min_func_name in generated_code
+    pattern = rf'\b{min_func_name}\b'
+    return re.search(pattern, generated_code) is not None
 
   def _pre_build_check(self, target_path: str,
                        build_result: BuildResult) -> bool:
@@ -321,7 +322,7 @@ class BuilderRunner:
                                    symptom, crash_stacks)
             break
 
-    elif initcov == donecov and lastround is not None:
+    elif check_cov_increase and initcov == donecov and lastround is not None:
       # Another error fuzz target case: no cov increase.
       # A special case is initcov == donecov == None, which indicates no
       # interesting inputs were found. This may happen if the target rejected
@@ -333,7 +334,8 @@ class BuilderRunner:
         SemanticCheckResult.NO_SEMANTIC_ERR)
 
   def build_and_run(self, generated_project: str, target_path: str,
-                    iteration: int) -> tuple[BuildResult, Optional[RunResult]]:
+                    iteration: int,
+                    language: str) -> tuple[BuildResult, Optional[RunResult]]:
     """Builds and runs the fuzz target for fuzzing."""
     build_result = BuildResult()
 
@@ -342,7 +344,7 @@ class BuilderRunner:
 
     try:
       return self.build_and_run_local(generated_project, target_path, iteration,
-                                      build_result)
+                                      build_result, language)
     except Exception as err:
       logging.warning(
           'Error occurred when building and running fuzz target locally'
@@ -351,7 +353,8 @@ class BuilderRunner:
 
   def build_and_run_local(
       self, generated_project: str, target_path: str, iteration: int,
-      build_result: BuildResult) -> tuple[BuildResult, Optional[RunResult]]:
+      build_result: BuildResult,
+      language: str) -> tuple[BuildResult, Optional[RunResult]]:
     """Builds and runs the fuzz target locally for fuzzing."""
 
     benchmark_target_name = os.path.basename(target_path)
@@ -360,14 +363,16 @@ class BuilderRunner:
         benchmark_target_name, iteration)
     build_result.succeeded = self.build_target_local(generated_project,
                                                      benchmark_log_path)
-    # Copy err.log into work dir.
-    try:
-      shutil.copyfile(
-          os.path.join(get_build_artifact_dir(generated_project, "workspace"),
-                       'err.log'),
-          self.work_dirs.error_logs_target(benchmark_target_name, iteration))
-    except FileNotFoundError as e:
-      logging.error('Cannot get err.log for %s: %s', generated_project, e)
+    # Copy err.log into work dir (Ignored for JVM projects)
+    if language != 'jvm':
+      try:
+        shutil.copyfile(
+            os.path.join(get_build_artifact_dir(generated_project, "workspace"),
+                         'err.log'),
+            self.work_dirs.error_logs_target(benchmark_target_name, iteration))
+      except FileNotFoundError as e:
+        logging.error('Cannot get err.log for %s: %s', generated_project, e)
+
     if not build_result.succeeded:
       errors = code_fixer.extract_error_message(benchmark_log_path,
                                                 project_target_name)
@@ -521,10 +526,11 @@ class BuilderRunner:
                stderr=sp.STDOUT,
                check=True)
       except sp.CalledProcessError:
-        print(f'Failed to run {generated_project} with {sanitizer}')
+        print(
+            f'Failed to build fuzzer for {generated_project} with {sanitizer}')
         return False
 
-    print(f'Successfully run {generated_project} with {sanitizer}')
+    print(f'Successfully build fuzzer for {generated_project} with {sanitizer}')
     return True
 
   def get_coverage_local(
@@ -652,7 +658,8 @@ class CloudBuilderRunner(BuilderRunner):
     return False
 
   def build_and_run(self, generated_project: str, target_path: str,
-                    iteration: int) -> tuple[BuildResult, Optional[RunResult]]:
+                    iteration: int,
+                    language: str) -> tuple[BuildResult, Optional[RunResult]]:
     """Builds and runs the fuzz target for fuzzing."""
     build_result = BuildResult()
 
@@ -661,7 +668,7 @@ class CloudBuilderRunner(BuilderRunner):
 
     try:
       return self.build_and_run_cloud(generated_project, target_path, iteration,
-                                      build_result)
+                                      build_result, language)
     except Exception as err:
       logging.warning(
           'Error occurred when building and running fuzz target on cloud'
@@ -671,7 +678,8 @@ class CloudBuilderRunner(BuilderRunner):
 
   def build_and_run_cloud(
       self, generated_project: str, target_path: str, iteration: int,
-      build_result: BuildResult) -> tuple[BuildResult, Optional[RunResult]]:
+      build_result: BuildResult,
+      language: str) -> tuple[BuildResult, Optional[RunResult]]:
     """Builds and runs the fuzz target locally for fuzzing."""
     logging.info('Evaluating %s on cloud.', os.path.realpath(target_path))
 
@@ -732,17 +740,19 @@ class CloudBuilderRunner(BuilderRunner):
         logging.warning('Cannot find cloud build log of %s: %s',
                         os.path.realpath(target_path), build_log_name)
 
-    with open(
-        self.work_dirs.error_logs_target(generated_target_name, iteration),
-        'wb') as f:
-      blob = bucket.blob(err_log_name)
-      if blob.exists():
-        logging.info('Downloading jcc error log of %s: %s to %s',
-                     os.path.realpath(target_path), err_log_name, f)
-        blob.download_to_file(f)
-      else:
-        logging.warning('Cannot find jcc error log of %s: %s',
-                        os.path.realpath(target_path), err_log_name)
+    # Ignored for JVM project since JVM project does not generate err.log
+    if language != 'jvm':
+      with open(
+          self.work_dirs.error_logs_target(generated_target_name, iteration),
+          'wb') as f:
+        blob = bucket.blob(err_log_name)
+        if blob.exists():
+          logging.info('Downloading jcc error log of %s: %s to %s',
+                       os.path.realpath(target_path), err_log_name, f)
+          blob.download_to_file(f)
+        else:
+          logging.warning('Cannot find jcc error log of %s: %s',
+                          os.path.realpath(target_path), err_log_name)
 
     with open(self.work_dirs.run_logs_target(generated_target_name, iteration),
               'wb') as f:
