@@ -1,0 +1,43 @@
+{
+    "samples": [
+
+    {
+        "benchmark": "output-libvpx-parse_block",
+        "sample": "01",
+        "status": "Done",
+        "compiles": "True",
+        "crashes": "False",
+        "crash_reason": "NO_COV_INCREASE",
+        "bug": "False",
+        "coverage": "0.00",
+        "coverage_diff": "0.0",
+        "coverage_report": "#",
+        "stacktrace": "/stacktrace",
+        "target_binary": "/target_binary",
+        "reproducer": "/artifacts",
+        "run_log": "run.log",
+        "source_code": "#include <fuzzer/FuzzedDataProvider.h>\\n#include <cstdint>\\n#include <vector>\\n#include <stdexcept>\\n\\nenum BLOCK_SIZE {\\n    BLOCK_4X4,\\n    BLOCK_4X8,\\n    BLOCK_8X4,\\n    BLOCK_8X8,\\n    BLOCK_8X16,\\n    BLOCK_16X8,\\n    BLOCK_16X16,\\n    BLOCK_16X32,\\n    BLOCK_32X16,\\n    BLOCK_32X32,\\n    BLOCK_32X64,\\n    BLOCK_64X32,\\n    BLOCK_64X64,\\n    BLOCK_64X128,\\n    BLOCK_128X64,\\n    BLOCK_128X128,\\n    BLOCK_INVALID,\\n    BLOCK_SIZE_COUNT // Add this to use as the upper bound for ConsumeEnum\\n};\\n\\nstruct TileWorkerData {\\n    // Placeholder structure\\n    // Add necessary fields here\\n};\\n\\nstruct VP9_COMMON {\\n    int mi_cols;\\n    int mi_rows;\\n    int subsampling_x;\\n    int subsampling_y;\\n    // Add other fields as necessary\\n};\\n\\nstruct VP9Decoder {\\n    VP9_COMMON common;\\n    // Add other fields as necessary\\n};\\n\\nextern \"C\" void parse_block(TileWorkerData *tileWorkerData, const VP9Decoder *vp9Decoder, int mi_row, int mi_col, BLOCK_SIZE bsize, int bwl, int bhl) {\\n    // Placeholder implementation of parse_block\\n    // Add the actual implementation here or link to the library that provides it\\n}\\n\\nextern \"C\" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {\\n    FuzzedDataProvider stream(data, size);\\n    \\n    // Create and initialize TileWorkerData\\n    TileWorkerData tileWorkerData;\\n    // Initialize fields of tileWorkerData as necessary\\n\\n    // Create and initialize VP9Decoder\\n    VP9Decoder vp9Decoder;\\n    vp9Decoder.common.mi_cols = stream.ConsumeIntegralInRange<int>(1, 10000); // Ensure valid range\\n    vp9Decoder.common.mi_rows = stream.ConsumeIntegralInRange<int>(1, 10000); // Ensure valid range\\n    vp9Decoder.common.subsampling_x = stream.ConsumeIntegralInRange<int>(0, 1); // Typically 0 or 1\\n    vp9Decoder.common.subsampling_y = stream.ConsumeIntegralInRange<int>(0, 1); // Typically 0 or 1\\n    // Initialize other fields of vp9Decoder as necessary\\n\\n    // Consume integers for mi_row, mi_col, bwl, bhl\\n    int mi_row = stream.ConsumeIntegralInRange<int>(0, vp9Decoder.common.mi_rows - 1); // Ensure within bounds\\n    int mi_col = stream.ConsumeIntegralInRange<int>(0, vp9Decoder.common.mi_cols - 1); // Ensure within bounds\\n    int bwl = stream.ConsumeIntegralInRange<int>(0, 10); // Example range, adjust as necessary\\n    int bhl = stream.ConsumeIntegralInRange<int>(0, 10); // Example range, adjust as necessary\\n\\n    // Consume enum value for BLOCK_SIZE\\n    BLOCK_SIZE bsize = static_cast<BLOCK_SIZE>(stream.ConsumeIntegralInRange<int>(BLOCK_4X4, BLOCK_SIZE_COUNT - 1));\\n\\n    // Ensure the function is called with valid parameters\\n    if (bsize < BLOCK_SIZE_COUNT && mi_row < vp9Decoder.common.mi_rows && mi_col < vp9Decoder.common.mi_cols) {\\n        // Call the function to fuzz\\n        parse_block(&tileWorkerData, &vp9Decoder, mi_row, mi_col, bsize, bwl, bhl);\\n    }\\n\\n    return 0;\\n}",
+        "model": ""
+    },
+
+    {
+        "benchmark": "output-libvpx-parse_block",
+        "sample": "02",
+        "status": "Done",
+        "compiles": "False",
+        "crashes": "False",
+        "crash_reason": "-",
+        "bug": "True",
+        "coverage": "0.00",
+        "coverage_diff": "0.0",
+        "coverage_report": "#",
+        "stacktrace": "/stacktrace",
+        "target_binary": "/target_binary",
+        "reproducer": "/artifacts",
+        "run_log": "run.log",
+        "source_code": "#include <fuzzer/FuzzedDataProvider.h>\\n#include <vpx/vpx_decoder.h>\\n#include <vpx/vpx_integer.h>\\n#include <vpx/vp8dx.h>\\n\\nextern \"C\" {\\n    #include <vpx/vp9.h>\\n    #include <vpx/vp9_blockd.h>\\n    void parse_block(TileWorkerData *, const VP9Decoder *, int, int, BLOCK_SIZE, int, int);\\n}\\n\\nextern \"C\" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {\\n    FuzzedDataProvider stream(data, size);\\n\\n    // Create and initialize TileWorkerData object\\n    TileWorkerData tile_worker_data = {};\\n    // Initialize the TileWorkerData members as needed\\n    // For example:\\n    // tile_worker_data.some_member = stream.ConsumeIntegral<type>();\\n\\n    // Create and initialize VP9Decoder object\\n    VP9Decoder vp9_decoder = {};\\n    // Initialize the VP9Decoder members as needed\\n    // For example:\\n    // vp9_decoder.some_member = stream.ConsumeIntegral<type>();\\n\\n    // Generate integer values for mi_row, mi_col, bwl, bhl\\n    int mi_row = stream.ConsumeIntegral<int>();\\n    int mi_col = stream.ConsumeIntegral<int>();\\n    int bwl = stream.ConsumeIntegral<int>();\\n    int bhl = stream.ConsumeIntegral<int>();\\n\\n    // Generate a BLOCK_SIZE value\\n    BLOCK_SIZE block_size = stream.ConsumeEnum<BLOCK_SIZE>();\\n\\n    // Call the function to fuzz\\n    parse_block(&tile_worker_data, &vp9_decoder, mi_row, mi_col, block_size, bwl, bhl);\\n\\n    return 0;\\n}",
+        "model": ""
+    }
+
+    ]
+}

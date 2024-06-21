@@ -1,0 +1,719 @@
+<!doctype html>
+
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Experiment results</title>
+<style>
+* {
+    box-sizing: border-box;
+}
+
+html {
+    line-height: 1.15;
+}
+
+body {
+    font-family: sans-serif;
+    font-size: 16px;
+}
+
+table {
+    border-collapse: collapse;
+    border-spacing: 0;
+}
+
+td, th {
+    border-right: 1px #dedede solid;
+    border-bottom: 1px #dedede solid;
+    padding: 5px;
+    text-align: left;
+}
+td:first-child, th:first-child {
+    border-left: 1px #dedede solid;
+}
+th {
+    border-top: 1px #dedede solid;
+}
+
+tbody tr:nth-child(odd) {
+    background-color: #f4f5ff;
+}
+</style>
+<body>
+    LLM: 
+    
+<h1>output-guetzli-_zn7guetzli7processerkns_6paramsepns_12processstatserknst3__16vectorihns5_9allocatoriheeeeiipns5_12basic_ / 02</h1>
+Bug: False
+<br>
+Crash reason: NO_SEMANTIC_ERR
+<br>
+<br>
+
+
+
+
+<h3>Final code</h3>
+
+<pre>
+#include &lt;fuzzer/FuzzedDataProvider.h&gt;
+#include &lt;vector&gt;
+#include &lt;string&gt;
+#include &#34;guetzli/processor.h&#34;
+#include &#34;guetzli/stats.h&#34;
+
+extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
+    FuzzedDataProvider stream(data, size);
+
+    // Create Params object
+    guetzli::Params params;
+    // Initialize ProcessStats pointer
+    guetzli::ProcessStats stats;
+
+    // Generate vector of unsigned char
+    size_t vector_size = stream.ConsumeIntegralInRange&lt;size_t&gt;(0, size);
+    std::vector&lt;unsigned char&gt; input_vector = stream.ConsumeBytes&lt;unsigned char&gt;(vector_size);
+
+    // Generate two integers
+    int width = stream.ConsumeIntegral&lt;int&gt;();
+    int height = stream.ConsumeIntegral&lt;int&gt;();
+
+    // Generate string pointer
+    std::string output_string = stream.ConsumeRandomLengthString();
+    std::string* output_string_ptr = &amp;output_string;
+
+    // Call the function to fuzz
+    guetzli::Process(params, &amp;stats, input_vector, width, height, output_string_ptr);
+
+    return 0;
+}
+</pre>
+
+
+<h3>Fixer prompt #1</h3>
+<pre>
+
+Given the following C++ fuzz harness and its build error message, fix the code to make it build for fuzzing.
+
+If there is undeclared identifier or unknown type name error, fix it by finding and including the related libraries.
+
+Note that some code may need to be wrapped with &lt;code&gt;extern &#34;C&#34;&lt;/code&gt; as their source is C program.
+
+MUST RETURN THE FULL CODE, INCLUDING UNCHANGED PARTS.
+EXTREMELY IMPORTANT: AVOID USING &lt;code&gt;goto&lt;/code&gt;. If you have to write code using &lt;code&gt;goto&lt;/code&gt;, you MUST MUST also declare all variables BEFORE the &lt;code&gt;goto&lt;/code&gt;. Never introduce new variables after the &lt;code&gt;goto&lt;/code&gt;.
+
+Below is the code needs to be built:
+&lt;code&gt;
+&lt;solution&gt;
+#include &lt;fuzzer/FuzzedDataProvider.h&gt;
+#include &lt;vector&gt;
+#include &lt;string&gt;
+#include &#34;guetzli/processor.h&#34;
+
+bool guetzli::Process(const Params &amp;, ProcessStats *, const std::vector&lt;unsigned char&gt; &amp;, int, int, std::string *);
+
+extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
+    FuzzedDataProvider stream(data, size);
+
+    // Create Params object
+    Params params;
+    // Initialize ProcessStats pointer
+    ProcessStats stats;
+
+    // Generate vector of unsigned char
+    size_t vector_size = stream.ConsumeIntegralInRange&lt;size_t&gt;(0, size);
+    std::vector&lt;unsigned char&gt; input_vector = stream.ConsumeBytes&lt;unsigned char&gt;(vector_size);
+
+    // Generate two integers
+    int width = stream.ConsumeIntegral&lt;int&gt;();
+    int height = stream.ConsumeIntegral&lt;int&gt;();
+
+    // Generate string pointer
+    std::string output_string = stream.ConsumeRandomLengthString();
+    std::string* output_string_ptr = &amp;output_string;
+
+    // Call the function to fuzz
+    guetzli::Process(params, &amp;stats, input_vector, width, height, output_string_ptr);
+
+    return 0;
+}
+&lt;/code&gt;
+
+The code has the following build issues:
+&lt;error&gt;
+fuzz_target.cc:1:1: error: expected unqualified-id
+    1 | &lt;solution&gt;
+      | ^
+fuzz_target.cc:13:5: error: unknown type name &#39;Params&#39;; did you mean &#39;guetzli::Params&#39;?
+   13 |     Params params;
+      |     ^~~~~~
+      |     guetzli::Params
+./guetzli/processor.h:29:8: note: &#39;guetzli::Params&#39; declared here
+   29 | struct Params {
+      |        ^
+fuzz_target.cc:15:5: error: unknown type name &#39;ProcessStats&#39;; did you mean &#39;guetzli::ProcessStats&#39;?
+   15 |     ProcessStats stats;
+      |     ^~~~~~~~~~~~
+      |     guetzli::ProcessStats
+./guetzli/stats.h:33:8: note: &#39;guetzli::ProcessStats&#39; declared here
+   33 | struct ProcessStats {
+      |        ^
+&lt;/error&gt;
+
+Fix code:
+1. Consider possible solutions for the issues listed above.
+2. Choose a solution that can maximize fuzzing result, which is utilizing the function under test and feeding it not null input.
+3. Apply the solutions to the original code.
+It&#39;s important to show the complete code, not only the fixed line.
+&lt;solution&gt;
+</pre>
+
+
+
+<h3>Code #1</h3>
+
+<pre>
+Here is the fixed code with the necessary changes to ensure it builds correctly for fuzzing:
+
+```cpp
+#include &lt;fuzzer/FuzzedDataProvider.h&gt;
+#include &lt;vector&gt;
+#include &lt;string&gt;
+#include &#34;guetzli/processor.h&#34;
+#include &#34;guetzli/stats.h&#34;
+
+extern &#34;C&#34; bool guetzli::Process(const guetzli::Params &amp;, guetzli::ProcessStats *, const std::vector&lt;unsigned char&gt; &amp;, int, int, std::string *);
+
+extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
+    FuzzedDataProvider stream(data, size);
+
+    // Create Params object
+    guetzli::Params params;
+    // Initialize ProcessStats pointer
+    guetzli::ProcessStats stats;
+
+    // Generate vector of unsigned char
+    size_t vector_size = stream.ConsumeIntegralInRange&lt;size_t&gt;(0, size);
+    std::vector&lt;unsigned char&gt; input_vector = stream.ConsumeBytes&lt;unsigned char&gt;(vector_size);
+
+    // Generate two integers
+    int width = stream.ConsumeIntegral&lt;int&gt;();
+    int height = stream.ConsumeIntegral&lt;int&gt;();
+
+    // Generate string pointer
+    std::string output_string = stream.ConsumeRandomLengthString();
+    std::string* output_string_ptr = &amp;output_string;
+
+    // Call the function to fuzz
+    guetzli::Process(params, &amp;stats, input_vector, width, height, output_string_ptr);
+
+    return 0;
+}
+```
+
+Changes made:
+1. Included the `guetzli/stats.h` header file to resolve the `ProcessStats` type.
+2. Prefixed `Params` and `ProcessStats` with `guetzli::` to correctly reference the types within the `guetzli` namespace.
+3. Wrapped the `guetzli::Process` function declaration with `extern &#34;C&#34;` to ensure proper linkage.
+
+This should resolve the build issues and allow the code to be used for fuzzing.
+</pre>
+
+
+<h3>Fixer prompt #2</h3>
+<pre>
+
+Given the following C++ fuzz harness and its build error message, fix the code to make it build for fuzzing.
+
+If there is undeclared identifier or unknown type name error, fix it by finding and including the related libraries.
+
+Note that some code may need to be wrapped with &lt;code&gt;extern &#34;C&#34;&lt;/code&gt; as their source is C program.
+
+MUST RETURN THE FULL CODE, INCLUDING UNCHANGED PARTS.
+EXTREMELY IMPORTANT: AVOID USING &lt;code&gt;goto&lt;/code&gt;. If you have to write code using &lt;code&gt;goto&lt;/code&gt;, you MUST MUST also declare all variables BEFORE the &lt;code&gt;goto&lt;/code&gt;. Never introduce new variables after the &lt;code&gt;goto&lt;/code&gt;.
+
+Below is the code needs to be built:
+&lt;code&gt;
+#include &lt;fuzzer/FuzzedDataProvider.h&gt;
+#include &lt;vector&gt;
+#include &lt;string&gt;
+#include &#34;guetzli/processor.h&#34;
+#include &#34;guetzli/stats.h&#34;
+
+extern &#34;C&#34; bool guetzli::Process(const guetzli::Params &amp;, guetzli::ProcessStats *, const std::vector&lt;unsigned char&gt; &amp;, int, int, std::string *);
+
+extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
+    FuzzedDataProvider stream(data, size);
+
+    // Create Params object
+    guetzli::Params params;
+    // Initialize ProcessStats pointer
+    guetzli::ProcessStats stats;
+
+    // Generate vector of unsigned char
+    size_t vector_size = stream.ConsumeIntegralInRange&lt;size_t&gt;(0, size);
+    std::vector&lt;unsigned char&gt; input_vector = stream.ConsumeBytes&lt;unsigned char&gt;(vector_size);
+
+    // Generate two integers
+    int width = stream.ConsumeIntegral&lt;int&gt;();
+    int height = stream.ConsumeIntegral&lt;int&gt;();
+
+    // Generate string pointer
+    std::string output_string = stream.ConsumeRandomLengthString();
+    std::string* output_string_ptr = &amp;output_string;
+
+    // Call the function to fuzz
+    guetzli::Process(params, &amp;stats, input_vector, width, height, output_string_ptr);
+
+    return 0;
+}
+&lt;/code&gt;
+
+The code has the following build issues:
+&lt;error&gt;
+fuzz_target.cc:7:26: error: declaration of &#39;Process&#39; has a different language linkage
+    7 | extern &#34;C&#34; bool guetzli::Process(const guetzli::Params &amp;, guetzli::ProcessStats *, const std::vector&lt;unsigned char&gt; &amp;, int, int, std::string *);
+      |                          ^
+./guetzli/processor.h:54:6: note: previous declaration is here
+   54 | bool Process(const Params&amp; params, ProcessStats* stats,
+      |      ^
+&lt;/error&gt;
+
+Fix code:
+1. Consider possible solutions for the issues listed above.
+2. Choose a solution that can maximize fuzzing result, which is utilizing the function under test and feeding it not null input.
+3. Apply the solutions to the original code.
+It&#39;s important to show the complete code, not only the fixed line.
+&lt;solution&gt;
+</pre>
+
+
+
+<h3>Code #2</h3>
+
+<pre>
+To fix the build issues in the provided code, we need to ensure that the `Process` function has the correct linkage. The error indicates that the `Process` function in the `guetzli` namespace is declared with C++ linkage, but we attempted to declare it with C linkage using `extern &#34;C&#34;`. 
+
+To resolve this, we should remove the `extern &#34;C&#34;` declaration for the `Process` function, and ensure that we include the necessary headers for the types used in the function.
+
+Here is the corrected code:
+
+```cpp
+#include &lt;fuzzer/FuzzedDataProvider.h&gt;
+#include &lt;vector&gt;
+#include &lt;string&gt;
+#include &#34;guetzli/processor.h&#34;
+#include &#34;guetzli/stats.h&#34;
+
+extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
+    FuzzedDataProvider stream(data, size);
+
+    // Create Params object
+    guetzli::Params params;
+    // Initialize ProcessStats pointer
+    guetzli::ProcessStats stats;
+
+    // Generate vector of unsigned char
+    size_t vector_size = stream.ConsumeIntegralInRange&lt;size_t&gt;(0, size);
+    std::vector&lt;unsigned char&gt; input_vector = stream.ConsumeBytes&lt;unsigned char&gt;(vector_size);
+
+    // Generate two integers
+    int width = stream.ConsumeIntegral&lt;int&gt;();
+    int height = stream.ConsumeIntegral&lt;int&gt;();
+
+    // Generate string pointer
+    std::string output_string = stream.ConsumeRandomLengthString();
+    std::string* output_string_ptr = &amp;output_string;
+
+    // Call the function to fuzz
+    guetzli::Process(params, &amp;stats, input_vector, width, height, output_string_ptr);
+
+    return 0;
+}
+```
+
+In this corrected code:
+1. The `extern &#34;C&#34;` declaration for the `Process` function has been removed to match the C++ linkage of the original declaration in `processor.h`.
+2. The rest of the code remains unchanged, ensuring that the function can be fuzzed with valid inputs.
+</pre>
+
+
+<h2>Logs</h2>
+<pre>
+Fixing /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-guetzli-_zn7guetzli7processerkns_6paramsepns_12processstatserknst3__16vectorihns5_9allocatoriheeeeiipns5_12basic_/fixed_targets/02.cc with gpt-4o, attempt 1.
+Fixing /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-guetzli-_zn7guetzli7processerkns_6paramsepns_12processstatserknst3__16vectorihns5_9allocatoriheeeeiipns5_12basic_/fixed_targets/02.cc with gpt-4o, attempt 2.
+Successfully built /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-guetzli-_zn7guetzli7processerkns_6paramsepns_12processstatserknst3__16vectorihns5_9allocatoriheeeeiipns5_12basic_/fixed_targets/02.cc with gpt-4o in 2 iterations of fixing.
+Result for guetzli-zn7guetzli7processerkns_6paramsepns_12processstatserknst3-16vectorihns5_9allocatoriheeeeiipns5_12basic-02: crashes=False, coverage=0.03969874904263467 (311/7834), coverage diff=0.012393767705382436 (70/5648)
+
+</pre>
+
+<h2>Run logs</h2>
+<pre>
+INFO:__main__:Running: docker run --rm --privileged --shm-size=2g --platform linux/amd64 -e FUZZING_ENGINE=libfuzzer -e SANITIZER=address -e RUN_FUZZER_MODE=interactive -e HELPER=True -v /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-guetzli-_zn7guetzli7processerkns_6paramsepns_12processstatserknst3__16vectorihns5_9allocatoriheeeeiipns5_12basic_/corpora/02.cc:/tmp/guetzli_fuzzer_corpus -v /tmp/tmptrp7ybx_/build/out/guetzli-zn7guetzli7processerkns_6paramsepns_12processstatserknst3-16vectorihns5_9allocatoriheeeeiipns5_12basic-02:/out -t gcr.io/oss-fuzz-base/base-runner run_fuzzer guetzli_fuzzer -print_final_stats=1 -max_total_time=30 -len_control=0 -timeout=30.
+vm.mmap_rnd_bits = 28
+rm: cannot remove &#39;/tmp/guetzli_fuzzer_corpus&#39;: Device or resource busy
+Using seed corpus: guetzli_fuzzer_seed_corpus.zip
+/out/guetzli_fuzzer -rss_limit_mb=2560 -timeout=25 -print_final_stats=1 -max_total_time=30 -len_control=0 -timeout=30 /tmp/guetzli_fuzzer_corpus &lt; /dev/null
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 931663104
+INFO: Loaded 1 modules   (7834 inline 8-bit counters): 7834 [0x55e605d914b8, 0x55e605d93352), 
+INFO: Loaded 1 PC tables (7834 PCs): 7834 [0x55e605d93358,0x55e605db1cf8), 
+INFO:     3487 files found in /tmp/guetzli_fuzzer_corpus
+INFO: -max_len is not provided; libFuzzer will not generate inputs larger than 17415 bytes
+Could not create jpg data from rgb pixels
+INFO: seed corpus: files: 3487 min: 1b max: 17415b total: 5777069b rss: 34Mb
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data 
+...truncated...
+ not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+Could not create jpg data from rgb pixels
+#3031310	DONE   cov: 311 ft: 372 corp: 35/940b lim: 17415 exec/s: 97784 rss: 73Mb
+###### Recommended dictionary. ######
+&#34;b\373SS&#34; # Uses: 28341
+&#34;\377\377\377\377\377\377\377%&#34; # Uses: 26463
+&#34;\001\000\000\000\000\000\000\000&#34; # Uses: 25980
+&#34;\302\377\333\001&#34; # Uses: 27652
+&#34;\377\377\377\377&#34; # Uses: 27733
+&#34;\000\000\000\000\000\000\000\012&#34; # Uses: 26033
+&#34;\000\000\000\000\000\000\000\026&#34; # Uses: 25778
+&#34;V\000\000\000\000\000\000\000&#34; # Uses: 26255
+&#34;\377\377\000\000&#34; # Uses: 27046
+&#34;\000\000\000\000\000\000\000\000&#34; # Uses: 23201
+&#34;\001\000\000\000&#34; # Uses: 1673
+###### End of recommended dictionary. ######
+Done 3031310 runs in 31 second(s)
+stat::number_of_executed_units: 3031310
+stat::average_exec_per_sec:     97784
+stat::new_units_added:          194
+stat::slowest_unit_time_sec:    0
+stat::peak_rss_mb:              73
+
+</pre>
+
+</body>

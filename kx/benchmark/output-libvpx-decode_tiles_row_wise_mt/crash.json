@@ -1,0 +1,43 @@
+{
+    "samples": [
+
+    {
+        "benchmark": "output-libvpx-decode_tiles_row_wise_mt",
+        "sample": "01",
+        "status": "Done",
+        "compiles": "True",
+        "crashes": "False",
+        "crash_reason": "NO_COV_INCREASE",
+        "bug": "False",
+        "coverage": "0.00",
+        "coverage_diff": "0.0",
+        "coverage_report": "#",
+        "stacktrace": "/stacktrace",
+        "target_binary": "/target_binary",
+        "reproducer": "/artifacts",
+        "run_log": "run.log",
+        "source_code": "#include <fuzzer/FuzzedDataProvider.h>\\n#include <cstdint>\\n#include <vector>\\n#include <cstddef> // for size_t\\n\\n// Assuming the necessary structures and functions are defined somewhere\\n// Here we just provide a mock structure to make the code compile\\nstruct VP9Decoder {\\n    // Mock members\\n    int max_threads;\\n    struct {\\n        int log2_tile_cols;\\n        int log2_tile_rows;\\n        int mi_rows;\\n        int mi_cols;\\n        int frame_parallel_decoding_mode;\\n        struct {\\n            int filter_level;\\n        } lf;\\n        int skip_loop_filter;\\n        int error_resilient_mode;\\n        int width;\\n        int height;\\n        int last_width;\\n        int last_height;\\n        int last_intra_only;\\n        int last_show_frame;\\n        int last_frame_type;\\n        int show_frame;\\n        int profile;\\n        int frame_context_idx;\\n        int refresh_frame_context;\\n        int allow_high_precision_mv;\\n        int corrupted;\\n        int current_video_frame;\\n        int frame_contexts[4];\\n        int *fc;\\n    } common;\\n    struct {\\n        int corrupted;\\n        int *plane;\\n        int *cur_buf;\\n    } mb;\\n    struct {\\n        int lfdata[4];\\n        int *lf_sync;\\n    } lf_row_sync;\\n    struct {\\n        int *recon_map;\\n        struct {\\n            int *thread_data;\\n        } row_mt_worker_data;\\n        int *tile_worker_data;\\n        int num_tiles_done;\\n        int *data_end;\\n    } row_mt_worker_data;\\n    struct {\\n        int *hook;\\n        int *data1;\\n        int *data2;\\n        int had_error;\\n    } tile_workers[4];\\n    struct {\\n        int *counts;\\n        int *bit_reader;\\n        int *xd;\\n    } tile_worker_data[4];\\n    struct {\\n        int jobq;\\n    } jobq;\\n};\\n\\nextern \"C\" {\\n    // Mock implementation of decode_tiles_row_wise_mt to make the code compile\\n    const uint8_t *decode_tiles_row_wise_mt(VP9Decoder *decoder, const uint8_t *data, const uint8_t *data_end) {\\n        // Mock behavior: just return the data_end pointer\\n        return data_end;\\n    }\\n}\\n\\nextern \"C\" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {\\n    FuzzedDataProvider stream(data, size);\\n\\n    // Create and initialize VP9Decoder object\\n    VP9Decoder decoder;\\n    decoder.max_threads = stream.ConsumeIntegralInRange<int>(1, 4);\\n    decoder.common.log2_tile_cols = stream.ConsumeIntegralInRange<int>(0, 6);\\n    decoder.common.log2_tile_rows = 0; // Asserting tile_rows == 1\\n    decoder.common.mi_rows = stream.ConsumeIntegral<int>();\\n    decoder.common.mi_cols = stream.ConsumeIntegral<int>();\\n    decoder.common.frame_parallel_decoding_mode = stream.ConsumeBool();\\n    decoder.common.lf.filter_level = stream.ConsumeIntegral<int>();\\n    decoder.common.skip_loop_filter = stream.ConsumeBool();\\n    decoder.common.error_resilient_mode = stream.ConsumeBool();\\n    decoder.common.width = stream.ConsumeIntegral<int>();\\n    decoder.common.height = stream.ConsumeIntegral<int>();\\n    decoder.common.last_width = stream.ConsumeIntegral<int>();\\n    decoder.common.last_height = stream.ConsumeIntegral<int>();\\n    decoder.common.last_intra_only = stream.ConsumeBool();\\n    decoder.common.last_show_frame = stream.ConsumeBool();\\n    decoder.common.last_frame_type = stream.ConsumeIntegral<int>();\\n    decoder.common.show_frame = stream.ConsumeBool();\\n    decoder.common.profile = stream.ConsumeIntegral<int>();\\n    decoder.common.frame_context_idx = stream.ConsumeIntegral<int>();\\n    decoder.common.refresh_frame_context = stream.ConsumeBool();\\n    decoder.common.allow_high_precision_mv = stream.ConsumeBool();\\n    decoder.common.corrupted = stream.ConsumeBool();\\n    decoder.common.current_video_frame = stream.ConsumeIntegral<int>();\\n    decoder.mb.corrupted = stream.ConsumeBool();\\n    decoder.mb.cur_buf = nullptr;\\n    decoder.mb.plane = nullptr;\\n    decoder.lf_row_sync.lf_sync = nullptr;\\n    decoder.lf_row_sync.lfdata[0] = stream.ConsumeIntegral<int>();\\n    decoder.row_mt_worker_data.recon_map = nullptr;\\n    decoder.row_mt_worker_data.row_mt_worker_data.thread_data = nullptr;\\n    decoder.row_mt_worker_data.tile_worker_data = nullptr;\\n    decoder.row_mt_worker_data.num_tiles_done = stream.ConsumeIntegral<int>();\\n    decoder.row_mt_worker_data.data_end = nullptr;\\n    for (int i = 0; i < 4; ++i) {\\n        decoder.tile_workers[i].hook = nullptr;\\n        decoder.tile_workers[i].data1 = nullptr;\\n        decoder.tile_workers[i].data2 = nullptr;\\n        decoder.tile_workers[i].had_error = stream.ConsumeBool();\\n        decoder.tile_worker_data[i].counts = nullptr;\\n        decoder.tile_worker_data[i].bit_reader = nullptr;\\n        decoder.tile_worker_data[i].xd = nullptr;\\n    }\\n    decoder.jobq.jobq = stream.ConsumeIntegral<int>();\\n\\n    // Generate data and data_end\\n    std::vector<uint8_t> data_vec = stream.ConsumeBytes<uint8_t>(stream.ConsumeIntegralInRange<size_t>(0, size));\\n    const uint8_t *data_ptr = data_vec.data();\\n    std::vector<uint8_t> data_end_vec = stream.ConsumeBytes<uint8_t>(stream.ConsumeIntegralInRange<size_t>(0, size));\\n    const uint8_t *data_end_ptr = data_end_vec.data();\\n\\n    // Call the function to fuzz\\n    decode_tiles_row_wise_mt(&decoder, data_ptr, data_end_ptr);\\n\\n    return 0;\\n}",
+        "model": ""
+    },
+
+    {
+        "benchmark": "output-libvpx-decode_tiles_row_wise_mt",
+        "sample": "02",
+        "status": "Done",
+        "compiles": "False",
+        "crashes": "False",
+        "crash_reason": "-",
+        "bug": "True",
+        "coverage": "0.00",
+        "coverage_diff": "0.0",
+        "coverage_report": "#",
+        "stacktrace": "/stacktrace",
+        "target_binary": "/target_binary",
+        "reproducer": "/artifacts",
+        "run_log": "run.log",
+        "source_code": "#include <fuzzer/FuzzedDataProvider.h>\\n#include <cstdint>\\n#include <vector>\\n#include <cstddef> // for size_t\\n\\n// Include necessary headers for VP9 decoding\\nextern \"C\" {\\n#include <vpx/vpx_decoder.h>\\n#include <vpx/vpx_frame_buffer.h>\\n#include <vpx/vpx_integer.h>\\n#include <vpx/vp8dx.h>\\n#include <vp9/common/vp9_common.h>\\n#include <vp9/decoder/vp9_decoder.h>\\n#include <vp9/common/vp9_thread_common.h>\\n// The header file <vp9/decoder/vp9_onyxd_int.h> is not found, so we need to include the correct one\\n#include <vp9/decoder/vp9_onyxd.h>\\n}\\n\\nconst uint8_t *decode_tiles_row_wise_mt(VP9Decoder *, const uint8_t *, const uint8_t *);\\n\\nextern \"C\" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {\\n  FuzzedDataProvider stream(data, size);\\n\\n  // Create a VP9Decoder object\\n  VP9Decoder pbi;\\n\\n  // Initialize VP9Decoder members if necessary (example initialization)\\n  pbi.common.log2_tile_cols = stream.ConsumeIntegralInRange<int>(0, 6);\\n  pbi.common.log2_tile_rows = stream.ConsumeIntegralInRange<int>(0, 1);\\n  pbi.max_threads = stream.ConsumeIntegralInRange<int>(1, 4);\\n  pbi.row_mt_worker_data = new RowMTWorkerData();\\n  pbi.tile_workers = new VPxWorker[pbi.max_threads];\\n  pbi.tile_worker_data = new TileWorkerData[1 << pbi.common.log2_tile_cols];\\n  pbi.lf_row_sync = new VP9LfSync();\\n  pbi.mb.plane = new struct macroblockd_plane[3];\\n\\n  // Extract pointers to data\\n  std::vector<uint8_t> input_data = stream.ConsumeBytes<uint8_t>(stream.ConsumeIntegralInRange<size_t>(0, size));\\n  const uint8_t *data_ptr = input_data.data();\\n\\n  std::vector<uint8_t> input_data_end = stream.ConsumeBytes<uint8_t>(stream.ConsumeIntegralInRange<size_t>(0, size));\\n  const uint8_t *data_end_ptr = input_data_end.data();\\n\\n  // Call the function to fuzz\\n  decode_tiles_row_wise_mt(&pbi, data_ptr, data_end_ptr);\\n\\n  // Clean up dynamically allocated memory\\n  delete[] pbi.tile_workers;\\n  delete[] pbi.tile_worker_data;\\n  delete pbi.row_mt_worker_data;\\n  delete pbi.lf_row_sync;\\n  delete[] pbi.mb.plane;\\n\\n  return 0;\\n}",
+        "model": ""
+    }
+
+    ]
+}

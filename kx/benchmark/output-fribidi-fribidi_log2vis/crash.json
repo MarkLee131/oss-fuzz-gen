@@ -1,0 +1,43 @@
+{
+    "samples": [
+
+    {
+        "benchmark": "output-fribidi-fribidi_log2vis",
+        "sample": "01",
+        "status": "Done",
+        "compiles": "True",
+        "crashes": "True",
+        "crash_reason": "FP_NEAR_INIT_CRASH",
+        "bug": "False",
+        "coverage": "0.00",
+        "coverage_diff": "0.0",
+        "coverage_report": "#",
+        "stacktrace": "/stacktrace",
+        "target_binary": "/target_binary",
+        "reproducer": "/artifacts",
+        "run_log": "run.log",
+        "source_code": "#include <fuzzer/FuzzedDataProvider.h>\\n#include <vector>\\n#include <cstring>\\n#include <fribidi.h>\\n\\nextern \"C\" FriBidiLevel fribidi_log2vis(const FriBidiChar *, const FriBidiStrIndex, FriBidiParType *, FriBidiChar *, FriBidiStrIndex *, FriBidiStrIndex *, FriBidiLevel *);\\n\\nextern \"C\" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {\\n    if (size < sizeof(FriBidiChar)) {\\n        return 0; // Not enough data to proceed\\n    }\\n\\n    FuzzedDataProvider stream(data, size);\\n\\n    // Extract the length of the input string, ensuring it does not exceed the size of the input data\\n    FriBidiStrIndex len = stream.ConsumeIntegralInRange<FriBidiStrIndex>(1, size / sizeof(FriBidiChar));\\n\\n    // Extract the input string\\n    std::vector<FriBidiChar> str(len);\\n    for (FriBidiStrIndex i = 0; i < len; ++i) {\\n        str[i] = stream.ConsumeIntegral<FriBidiChar>();\\n    }\\n\\n    // Extract the base direction\\n    FriBidiParType base_dir = static_cast<FriBidiParType>(stream.ConsumeIntegralInRange<int>(FRIBIDI_PAR_LTR, FRIBIDI_PAR_ON));\\n\\n    // Allocate memory for the output parameters\\n    std::vector<FriBidiChar> visual_str(len);\\n    std::vector<FriBidiStrIndex> positions_L_to_V(len);\\n    std::vector<FriBidiStrIndex> positions_V_to_L(len);\\n    std::vector<FriBidiLevel> embedding_levels(len);\\n\\n    // Check if the base direction is valid\\n    if (base_dir < FRIBIDI_PAR_LTR || base_dir > FRIBIDI_PAR_ON) {\\n        return 0; // Invalid base direction\\n    }\\n\\n    // Call the function to fuzz\\n    fribidi_log2vis(\\n        str.data(),\\n        len,\\n        &base_dir,\\n        visual_str.data(),\\n        positions_L_to_V.data(),\\n        positions_V_to_L.data(),\\n        embedding_levels.data()\\n    );\\n\\n    return 0;\\n}",
+        "model": ""
+    },
+
+    {
+        "benchmark": "output-fribidi-fribidi_log2vis",
+        "sample": "02",
+        "status": "Done",
+        "compiles": "True",
+        "crashes": "False",
+        "crash_reason": "NO_SEMANTIC_ERR",
+        "bug": "True",
+        "coverage": "51.67",
+        "coverage_diff": "0.16521739130434782",
+        "coverage_report": "#",
+        "stacktrace": "/stacktrace",
+        "target_binary": "/target_binary",
+        "reproducer": "/artifacts",
+        "run_log": "run.log",
+        "source_code": "#include <fuzzer/FuzzedDataProvider.h>\\n#include <fribidi.h>\\n#include <vector>\\n\\nextern \"C\" FriBidiLevel fribidi_log2vis(const FriBidiChar *, const FriBidiStrIndex, FriBidiParType *, FriBidiChar *, FriBidiStrIndex *, FriBidiStrIndex *, FriBidiLevel *);\\n\\nextern \"C\" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {\\n    FuzzedDataProvider stream(data, size);\\n\\n    // Generate input values\\n    FriBidiStrIndex len = stream.ConsumeIntegralInRange<FriBidiStrIndex>(0, 1000);\\n    std::vector<FriBidiChar> str_vec(len);\\n    for (FriBidiStrIndex i = 0; i < len; ++i) {\\n        str_vec[i] = stream.ConsumeIntegral<FriBidiChar>();\\n    }\\n    const FriBidiChar *str = str_vec.data();\\n\\n    FriBidiParType base_dir = stream.ConsumeIntegral<FriBidiParType>();\\n\\n    std::vector<FriBidiChar> visual_str_vec(len);\\n    FriBidiChar *visual_str = visual_str_vec.data();\\n\\n    std::vector<FriBidiStrIndex> positions_L_to_V_vec(len);\\n    FriBidiStrIndex *positions_L_to_V = positions_L_to_V_vec.data();\\n\\n    std::vector<FriBidiStrIndex> positions_V_to_L_vec(len);\\n    FriBidiStrIndex *positions_V_to_L = positions_V_to_L_vec.data();\\n\\n    std::vector<FriBidiLevel> embedding_levels_vec(len);\\n    FriBidiLevel *embedding_levels = embedding_levels_vec.data();\\n\\n    // Call the function to fuzz\\n    fribidi_log2vis(str, len, &base_dir, visual_str, positions_L_to_V, positions_V_to_L, embedding_levels);\\n\\n    return 0;\\n}",
+        "model": ""
+    }
+
+    ]
+}

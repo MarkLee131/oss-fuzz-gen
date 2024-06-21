@@ -1,0 +1,43 @@
+{
+    "samples": [
+
+    {
+        "benchmark": "output-hunspell-hunspell_suggest",
+        "sample": "01",
+        "status": "Done",
+        "compiles": "True",
+        "crashes": "True",
+        "crash_reason": "NO_SEMANTIC_ERR",
+        "bug": "True",
+        "coverage": "6.93",
+        "coverage_diff": "0.00458395615346288",
+        "coverage_report": "#",
+        "stacktrace": "/stacktrace",
+        "target_binary": "/target_binary",
+        "reproducer": "/artifacts",
+        "run_log": "run.log",
+        "source_code": "#include <fuzzer/FuzzedDataProvider.h>\\n#include <hunspell/hunspell.h>\\n#include <vector>\\n#include <string>\\n#include <cstdlib>\\n\\nextern \"C\" {\\n    Hunhandle* Hunspell_create(const char* affpath, const char* dpath);\\n    void Hunspell_destroy(Hunhandle* pHunspell);\\n    int Hunspell_suggest(Hunhandle* pHunspell, char*** slst, const char* word);\\n}\\n\\nextern \"C\" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {\\n    FuzzedDataProvider stream(data, size);\\n\\n    // Initialize Hunspell handle\\n    Hunhandle* handle = Hunspell_create(\"en_US.aff\", \"en_US.dic\");\\n    if (handle == nullptr) {\\n        return 0;\\n    }\\n\\n    // Generate a random string to use as the word\\n    std::string word = stream.ConsumeRandomLengthString(100);\\n    const char* word_cstr = word.c_str();\\n\\n    // Prepare the suggestion list\\n    char** suggestions = nullptr;\\n\\n    // Call the function being fuzzed\\n    Hunspell_suggest(handle, &suggestions, word_cstr);\\n\\n    // Free the suggestions\\n    if (suggestions != nullptr) {\\n        for (int i = 0; suggestions[i] != nullptr; ++i) {\\n            free(suggestions[i]);\\n        }\\n        free(suggestions);\\n    }\\n\\n    // Destroy the Hunspell handle\\n    Hunspell_destroy(handle);\\n\\n    return 0;\\n}",
+        "model": ""
+    },
+
+    {
+        "benchmark": "output-hunspell-hunspell_suggest",
+        "sample": "02",
+        "status": "Done",
+        "compiles": "True",
+        "crashes": "False",
+        "crash_reason": "NO_SEMANTIC_ERR",
+        "bug": "True",
+        "coverage": "6.52",
+        "coverage_diff": "0.00458395615346288",
+        "coverage_report": "#",
+        "stacktrace": "/stacktrace",
+        "target_binary": "/target_binary",
+        "reproducer": "/artifacts",
+        "run_log": "run.log",
+        "source_code": "#include <fuzzer/FuzzedDataProvider.h>\\n#include <hunspell/hunspell.h>\\n#include <vector>\\n#include <string>\\n\\nextern \"C\" int Hunspell_suggest(Hunhandle *, char ***, const char *);\\n\\nextern \"C\" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {\\n    FuzzedDataProvider stream(data, size);\\n\\n    // Create a Hunspell handle\\n    Hunhandle *handle = Hunspell_create(\"en_US.aff\", \"en_US.dic\");\\n    if (!handle) {\\n        return 0;\\n    }\\n\\n    // Generate a random word to suggest corrections for\\n    std::string word = stream.ConsumeRandomLengthString(100);\\n\\n    // Prepare the output list\\n    char **suggestions = nullptr;\\n\\n    // Call the function to fuzz\\n    Hunspell_suggest(handle, &suggestions, word.c_str());\\n\\n    // Free the suggestions list\\n    if (suggestions) {\\n        Hunspell_free_list(handle, &suggestions, Hunspell_suggest(handle, &suggestions, word.c_str()));\\n    }\\n\\n    // Destroy the Hunspell handle\\n    Hunspell_destroy(handle);\\n\\n    return 0;\\n}",
+        "model": ""
+    }
+
+    ]
+}

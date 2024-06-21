@@ -1,0 +1,43 @@
+{
+    "samples": [
+
+    {
+        "benchmark": "output-avahi-avahi_dns_packet_new_reply",
+        "sample": "01",
+        "status": "Done",
+        "compiles": "False",
+        "crashes": "False",
+        "crash_reason": "-",
+        "bug": "True",
+        "coverage": "0.00",
+        "coverage_diff": "0.0",
+        "coverage_report": "#",
+        "stacktrace": "/stacktrace",
+        "target_binary": "/target_binary",
+        "reproducer": "/artifacts",
+        "run_log": "run.log",
+        "source_code": "#include <fuzzer/FuzzedDataProvider.h>\\n#include <cassert>\\n#include <cstdint>\\n#include <cstdlib>\\n#include <cstring>\\n#include <vector>\\n\\n// Assuming the necessary headers for AvahiDnsPacket and related functions\\nextern \"C\" {\\n    #include <avahi-common/dns.h>\\n    #include <avahi-common/malloc.h>\\n}\\n\\nextern \"C\" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {\\n    FuzzedDataProvider stream(data, size);\\n\\n    // Create a dummy AvahiDnsPacket for testing\\n    AvahiDnsPacket *packet = avahi_dns_packet_new(size);\\n    if (!packet) {\\n        return 0;\\n    }\\n\\n    // Fill the packet with some data\\n    std::vector<uint8_t> packet_data = stream.ConsumeBytes<uint8_t>(size);\\n    if (packet_data.size() > 0) {\\n        memcpy(packet->data, packet_data.data(), packet_data.size());\\n    }\\n\\n    // Generate parameters for avahi_dns_packet_new_reply\\n    unsigned int mtu = stream.ConsumeIntegral<unsigned int>();\\n    int copy_queries = stream.ConsumeBool();\\n    int aa = stream.ConsumeBool();\\n\\n    // Call the function being tested\\n    AvahiDnsPacket *reply_packet = avahi_dns_packet_new_reply(packet, mtu, copy_queries, aa);\\n\\n    // Clean up\\n    avahi_dns_packet_free(packet);\\n    if (reply_packet) {\\n        avahi_dns_packet_free(reply_packet);\\n    }\\n\\n    return 0;\\n}",
+        "model": ""
+    },
+
+    {
+        "benchmark": "output-avahi-avahi_dns_packet_new_reply",
+        "sample": "02",
+        "status": "Done",
+        "compiles": "False",
+        "crashes": "False",
+        "crash_reason": "-",
+        "bug": "True",
+        "coverage": "0.00",
+        "coverage_diff": "0.0",
+        "coverage_report": "#",
+        "stacktrace": "/stacktrace",
+        "target_binary": "/target_binary",
+        "reproducer": "/artifacts",
+        "run_log": "run.log",
+        "source_code": "#include <fuzzer/FuzzedDataProvider.h>\\n#include <cassert>\\n#include <avahi-common/malloc.h>\\n#include <avahi-common/simple-watch.h> // Ensure this header is available in your system\\n\\nextern \"C\" {\\n    #include <avahi-common/dns.h> // Wrap with extern \"C\" to handle C linkage\\n    AvahiDnsPacket* avahi_dns_packet_new_reply(AvahiDnsPacket* p, unsigned int mtu, int copy_queries, int aa);\\n    void avahi_dns_packet_free(AvahiDnsPacket* p);\\n}\\n\\nextern \"C\" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {\\n    FuzzedDataProvider stream(data, size);\\n\\n    // Create a dummy AvahiDnsPacket to pass as the first argument\\n    AvahiDnsPacket dummy_packet;\\n    dummy_packet.rindex = stream.ConsumeIntegral<unsigned>();\\n\\n    // Consume values for the remaining parameters\\n    unsigned int mtu = stream.ConsumeIntegral<unsigned int>();\\n    int copy_queries = stream.ConsumeIntegral<int>();\\n    int aa = stream.ConsumeIntegral<int>();\\n\\n    // Call the target function\\n    AvahiDnsPacket* result = avahi_dns_packet_new_reply(&dummy_packet, mtu, copy_queries, aa);\\n\\n    // Clean up if necessary (depends on the implementation details of avahi_dns_packet_new_reply)\\n    if (result) {\\n        avahi_dns_packet_free(result);\\n    }\\n\\n    return 0;\\n}",
+        "model": ""
+    }
+
+    ]
+}

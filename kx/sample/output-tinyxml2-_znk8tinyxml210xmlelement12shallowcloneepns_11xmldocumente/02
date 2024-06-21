@@ -1,0 +1,387 @@
+<!doctype html>
+
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Experiment results</title>
+<style>
+* {
+    box-sizing: border-box;
+}
+
+html {
+    line-height: 1.15;
+}
+
+body {
+    font-family: sans-serif;
+    font-size: 16px;
+}
+
+table {
+    border-collapse: collapse;
+    border-spacing: 0;
+}
+
+td, th {
+    border-right: 1px #dedede solid;
+    border-bottom: 1px #dedede solid;
+    padding: 5px;
+    text-align: left;
+}
+td:first-child, th:first-child {
+    border-left: 1px #dedede solid;
+}
+th {
+    border-top: 1px #dedede solid;
+}
+
+tbody tr:nth-child(odd) {
+    background-color: #f4f5ff;
+}
+</style>
+<body>
+    LLM: 
+    
+<h1>output-tinyxml2-_znk8tinyxml210xmlelement12shallowcloneepns_11xmldocumente / 02</h1>
+Bug: False
+<br>
+Crash reason: NO_SEMANTIC_ERR
+<br>
+<br>
+
+
+
+
+<h3>Final code</h3>
+
+<pre>
+#include &lt;fuzzer/FuzzedDataProvider.h&gt;
+#include &#34;tinyxml2.h&#34;
+
+using namespace tinyxml2;
+
+extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
+    FuzzedDataProvider stream(data, size);
+
+    // Create a new XMLDocument
+    XMLDocument doc;
+
+    // Create a root element with some name
+    const std::string rootName = stream.ConsumeRandomLengthString(10);
+    XMLElement* root = doc.NewElement(rootName.c_str());
+    doc.InsertFirstChild(root);
+
+    // Add some attributes to the root element
+    int numAttributes = stream.ConsumeIntegralInRange&lt;int&gt;(0, 10);
+    for (int i = 0; i &lt; numAttributes; ++i) {
+        const std::string attrName = stream.ConsumeRandomLengthString(10);
+        const std::string attrValue = stream.ConsumeRandomLengthString(20);
+        root-&gt;SetAttribute(attrName.c_str(), attrValue.c_str());
+    }
+
+    // Now we call the function to fuzz
+    XMLNode* clonedNode = root-&gt;ShallowClone(&amp;doc);
+
+    // Clean up
+    doc.DeleteNode(clonedNode);
+
+    return 0;
+}
+</pre>
+
+
+<h3>Fixer prompt #1</h3>
+<pre>
+
+Given the following C++ fuzz harness and its build error message, fix the code to make it build for fuzzing.
+
+If there is undeclared identifier or unknown type name error, fix it by finding and including the related libraries.
+
+Note that some code may need to be wrapped with &lt;code&gt;extern &#34;C&#34;&lt;/code&gt; as their source is C program.
+
+MUST RETURN THE FULL CODE, INCLUDING UNCHANGED PARTS.
+EXTREMELY IMPORTANT: AVOID USING &lt;code&gt;goto&lt;/code&gt;. If you have to write code using &lt;code&gt;goto&lt;/code&gt;, you MUST MUST also declare all variables BEFORE the &lt;code&gt;goto&lt;/code&gt;. Never introduce new variables after the &lt;code&gt;goto&lt;/code&gt;.
+
+Below is the code needs to be built:
+&lt;code&gt;
+&lt;solution&gt;
+#include &lt;fuzzer/FuzzedDataProvider.h&gt;
+#include &#34;tinyxml2.h&#34;
+
+using namespace tinyxml2;
+
+extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
+    FuzzedDataProvider stream(data, size);
+
+    // Create a new XMLDocument
+    XMLDocument doc;
+
+    // Create a root element with some name
+    const std::string rootName = stream.ConsumeRandomLengthString(10);
+    XMLElement* root = doc.NewElement(rootName.c_str());
+    doc.InsertFirstChild(root);
+
+    // Add some attributes to the root element
+    int numAttributes = stream.ConsumeIntegralInRange&lt;int&gt;(0, 10);
+    for (int i = 0; i &lt; numAttributes; ++i) {
+        const std::string attrName = stream.ConsumeRandomLengthString(10);
+        const std::string attrValue = stream.ConsumeRandomLengthString(20);
+        root-&gt;SetAttribute(attrName.c_str(), attrValue.c_str());
+    }
+
+    // Now we call the function to fuzz
+    XMLNode* clonedNode = root-&gt;ShallowClone(&amp;doc);
+
+    // Clean up
+    doc.DeleteNode(clonedNode);
+
+    return 0;
+}
+&lt;/code&gt;
+
+The code has the following build issues:
+&lt;error&gt;
+/src/xmltest.cpp:1:1: error: expected unqualified-id
+    1 | &lt;solution&gt;
+      | ^
+/src/xmltest.cpp:3:10: fatal error: &#39;tinyxml2.h&#39; file not found
+    3 | #include &#34;tinyxml2.h&#34;
+      |          ^~~~~~~~~~~~
+&lt;/error&gt;
+
+Fix code:
+1. Consider possible solutions for the issues listed above.
+2. Choose a solution that can maximize fuzzing result, which is utilizing the function under test and feeding it not null input.
+3. Apply the solutions to the original code.
+It&#39;s important to show the complete code, not only the fixed line.
+&lt;solution&gt;
+</pre>
+
+
+
+<h3>Code #1</h3>
+
+<pre>
+Here&#39;s the fixed code:
+
+```cpp
+#include &lt;fuzzer/FuzzedDataProvider.h&gt;
+#include &#34;tinyxml2.h&#34;
+
+using namespace tinyxml2;
+
+extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
+    FuzzedDataProvider stream(data, size);
+
+    // Create a new XMLDocument
+    XMLDocument doc;
+
+    // Create a root element with some name
+    const std::string rootName = stream.ConsumeRandomLengthString(10);
+    XMLElement* root = doc.NewElement(rootName.c_str());
+    doc.InsertFirstChild(root);
+
+    // Add some attributes to the root element
+    int numAttributes = stream.ConsumeIntegralInRange&lt;int&gt;(0, 10);
+    for (int i = 0; i &lt; numAttributes; ++i) {
+        const std::string attrName = stream.ConsumeRandomLengthString(10);
+        const std::string attrValue = stream.ConsumeRandomLengthString(20);
+        root-&gt;SetAttribute(attrName.c_str(), attrValue.c_str());
+    }
+
+    // Now we call the function to fuzz
+    XMLNode* clonedNode = root-&gt;ShallowClone(&amp;doc);
+
+    // Clean up
+    doc.DeleteNode(clonedNode);
+
+    return 0;
+}
+```
+
+Explanation of the fixes:
+1. Removed the erroneous `&lt;solution&gt;` tags from the code.
+2. Ensured that the `#include &#34;tinyxml2.h&#34;` directive is correct and that the `tinyxml2` library is available in the include path during the build process.
+3. Wrapped the `LLVMFuzzerTestOneInput` function with `extern &#34;C&#34;` to ensure proper linkage when compiled with a C++ compiler.
+</pre>
+
+
+<h2>Logs</h2>
+<pre>
+Fixing /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-tinyxml2-_znk8tinyxml210xmlelement12shallowcloneepns_11xmldocumente/fixed_targets/02.cpp with gpt-4o, attempt 1.
+Successfully built /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-tinyxml2-_znk8tinyxml210xmlelement12shallowcloneepns_11xmldocumente/fixed_targets/02.cpp with gpt-4o in 1 iterations of fixing.
+Result for tinyxml2-znk8tinyxml210xmlelement12shallowcloneepns_11xmldocumente-02: crashes=False, coverage=0.06132792701469843 (121/1973), coverage diff=0.025727069351230425 (69/2682)
+
+</pre>
+
+<h2>Run logs</h2>
+<pre>
+INFO:__main__:Running: docker run --rm --privileged --shm-size=2g --platform linux/amd64 -e FUZZING_ENGINE=libfuzzer -e SANITIZER=address -e RUN_FUZZER_MODE=interactive -e HELPER=True -v /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-tinyxml2-_znk8tinyxml210xmlelement12shallowcloneepns_11xmldocumente/corpora/02.cpp:/tmp/xmltest_corpus -v /tmp/tmptrp7ybx_/build/out/tinyxml2-znk8tinyxml210xmlelement12shallowcloneepns_11xmldocumente-02:/out -t gcr.io/oss-fuzz-base/base-runner run_fuzzer xmltest -print_final_stats=1 -max_total_time=30 -len_control=0 -timeout=30.
+vm.mmap_rnd_bits = 28
+rm: cannot remove &#39;/tmp/xmltest_corpus&#39;: Device or resource busy
+/out/xmltest -rss_limit_mb=2560 -timeout=25 -print_final_stats=1 -max_total_time=30 -len_control=0 -timeout=30 /tmp/xmltest_corpus -dict=xml.dict &lt; /dev/null
+Dictionary: 60 entries
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 3929520505
+INFO: Loaded 1 modules   (1973 inline 8-bit counters): 1973 [0x55b4c6e86138, 0x55b4c6e868ed), 
+INFO: Loaded 1 PC tables (1973 PCs): 1973 [0x55b4c6e868f0,0x55b4c6e8e440), 
+INFO:        0 files found in /tmp/xmltest_corpus
+INFO: -max_len is not provided; libFuzzer will not generate inputs larger than 4096 bytes
+INFO: A corpus is not provided, starting from an empty corpus
+#2	INITED cov: 74 ft: 75 corp: 1/1b exec/s: 0 rss: 30Mb
+	NEW_FUNC[1/6]: 0x55b4c6dce090 in tinyxml2::XMLAttribute::SetAttribute(char const*) /src/tinyxml2/tinyxml2.cpp:1548
+	NEW_FUNC[2/6]: 0x55b4c6dd4f50 in tinyxml2::XMLElement::FindOrCreateAttribute(char const*) /src/tinyxml2/tinyxml2.cpp:1921
+#3	NEW    cov: 117 ft: 132 corp: 2/28b lim: 4096 exec/s: 0 rss: 31Mb L: 27/27 MS: 1 InsertRepeatedBytes-
+#4	NEW    cov: 117 ft: 136 corp: 3/30b lim: 4096 exec/s: 0 rss: 31Mb L: 2/27 MS: 1 InsertByte-
+#5	NEW    cov: 117 ft: 155 corp: 4/74b lim: 4096 exec/s: 0 rss: 31Mb L: 44/44 MS: 1 CopyPart-
+#7	NEW    cov: 117 ft: 161 corp: 5/226b lim: 4096 exec/s: 0 rss: 31Mb L: 152/152 MS: 2 ManualDict-InsertRepeatedBytes- DE: &#34;#FIXED&#34;-
+#8	NEW    cov: 117 ft: 165 corp: 6/233b lim: 4096 exec/s: 0 rss: 31Mb L: 7/152 MS: 1 PersAutoDict- DE: &#34;#FIXED&#34;-
+#10	NEW    cov: 117 ft: 169 corp: 7/236b lim: 4096 exec/s: 0 rss: 31Mb L: 3/152 MS: 2 ChangeBit-InsertByte-
+#14	NEW    cov: 117 ft: 170 corp: 8/375b lim: 4096 exec/s: 0 rss: 31Mb L: 139/152 MS: 4 ChangeBit-InsertByte-CrossOver-InsertRepeatedBytes-
+#20	NEW    cov: 117 ft: 193 corp: 9/388b lim: 4096 exec/s: 0 rss: 31Mb L: 13/152 MS: 1 PersAutoDict- DE: &#34;#FIXED&#34;-
+#30	NEW    cov: 117 ft: 209 corp: 10/399b lim: 4096 exec/s: 0 rss: 31Mb L: 11/152 MS: 5 ChangeASCIIInt-ChangeBit-ChangeByte-ManualDict-InsertByte- DE: &#34;&lt;?xml?&gt;&#34;-
+#35	NEW    cov: 117 ft: 211 corp: 11/451b lim: 4096 exec/s: 0 rss: 31Mb L: 52/152 MS: 5 EraseBytes-InsertRepeatedBytes-PersAutoDict-InsertByte-ManualDict- DE: &#34;#FIXED&#34;-&#34;UTF-16&#34;-
+#41	NEW    cov: 117 ft: 216 corp: 12/555b lim: 4096 exec/s: 0 rss: 31Mb L: 104/152 MS: 1 InsertRepeatedBytes-
+#54	NEW    cov: 117 ft: 217 corp: 13/620b lim: 4096 exec/s: 0 rss: 32Mb L: 65/152 MS: 3 InsertRepeatedBytes-ChangeByte-ChangeBit-
+#62	NEW    cov: 117 ft: 235 corp: 14/635b lim: 4096 exec/s: 0 rss: 32Mb L: 15/152 MS: 3 EraseBytes-ShuffleBytes-PersAutoDict- DE: &#34;UTF-16&#34;-
+#63	NEW    cov: 117 ft: 236 corp: 15/667b lim: 4096 exec/s: 0 rss: 32Mb L: 32/152 MS: 1 EraseBytes-
+#103	NEW    cov: 117 ft: 251 corp: 16/680b lim: 4096 exec/s: 0 rss: 32Mb L: 13/152 MS: 5 ChangeByte-ChangeBit-ManualDict-ChangeBinInt-ManualDict- DE: &#34;&lt;/a&gt;&#34;-&#34;:schema&#34;-
+#108	NEW    cov: 117 ft: 263 corp: 17/865b lim: 4096 exec/s: 0 rss: 32Mb L: 185/185 MS: 5 ChangeByte-CopyPart-ChangeBit-CopyPart-ManualDict- DE: &#34;IDREFS&#34;-
+#123	NEW    cov: 117 ft: 265 corp: 18/877b lim: 4096 exec/s: 0 rss: 32Mb L: 12/185 MS: 5 EraseBytes-ChangeBit-InsertByte-PersAutoDict-CopyPart- DE: &#34;UTF-16&#34;-
+#155	NEW    cov: 117 ft: 266 corp: 19/1111b lim: 4096 exec/s: 0 rss: 33Mb L: 234/234 MS: 2 InsertRepeatedBytes-InsertRepeatedBytes-
+#163	NEW    cov: 117 ft: 273 corp: 20/1212b lim: 4096 exec/s: 0 rss: 33Mb L: 101/234 MS: 3 ShuffleBytes-ChangeByte-InsertRepeatedBytes-
+#190	NEW    cov: 117 ft: 278 corp: 21/1555b lim: 4096 exec/s: 0 rss: 33Mb L: 343/343 MS: 2 InsertByte-InsertRepeatedBytes-
+#218	NEW    cov: 117 ft: 279 corp: 22/1681b lim: 4096 exec/s: 0 rss: 33Mb L: 126/343 MS: 3 EraseBytes-ShuffleBytes-InsertRepeatedBytes-
+#222	NEW    cov: 117 ft: 282 corp: 23/1725b lim: 4096 exec/s: 0 rss: 34Mb L: 44/343 MS: 4 CMP-CrossOver-ChangeBit-InsertRepeatedBytes- DE: &#34;\000\000\000\000\000\000\000\017&#34;-
+#245	NEW    cov: 117 ft: 283 corp: 24/1880b lim: 4096 exec/s: 0 rss: 34Mb L: 155/343 MS: 3 InsertRepeatedBytes-CrossOver-CrossOver-
+#269	REDUCE cov: 117 ft: 283 corp: 24/1807b lim: 4096 exec/s: 0 rss: 34Mb L: 161/343 MS: 4 ShuffleBytes-InsertByte-InsertRepeatedBytes-EraseBytes-
+#306	NEW    cov: 117 ft: 285 corp: 25/2052b lim: 4096 exec/s: 0 rss: 35Mb L: 245/343 MS: 2 ShuffleBytes-InsertRepeatedBytes-
+#341	REDUCE cov: 117 ft: 285 corp: 25/2029b lim: 4096 exec/s: 0 rss: 35Mb L: 81/343 MS: 5 CMP-ShuffleBytes-CopyPart-EraseBytes-EraseBytes- DE: &#34;\001\000\000\000\000\000\000\000&#34;-
+#364	REDUCE cov: 117 ft: 285 corp: 25/1900b lim: 4096 exec/s: 0 rss: 35Mb L: 214/245 MS: 3 CMP-CrossOver-EraseBytes- DE: &#34;\000\000\000\000\000\000\000\031&#34;-
+#414	REDUCE cov: 117 ft: 285 corp: 25/1812b lim: 4096 exec/s: 0 rss: 36Mb L: 97/245 MS: 5 ManualDict-CrossOver-ChangeBinInt-ChangeByte-EraseBytes- DE: &#34;%a&#34;-
+#420	NEW    cov: 117 ft: 287 corp: 26/1981b lim: 4096 exec/s: 0 rss: 36Mb L: 169/245 MS: 1 CrossOver-
+#501	REDUCE cov: 117 ft: 287 corp: 26/1968b lim: 4096 exec/s: 0 rss: 37Mb L: 88/245 MS: 1 EraseBytes-
+#503	REDUCE cov: 117 ft: 287 corp: 26/1966b lim: 4096 exec/s: 0 rss: 37Mb L: 11/245 MS: 2 CopyPart-EraseBytes-
+#540	REDUCE cov: 117 ft: 287 corp: 26/1956b lim: 4096 exec/s: 0 rss: 37Mb L: 55/245 MS: 2 ChangeByte-EraseBytes-
+#550	REDUCE cov: 117 ft: 287 corp: 26/1955b lim: 4096 exec/s: 0 rss: 38Mb L: 14/245 MS: 5 ManualDict-ShuffleBytes-InsertByte-ManualDict-EraseBytes- DE: &#34;&lt;a /&gt;&#34;-&#34;&lt;![INCLUDE[&#34;-
+#563	REDUCE cov: 117 ft: 287 corp: 26/1950b lim: 4096 exec/s: 0 rss: 38Mb L: 83/245 MS: 3 ShuffleBytes-ShuffleBytes-EraseBytes-
+#613	NEW    cov: 117 ft: 288 corp: 27/2204b lim: 4096 exec/s: 0 rss: 38Mb L: 254/254 MS: 5 ManualDict-ChangeByte-CMP-ChangeBinInt-InsertByte- DE: &#34;#FIXED&#34;-&#34;\377\377\377\377\377\377\377\013&#34;-
+#614	REDUCE cov: 117 ft: 288 corp: 27/2182b lim: 4096 exec/s: 0 rss: 38Mb L: 75/254 MS: 1 EraseBytes-
+#634	REDUCE cov: 117 ft: 288 corp: 27/2179b lim: 4096 exec/s: 0 rss: 38Mb L: 152/254 MS: 5 ChangeBit-CrossOver-CrossOver-InsertRepeatedBytes-EraseBytes-
+#638	REDUCE cov: 117 ft: 288 corp: 27/2176b lim: 4096 exec/s: 0 rss: 39Mb L: 52/254 MS: 4 InsertByte-EraseBytes-ChangeByte-InsertRepeatedBytes-
+#672	NEW    cov: 117 ft: 299 corp: 28/2441b lim: 4096 exec/s: 0 rss: 39Mb L: 265/265 MS: 4 ManualDict-PersAutoDict-ManualDict-ChangeBit- DE: &#34; xml:space=\&#34;1\&#34;&#34;-&#34;&lt;![INCLUDE[&#34;-&#34; standalone=\&#34;no\&#34;&#34;-
+#778	REDUCE cov: 117 ft: 299 corp: 28/2402b lim: 4096 exec/s: 0 rss: 40Mb L: 175/265 MS: 1 EraseBytes-
+#868	REDUCE cov: 117 ft: 299 corp: 28/2377b lim: 4096 exec/s: 0 rss: 41Mb L: 150/265 MS: 5 CMP-PersAutoDict-ChangeBinInt-ChangeByte-EraseBytes- DE: &#34;GGGG2JGGGG&#34;-&#34; standalone=\&#34;no\&#34;&#34;-
+#984	REDUCE cov: 117 ft: 299 corp: 28/2376b lim: 4096 exec/s: 0 rss: 43Mb L: 26/265 MS: 1 EraseBytes-
+#985	REDUCE cov: 117 ft: 299 corp: 28/2326b lim: 4096 exec/s: 0 rss: 43Mb L: 102/265 MS: 1 EraseBytes-
+#1081	REDUCE cov: 117 ft: 299 corp: 28/2324b lim: 4096 exec/s: 0 rss: 44Mb L: 12/265 MS: 1 EraseBytes-
+#1111	REDUCE cov: 117 ft: 299 corp: 28/2320b lim: 4096 exec/s: 0 rss: 44Mb L: 77/265 MS: 5 CrossOver-ChangeASCIIInt-ChangeASCIIInt-InsertByte-EraseBytes-
+#1258	REDUCE cov: 117 ft: 299 corp: 28/2308b lim: 4096 exec/s: 0 rss: 46Mb L: 157/265 MS: 2 EraseBytes-InsertByte-
+#1407	NEW    cov: 117 ft: 304 corp: 29/2580b lim: 4096 exec/s: 0 rss: 46Mb L: 272/272 MS: 4 InsertByte-ChangeBit-CopyPart-InsertRepeatedBytes-
+#1456	REDUCE cov: 117 ft: 304 corp: 29/2575b lim: 4096 exec/s: 0 rss: 46Mb L: 27/272 MS: 4 CopyPart-CopyPart-ChangeBinInt-EraseBytes-
+#1486	REDUCE cov: 117 ft: 304 corp: 29/2557b lim: 4096 exec/s: 0 rss: 46Mb L: 134/272 MS: 5 EraseBytes-ShuffleBytes-ChangeByte-CopyPart-CrossOver-
+#1
+...truncated...
+rss: 48Mb L: 76/254 MS: 1 EraseBytes-
+#627793	REDUCE cov: 121 ft: 325 corp: 44/1359b lim: 4096 exec/s: 57072 rss: 48Mb L: 17/254 MS: 3 InsertByte-ShuffleBytes-EraseBytes-
+#638310	REDUCE cov: 121 ft: 325 corp: 44/1358b lim: 4096 exec/s: 58028 rss: 48Mb L: 22/254 MS: 2 EraseBytes-ChangeBit-
+#656167	REDUCE cov: 121 ft: 325 corp: 44/1355b lim: 4096 exec/s: 59651 rss: 48Mb L: 73/254 MS: 2 ChangeByte-EraseBytes-
+#659578	REDUCE cov: 121 ft: 325 corp: 44/1354b lim: 4096 exec/s: 59961 rss: 48Mb L: 39/254 MS: 1 EraseBytes-
+#674315	REDUCE cov: 121 ft: 325 corp: 44/1353b lim: 4096 exec/s: 61301 rss: 48Mb L: 16/254 MS: 2 ChangeBit-EraseBytes-
+#685377	REDUCE cov: 121 ft: 325 corp: 44/1352b lim: 4096 exec/s: 57114 rss: 48Mb L: 21/254 MS: 2 EraseBytes-ShuffleBytes-
+#692513	REDUCE cov: 121 ft: 325 corp: 44/1351b lim: 4096 exec/s: 57709 rss: 48Mb L: 16/254 MS: 1 EraseBytes-
+#736044	REDUCE cov: 121 ft: 325 corp: 44/1350b lim: 4096 exec/s: 61337 rss: 48Mb L: 38/254 MS: 1 EraseBytes-
+#760400	REDUCE cov: 121 ft: 325 corp: 44/1348b lim: 4096 exec/s: 58492 rss: 48Mb L: 14/254 MS: 1 EraseBytes-
+#781971	REDUCE cov: 121 ft: 325 corp: 44/1347b lim: 4096 exec/s: 60151 rss: 48Mb L: 81/254 MS: 1 EraseBytes-
+#794168	REDUCE cov: 121 ft: 325 corp: 44/1346b lim: 4096 exec/s: 61089 rss: 48Mb L: 72/254 MS: 2 CMP-EraseBytes- DE: &#34;\001\000\000\000&#34;-
+#873704	REDUCE cov: 121 ft: 325 corp: 44/1345b lim: 4096 exec/s: 62407 rss: 48Mb L: 20/254 MS: 1 EraseBytes-
+#960155	REDUCE cov: 121 ft: 325 corp: 44/1344b lim: 4096 exec/s: 60009 rss: 48Mb L: 37/254 MS: 1 EraseBytes-
+#967537	REDUCE cov: 121 ft: 325 corp: 44/1343b lim: 4096 exec/s: 60471 rss: 48Mb L: 77/254 MS: 2 ChangeASCIIInt-EraseBytes-
+#1048576	pulse  cov: 121 ft: 325 corp: 44/1343b lim: 4096 exec/s: 61680 rss: 48Mb
+#1058273	REDUCE cov: 121 ft: 325 corp: 44/1342b lim: 4096 exec/s: 62251 rss: 48Mb L: 15/254 MS: 1 EraseBytes-
+#1090515	REDUCE cov: 121 ft: 325 corp: 44/1338b lim: 4096 exec/s: 64147 rss: 48Mb L: 73/254 MS: 2 ChangeBinInt-EraseBytes-
+#1097298	REDUCE cov: 121 ft: 325 corp: 44/1337b lim: 4096 exec/s: 60961 rss: 48Mb L: 14/254 MS: 3 CopyPart-ChangeBit-EraseBytes-
+#1116854	REDUCE cov: 121 ft: 325 corp: 44/1336b lim: 4096 exec/s: 62047 rss: 48Mb L: 19/254 MS: 1 EraseBytes-
+#1124356	REDUCE cov: 121 ft: 325 corp: 44/1335b lim: 4096 exec/s: 62464 rss: 48Mb L: 71/254 MS: 2 ChangeBit-EraseBytes-
+#1126908	REDUCE cov: 121 ft: 325 corp: 44/1333b lim: 4096 exec/s: 62606 rss: 48Mb L: 35/254 MS: 2 EraseBytes-CopyPart-
+#1215865	REDUCE cov: 121 ft: 325 corp: 44/1329b lim: 4096 exec/s: 63992 rss: 48Mb L: 69/254 MS: 2 EraseBytes-CrossOver-
+#1257763	REDUCE cov: 121 ft: 325 corp: 44/1324b lim: 4096 exec/s: 62888 rss: 48Mb L: 66/254 MS: 3 EraseBytes-ChangeBit-CrossOver-
+#1269519	REDUCE cov: 121 ft: 325 corp: 44/1323b lim: 4096 exec/s: 63475 rss: 48Mb L: 65/254 MS: 1 EraseBytes-
+#1272805	REDUCE cov: 121 ft: 325 corp: 44/1322b lim: 4096 exec/s: 63640 rss: 48Mb L: 64/254 MS: 1 EraseBytes-
+#1293541	REDUCE cov: 121 ft: 325 corp: 44/1321b lim: 4096 exec/s: 64677 rss: 48Mb L: 63/254 MS: 1 EraseBytes-
+#1320664	REDUCE cov: 121 ft: 325 corp: 44/1320b lim: 4096 exec/s: 62888 rss: 48Mb L: 68/254 MS: 3 ManualDict-PersAutoDict-EraseBytes- DE: &#34; xml:id=\&#34;1\&#34;&#34;-&#34;UTF-8&#34;-
+#1391460	REDUCE cov: 121 ft: 325 corp: 44/1315b lim: 4096 exec/s: 63248 rss: 48Mb L: 58/254 MS: 1 EraseBytes-
+#1401351	REDUCE cov: 121 ft: 325 corp: 44/1312b lim: 4096 exec/s: 63697 rss: 48Mb L: 55/254 MS: 1 EraseBytes-
+#1406134	REDUCE cov: 121 ft: 325 corp: 44/1307b lim: 4096 exec/s: 63915 rss: 48Mb L: 50/254 MS: 3 ChangeByte-ShuffleBytes-EraseBytes-
+#1427255	REDUCE cov: 121 ft: 325 corp: 44/1305b lim: 4096 exec/s: 64875 rss: 48Mb L: 48/254 MS: 1 EraseBytes-
+#1524301	REDUCE cov: 121 ft: 325 corp: 44/1304b lim: 4096 exec/s: 63512 rss: 48Mb L: 34/254 MS: 1 EraseBytes-
+#1527193	REDUCE cov: 121 ft: 325 corp: 44/1303b lim: 4096 exec/s: 63633 rss: 48Mb L: 47/254 MS: 2 CopyPart-EraseBytes-
+#1595860	REDUCE cov: 121 ft: 325 corp: 44/1275b lim: 4096 exec/s: 63834 rss: 48Mb L: 53/254 MS: 2 ChangeBit-EraseBytes-
+#1608632	REDUCE cov: 121 ft: 325 corp: 44/1274b lim: 4096 exec/s: 64345 rss: 48Mb L: 46/254 MS: 2 ChangeBinInt-EraseBytes-
+#1614333	REDUCE cov: 121 ft: 325 corp: 44/1273b lim: 4096 exec/s: 64573 rss: 48Mb L: 45/254 MS: 1 EraseBytes-
+#1642896	REDUCE cov: 121 ft: 325 corp: 44/1260b lim: 4096 exec/s: 63188 rss: 48Mb L: 40/254 MS: 3 CrossOver-CrossOver-EraseBytes-
+#1643755	REDUCE cov: 121 ft: 325 corp: 44/1258b lim: 4096 exec/s: 63221 rss: 48Mb L: 38/254 MS: 4 ChangeBinInt-ChangeByte-InsertRepeatedBytes-EraseBytes-
+#1656467	REDUCE cov: 121 ft: 325 corp: 44/1256b lim: 4096 exec/s: 63710 rss: 48Mb L: 36/254 MS: 2 ShuffleBytes-EraseBytes-
+#1671628	REDUCE cov: 121 ft: 325 corp: 44/1254b lim: 4096 exec/s: 64293 rss: 48Mb L: 34/254 MS: 1 EraseBytes-
+#1683274	REDUCE cov: 121 ft: 325 corp: 44/1253b lim: 4096 exec/s: 64741 rss: 48Mb L: 33/254 MS: 1 EraseBytes-
+#1691331	REDUCE cov: 121 ft: 325 corp: 44/1252b lim: 4096 exec/s: 65051 rss: 48Mb L: 32/254 MS: 2 ChangeBit-EraseBytes-
+#1725284	REDUCE cov: 121 ft: 325 corp: 44/1251b lim: 4096 exec/s: 63899 rss: 48Mb L: 67/254 MS: 3 ChangeByte-ChangeASCIIInt-EraseBytes-
+#1729995	REDUCE cov: 121 ft: 325 corp: 44/1248b lim: 4096 exec/s: 64073 rss: 48Mb L: 42/254 MS: 1 EraseBytes-
+#1789741	REDUCE cov: 121 ft: 325 corp: 44/1247b lim: 4096 exec/s: 63919 rss: 48Mb L: 41/254 MS: 1 EraseBytes-
+#1814072	REDUCE cov: 121 ft: 325 corp: 44/1246b lim: 4096 exec/s: 64788 rss: 48Mb L: 39/254 MS: 1 EraseBytes-
+#1838533	REDUCE cov: 121 ft: 325 corp: 44/1244b lim: 4096 exec/s: 63397 rss: 48Mb L: 30/254 MS: 1 EraseBytes-
+#1912922	REDUCE cov: 121 ft: 325 corp: 44/1239b lim: 4096 exec/s: 63764 rss: 48Mb L: 25/254 MS: 4 ManualDict-CopyPart-CrossOver-EraseBytes- DE: &#34;&lt;a /&gt;&#34;-
+#1912931	REDUCE cov: 121 ft: 325 corp: 44/1229b lim: 4096 exec/s: 63764 rss: 48Mb L: 15/254 MS: 4 InsertByte-ChangeBinInt-InsertByte-EraseBytes-
+#1914713	REDUCE cov: 121 ft: 325 corp: 44/1226b lim: 4096 exec/s: 63823 rss: 48Mb L: 12/254 MS: 2 PersAutoDict-EraseBytes- DE: &#34;#IMPLIED&#34;-
+#1918424	REDUCE cov: 121 ft: 325 corp: 44/1221b lim: 4096 exec/s: 63947 rss: 48Mb L: 7/254 MS: 1 EraseBytes-
+#1932245	REDUCE cov: 121 ft: 325 corp: 44/1218b lim: 4096 exec/s: 64408 rss: 48Mb L: 4/254 MS: 1 EraseBytes-
+#1976270	DONE   cov: 121 ft: 325 corp: 44/1218b lim: 4096 exec/s: 63750 rss: 48Mb
+###### Recommended dictionary. ######
+&#34;\000\000\000\000\000\000\000\017&#34; # Uses: 2094
+&#34;\001\000\000\000\000\000\000\000&#34; # Uses: 1969
+&#34;\000\000\000\000\000\000\000\031&#34; # Uses: 2005
+&#34;\377\377\377\377\377\377\377\013&#34; # Uses: 2056
+&#34;GGGG2JGGGG&#34; # Uses: 1907
+&#34;\000\000\000\000\000\000\000\021&#34; # Uses: 1982
+&#34;?lm1#?&gt;&#34; # Uses: 2066
+&#34;\000\000\000\000\000\000\000\000&#34; # Uses: 1953
+&#34;\342\342\342\342\377\342%\342\342\342&#34; # Uses: 1948
+&#34;\377\377\377\001&#34; # Uses: 2213
+&#34;\034\034\034\034\034\034\034\034\034\034&#34; # Uses: 1957
+&#34;GG\377\377\377\377\377\377\377\377&#34; # Uses: 2003
+&#34;\025\000\000\000\000\000\000\000&#34; # Uses: 1933
+&#34;\027\000\000\000\000\000\000\000&#34; # Uses: 2031
+&#34;\261\261\261\261\261\261\261\261\261\247&#34; # Uses: 1851
+&#34;\022\000\000\000\000\000\000\000&#34; # Uses: 2009
+&#34;\377\377\377\377\377\377\377\017&#34; # Uses: 1991
+&#34;\000\000\000\000\000\000\000\006&#34; # Uses: 2024
+&#34;\011\000\000\000\000\000\000\000&#34; # Uses: 1920
+&#34;u&lt;\303[CDATA[&#34; # Uses: 1892
+&#34;\013\000\000\000\000\000\000\000&#34; # Uses: 1923
+&#34;\377{\377\377\377\377\377\377\377&#34; # Uses: 1853
+&#34;\377\377\377\377\377\377\377\023&#34; # Uses: 1895
+&#34;\001\000&#34; # Uses: 2325
+&#34;\377\377\377\377&#34; # Uses: 2011
+&#34;\377\377\377\377\377\377\377\377&#34; # Uses: 1845
+&#34;(S&#39;&#39;&#34; # Uses: 1985
+&#34;\377\377\377\377\377\377\377\213&#34; # Uses: 1749
+&#34;\000\000&#34; # Uses: 2120
+&#34;DT&#34; # Uses: 2075
+&#34;\377\377&#34; # Uses: 1982
+&#34;\001\000\000\002&#34; # Uses: 1931
+&#34;lGG&#34; # Uses: 1905
+&#34;\034\034\034&#34; # Uses: 1646
+&#34;\377\377\377\377\377&#34; # Uses: 1453
+&#34;)\034l\222\222\222\307\247\034&#34; # Uses: 1337
+&#34;\001\000\000\000&#34; # Uses: 1248
+###### End of recommended dictionary. ######
+Done 1976270 runs in 31 second(s)
+stat::number_of_executed_units: 1976270
+stat::average_exec_per_sec:     63750
+stat::new_units_added:          500
+stat::slowest_unit_time_sec:    0
+stat::peak_rss_mb:              48
+
+</pre>
+
+</body>

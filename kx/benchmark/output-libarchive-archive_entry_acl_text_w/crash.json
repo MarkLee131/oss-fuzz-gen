@@ -1,0 +1,43 @@
+{
+    "samples": [
+
+    {
+        "benchmark": "output-libarchive-archive_entry_acl_text_w",
+        "sample": "01",
+        "status": "Done",
+        "compiles": "False",
+        "crashes": "False",
+        "crash_reason": "-",
+        "bug": "True",
+        "coverage": "0.00",
+        "coverage_diff": "0.0",
+        "coverage_report": "#",
+        "stacktrace": "/stacktrace",
+        "target_binary": "/target_binary",
+        "reproducer": "/artifacts",
+        "run_log": "run.log",
+        "source_code": "#include <fuzzer/FuzzedDataProvider.h>\\n#include <archive.h>\\n#include <archive_entry.h>\\n#include <cstddef>\\n#include <cstdint>\\n#include <vector>\\n#include <cwchar> // For wchar_t\\n#include <cstring> // For memcpy\\n\\nextern \"C\" {\\n    #include <archive.h>\\n    #include <archive_entry.h>\\n}\\n\\nextern \"C\" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {\\n    FuzzedDataProvider stream(data, size);\\n\\n    // Create a new archive_entry object\\n    struct archive_entry *entry = archive_entry_new();\\n\\n    // Consume an integer for the flags parameter\\n    int flags = stream.ConsumeIntegral<int>();\\n\\n    // Create a wide string from the remaining data\\n    std::vector<uint8_t> rawData = stream.ConsumeBytes<uint8_t>(stream.remaining_bytes());\\n    std::vector<wchar_t> wdata(rawData.size() / sizeof(wchar_t) + 1); // +1 for null-termination\\n\\n    // Copy and convert rawData to wdata\\n    memcpy(wdata.data(), rawData.data(), rawData.size());\\n    wdata[wdata.size() - 1] = L'\\0'; // Ensure null-termination\\n\\n    // Set the ACL text to the entry\\n    archive_entry_acl_clear(entry);\\n    archive_entry_acl_add_entry_w_len(entry, ARCHIVE_ENTRY_ACL_TYPE_ACCESS, ARCHIVE_ENTRY_ACL_EXECUTE, wdata.data(), flags);\\n\\n    // Call the function to be fuzzed\\n    la_ssize_t len;\\n    const wchar_t *result = archive_entry_acl_to_text_w(entry, &len, flags);\\n\\n    // Clean up\\n    archive_entry_free(entry);\\n\\n    return 0;\\n}",
+        "model": ""
+    },
+
+    {
+        "benchmark": "output-libarchive-archive_entry_acl_text_w",
+        "sample": "02",
+        "status": "Done",
+        "compiles": "False",
+        "crashes": "False",
+        "crash_reason": "-",
+        "bug": "True",
+        "coverage": "0.00",
+        "coverage_diff": "0.0",
+        "coverage_report": "#",
+        "stacktrace": "/stacktrace",
+        "target_binary": "/target_binary",
+        "reproducer": "/artifacts",
+        "run_log": "run.log",
+        "source_code": "#include <fuzzer/FuzzedDataProvider.h>\\n#include <archive.h>\\n#include <archive_entry.h>\\n#include <wchar.h>\\n#include <stdint.h>\\n#include <stddef.h>\\n\\nextern \"C\" {\\n    #include <archive.h>\\n    #include <archive_entry.h>\\n}\\n\\nextern \"C\" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {\\n    FuzzedDataProvider stream(data, size);\\n\\n    // Create a new archive entry\\n    struct archive_entry *entry = archive_entry_new();\\n    if (entry == NULL) {\\n        return 0; // Fail gracefully if entry creation fails\\n    }\\n\\n    // Consume an integer value for the second parameter\\n    int flags = stream.ConsumeIntegral<int>();\\n\\n    // Call the function being tested\\n    const wchar_t *result = archive_entry_acl_text_w(entry, flags);\\n\\n    // Check if result is not NULL and perform some operations if needed\\n    if (result != NULL) {\\n        // For example, we can measure the length of the returned string\\n        size_t len = wcslen(result);\\n        (void)len; // Avoid unused variable warning\\n    }\\n\\n    // Clean up\\n    archive_entry_free(entry);\\n\\n    return 0;\\n}",
+        "model": ""
+    }
+
+    ]
+}
