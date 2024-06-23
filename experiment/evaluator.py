@@ -170,10 +170,12 @@ class Evaluator:
   """Target evaluator."""
 
   def __init__(self, runner: builder_runner.BuilderRunner, benchmark: Benchmark,
-               work_dirs: WorkDirs):
+               work_dirs: WorkDirs,
+               template_dir: str):
     self.builder_runner = runner
     self.benchmark = benchmark
     self.work_dirs = work_dirs
+    self.template_dir =  template_dir
 
   def build_log_path(self, generated_target_name: str, iteration: int):
     return os.path.join(self.work_dirs.run_logs,
@@ -234,7 +236,7 @@ class Evaluator:
     else:
       error_desc, errors = None, build_result.errors
     code_fixer.llm_fix(ai_binary, target_path, self.benchmark, iteration,
-                       error_desc, errors, self.builder_runner.fixer_model_name)
+                       error_desc, errors, self.builder_runner.fixer_model_name, template_dir=self.template_dir)
     shutil.copyfile(
         target_path,
         os.path.join(oss_fuzz_checkout.OSS_FUZZ_DIR, 'projects',

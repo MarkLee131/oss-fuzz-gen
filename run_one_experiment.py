@@ -78,6 +78,40 @@ class AggregatedResult:
         f'max coverage diff report: {self.max_coverage_diff_report or "None"}')
 
 
+def generate_spec(benchmark: Benchmark,
+                     model: models.LLM,
+                     prompt: prompts.Prompt,
+                     work_dirs: WorkDirs,
+                     builder: prompt_builder.PromptBuilder,
+                     debug: bool = DEBUG) -> list[str]:
+  """Generates specification with LLM."""
+  print(f'Generating targets for {benchmark.project} '
+        f'{benchmark.function_signature} using {model.name}..')
+  model.generate_code(prompt,
+                      response_dir=work_dirs.raw_specification_dir,
+                      log_output=debug)
+
+  generated_specs = []
+  for file in os.listdir(work_dirs.raw_specification_dir):
+    if not output_parser.is_raw_output(file):
+      continue
+    raw_specification = os.path.join(work_dirs.raw_specification_dir, file)
+    target_specification = output_parser.parse_code(raw_specification)
+    target_specification = builder.post_process_generated_code(target_specification)
+    target_id, _ = os.path.splitext(raw_specification)
+    target_file = f'{target_id}.txt'
+    target_path = os.path.join(work_dirs.raw_specification_dir, target_file)
+    output_parser.save_output(target_specification, target_path)
+    generated_specs.append(target_path)
+
+  if generated_specs:
+    targets_relpath = map(os.path.relpath, generated_specs)
+    print('Generated:\n', '\n '.join(targets_relpath))
+  else:
+    print(f'Failed to generate specifications: {generated_specs}')
+  return generated_specs
+  
+
 def generate_targets(benchmark: Benchmark,
                      model: models.LLM,
                      prompt: prompts.Prompt,
@@ -168,6 +202,7 @@ def check_targets(
     cloud_experiment_bucket: str = '',
     run_timeout: int = RUN_TIMEOUT,
     fixer_model_name: str = models.DefaultModel.name,
+    template_dir: str = None
 ) -> Optional[AggregatedResult]:
   """Builds all targets in the fixed target directory."""
   target_stats = []
@@ -186,7 +221,7 @@ def check_targets(
                                                       run_timeout,
                                                       fixer_model_name)
 
-  evaluator = exp_evaluator.Evaluator(builder_runner, benchmark, work_dirs)
+  evaluator = exp_evaluator.Evaluator(builder_runner, benchmark, work_dirs, template_dir)
 
   ai_target_pairs = [(ai_binary, target) for target in generated_targets]
   with pool.ThreadPool(NUM_EVA) as p:
@@ -230,7 +265,8 @@ def run(benchmark: Benchmark,
   logging.basicConfig(level=logging.INFO)
 
   if example_pair is None:
-    example_pair = prompt_builder.EXAMPLES[benchmark.language]
+    # example_pair = prompt_builder.EXAMPLES[benchmark.language]
+    pass
 
   if manual_fix:
     generated_targets = [
@@ -265,12 +301,27 @@ def run(benchmark: Benchmark,
         # Use default
         builder = prompt_builder.DefaultTemplateBuilder(model, template_dir)
 
-    prompt = builder.build(benchmark.function_signature,
-                           benchmark.file_type,
-                           example_pair,
-                           project_examples,
-                           project_context_content=context_info)
+    planning_prompt = builder.build_planning_prompt(
+                              benchmark,
+                              example_pair,
+                              project_examples,
+                              project_context_content=context_info)
+    planning_prompt.save(work_dirs.planning_prompt)
+  
+    # prompt = builder.build(benchmark.function_signature,
+    #                        benchmark.file_type,
+    #                        example_pair,
+    #                        project_examples,
+    #                        project_context_content=context_info)
+    # prompt.save(work_dirs.prompt)
+    
+    # if not dry_run:
+    spec = generate_spec(benchmark, model, planning_prompt, work_dirs, builder, debug=debug) # list
+    
+    
+    prompt = builder.build_from_spec(spec)
     prompt.save(work_dirs.prompt)
+    
 
     if dry_run:
       return None
@@ -284,4 +335,4 @@ def run(benchmark: Benchmark,
     generated_targets = fix_code(work_dirs, generated_targets)
   return check_targets(model.ai_binary, benchmark, work_dirs, generated_targets,
                        cloud_experiment_name, cloud_experiment_bucket,
-                       run_timeout, model.name)
+                       run_timeout, model.name, template_dir)

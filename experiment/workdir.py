@@ -35,6 +35,7 @@ class WorkDirs:
     os.makedirs(self._base_dir, exist_ok=True)
     os.makedirs(self.status, exist_ok=True)
     os.makedirs(self.raw_targets, exist_ok=True)
+    os.makedirs(self.raw_specification_dir, exist_ok=True)
     os.makedirs(self.fixed_targets, exist_ok=True)
     os.makedirs(self.build_logs, exist_ok=True)
     os.makedirs(self.run_logs, exist_ok=True)
@@ -59,8 +60,17 @@ class WorkDirs:
 
   @property
   def prompt(self):
-    return os.path.join(self._base_dir, 'prompt.txt')
+    return os.path.join(self._base_dir, 'generation_prompt.txt')
 
+  ## Add the spec file path
+  @property
+  def planning_prompt(self):
+    return os.path.join(self._base_dir, 'planning_prompt.txt')
+
+  @property
+  def raw_specification_dir(self):
+    return os.path.join(self._base_dir, f'raw_specification')
+  
   @property
   def raw_targets(self):
     return os.path.join(self._base_dir, 'raw_targets')
