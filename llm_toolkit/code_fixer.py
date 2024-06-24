@@ -337,11 +337,14 @@ def group_error_messages(error_lines: list[str]) -> list[str]:
   return error_blocks
 
 
-def llm_fix(ai_binary: str, target_path: str, benchmark: benchmarklib.Benchmark,
-            llm_fix_id: int, error_desc: Optional[str], errors: list[str],
+def llm_fix(ai_binary: str,
+            target_path: str,
+            benchmark: benchmarklib.Benchmark,
+            llm_fix_id: int,
+            error_desc: Optional[str],
+            errors: list[str],
             fixer_model_name: str,
-            template_dir: Optional[str] = None
-            ) -> None:
+            template_dir: Optional[str] = None) -> None:
   """Reads and fixes |target_path| in place with LLM based on |error_log|."""
   fuzz_target_source_code = parser.parse_code(target_path)
 
@@ -400,8 +403,7 @@ def apply_llm_fix(ai_binary: str,
                   response_dir: str,
                   fixer_model_name: str = models.DefaultModel.name,
                   temperature: float = 0.4,
-                  template_dir: Optional[str] = None
-                  ):
+                  template_dir: Optional[str] = None):
   """Queries LLM to fix the code."""
   fixer_model = models.LLM.setup(
       ai_binary=ai_binary,
@@ -410,7 +412,8 @@ def apply_llm_fix(ai_binary: str,
       temperature=temperature,
   )
 
-  builder = prompt_builder.DefaultTemplateBuilder(fixer_model, template_dir=template_dir)
+  builder = prompt_builder.DefaultTemplateBuilder(fixer_model,
+                                                  template_dir=template_dir)
   prompt = builder.build_fixer_prompt(benchmark, fuzz_target_source_code,
                                       error_desc, errors)
   prompt.save(prompt_path)

@@ -89,20 +89,19 @@ class PromptBuilder:
             project_example_content: Optional[list[list[str]]] = None,
             project_context_content: Optional[dict] = None) -> prompts.Prompt:
     """Builds a prompt."""
-  
+
   @abstractmethod
-  def build_planning_prompt(self,
-            benchmark: Benchmark,
-            example_pair: list[list[str]],
-            project_example_content: Optional[list[list[str]]] = None,
-            project_context_content: Optional[dict] = None) -> prompts.Prompt:
+  def build_planning_prompt(
+      self,
+      benchmark: Benchmark,
+      example_pair: list[list[str]],
+      project_example_content: Optional[list[list[str]]] = None,
+      project_context_content: Optional[dict] = None) -> prompts.Prompt:
     """Builds a prompt."""
 
-  
-  @abstractmethod 
-  def build_from_spec(self,
-            function_signature: str,
-            target_file_type: FileType) -> prompts.Prompt:
+  @abstractmethod
+  def build_from_spec(self, function_signature: str,
+                      target_file_type: FileType) -> prompts.Prompt:
     """Builds a prompt."""
 
   @abstractmethod
@@ -130,7 +129,8 @@ class DefaultTemplateBuilder(PromptBuilder):
     self.priming_template_file = self._find_template(template_dir,
                                                      'priming.txt')
     self.cpp_priming_filler_file = self._find_template(
-        template_dir, 'cpp-specific-priming-filler.txt') # keep it for introduce the fuzzed_data_provider
+        template_dir, 'cpp-specific-priming-filler.txt'
+    )  # keep it for introduce the fuzzed_data_provider
     self.problem_template_file = self._find_template(template_dir,
                                                      'problem.txt')
     self.solution_template_file = self._find_template(template_dir,
@@ -141,12 +141,12 @@ class DefaultTemplateBuilder(PromptBuilder):
         template_dir, 'fixer_priming.txt')
     self.fixer_problem_template_file = self._find_template(
         template_dir, 'fixer_problem.txt')
-    
+
     self.spec_guided_template_file = self._find_template(
         template_dir, 'spec_guide.txt')
 
-  def _format_priming(self, target_file_type: FileType, function_signature: str
-                      ) -> str:
+  def _format_priming(self, target_file_type: FileType,
+                      function_signature: str) -> str:
     """Formats a priming based on the prompt template."""
     priming = self._get_template(self.priming_template_file)
     if target_file_type in [FileType.C, FileType.CPP]:
@@ -274,28 +274,29 @@ class DefaultTemplateBuilder(PromptBuilder):
       self._prompt.add_problem(problem)
       self._prompt.add_solution(solution)
 
-
   # rewrite the build function to use the spec_guided template
-  def build_planning_prompt(self,
-            benchmark: Benchmark,
-            example_pair: list[list[str]],
-            project_example_content: Optional[list[list[str]]] = None,
-            project_context_content: Optional[dict] = None) -> prompts.Prompt:
+  def build_planning_prompt(
+      self,
+      benchmark: Benchmark,
+      example_pair: list[list[str]],
+      project_example_content: Optional[list[list[str]]] = None,
+      project_context_content: Optional[dict] = None) -> prompts.Prompt:
     """Constructs a prompt using the templates in |self| and saves it."""
-    priming = self._format_priming(benchmark.file_type, benchmark.function_signature)
+    priming = self._format_priming(benchmark.file_type,
+                                   benchmark.function_signature)
     final_problem = self.format_problem(benchmark.function_signature)
 
     if project_context_content:
       # {'xrefs': [], 'func_source': 'AvahiStringList *avahi_string_list_add_pair(AvahiStringList *l, const char *key, const char *value) {\n    assert(key);\n\n    if (value)\n        return avahi_string_list_add_printf(l, "%s=%s", key, value);\n    else\n        return avahi_string_list_add(l, key);\n}\n', 'files': [], 'decl': 'AvahiStringList * avahi_string_list_add_pair(AvahiStringList *, const char *, const char *);'}
-      
+
       final_problem += '\nThe code context of the function-under-test is:\n' + \
         "Function source code is:\n" + project_context_content['func_source'] + '\n' + \
         "Function declaration is:\n" + project_context_content['decl'] + '\n'
-      
+
     # Set header inclusion string if there are any headers.
     headers_to_include = introspector.query_introspector_header_files(
         benchmark.project)
-        
+
     header_inclusion_string = ''
     if headers_to_include:
       header_inclusion_string = ', '.join(headers_to_include)
@@ -304,7 +305,7 @@ class DefaultTemplateBuilder(PromptBuilder):
         benchmark.project, benchmark.function_signature)
 
     header_related_text = 'header files within this project are:\n' + header_inclusion_string + '\n Choose the appropriate header files to our specification.\n'
-    
+
     arg_types_text = ''
     if arg_types:
       arg_types_text = 'The target function takes the following arguments:\n'
@@ -314,15 +315,14 @@ class DefaultTemplateBuilder(PromptBuilder):
 
     final_problem += header_related_text + arg_types_text
 
-
     sample_cross_references = introspector.query_introspector_sample_xrefs(
         benchmark.project, benchmark.function_signature)
-    
+
     if sample_cross_references:
       additional_text = (
           'The target function is used in various places of the target project.'
           'Please see the following usage example to guide you to write the specification:\n'
-          )
+      )
 
       exp_usage = 'Example usage:\n'
       additional_text += exp_usage + exp_usage.join(
@@ -331,16 +331,17 @@ class DefaultTemplateBuilder(PromptBuilder):
       additional_text = ''
 
     final_problem += additional_text
-    
+
     self._prepare_prompt(priming, final_problem, example_pair,
                          project_example_content)
     return self._prompt
-    
-  def build_from_spec(self,
-                      spec_list:list[str],
-                      ) -> prompts.Prompt:
+
+  def build_from_spec(
+      self,
+      spec_list: list[str],
+  ) -> prompts.Prompt:
     """Constructs a prompt using the templates in |self| and saves it."""
-    
+
     ### spec_list is a list of string for the spec path, we need to select the longest one as the final spec
     best_spec = ''
     for spec_path in spec_list:
@@ -354,9 +355,6 @@ class DefaultTemplateBuilder(PromptBuilder):
     spec_priming = spec_priming.replace('{SPECIFICATION}', best_spec)
     self._prompt.add_priming(spec_priming)
     return self._prompt
-    
-                      
-            
 
   # def build(self,
   #           function_signature: str,

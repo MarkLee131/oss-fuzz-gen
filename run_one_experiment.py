@@ -79,11 +79,11 @@ class AggregatedResult:
 
 
 def generate_spec(benchmark: Benchmark,
-                     model: models.LLM,
-                     prompt: prompts.Prompt,
-                     work_dirs: WorkDirs,
-                     builder: prompt_builder.PromptBuilder,
-                     debug: bool = DEBUG) -> list[str]:
+                  model: models.LLM,
+                  prompt: prompts.Prompt,
+                  work_dirs: WorkDirs,
+                  builder: prompt_builder.PromptBuilder,
+                  debug: bool = DEBUG) -> list[str]:
   """Generates specification with LLM."""
   print(f'Generating targets for {benchmark.project} '
         f'{benchmark.function_signature} using {model.name}..')
@@ -97,7 +97,8 @@ def generate_spec(benchmark: Benchmark,
       continue
     raw_specification = os.path.join(work_dirs.raw_specification_dir, file)
     target_specification = output_parser.parse_code(raw_specification)
-    target_specification = builder.post_process_generated_code(target_specification)
+    target_specification = builder.post_process_generated_code(
+        target_specification)
     target_id, _ = os.path.splitext(raw_specification)
     target_file = f'{target_id}.txt'
     target_path = os.path.join(work_dirs.raw_specification_dir, target_file)
@@ -110,7 +111,7 @@ def generate_spec(benchmark: Benchmark,
   else:
     print(f'Failed to generate specifications: {generated_specs}')
   return generated_specs
-  
+
 
 def generate_targets(benchmark: Benchmark,
                      model: models.LLM,
@@ -193,17 +194,15 @@ def aggregate_results(target_stats: list[tuple[int, exp_evaluator.Result]],
                           max_coverage_diff_report)
 
 
-def check_targets(
-    ai_binary: str,
-    benchmark: Benchmark,
-    work_dirs: WorkDirs,
-    generated_targets: List[str],
-    cloud_experiment_name: str = '',
-    cloud_experiment_bucket: str = '',
-    run_timeout: int = RUN_TIMEOUT,
-    fixer_model_name: str = models.DefaultModel.name,
-    template_dir: str = None
-) -> Optional[AggregatedResult]:
+def check_targets(ai_binary: str,
+                  benchmark: Benchmark,
+                  work_dirs: WorkDirs,
+                  generated_targets: List[str],
+                  cloud_experiment_name: str = '',
+                  cloud_experiment_bucket: str = '',
+                  run_timeout: int = RUN_TIMEOUT,
+                  fixer_model_name: str = models.DefaultModel.name,
+                  template_dir: str = None) -> Optional[AggregatedResult]:
   """Builds all targets in the fixed target directory."""
   target_stats = []
 
@@ -221,7 +220,8 @@ def check_targets(
                                                       run_timeout,
                                                       fixer_model_name)
 
-  evaluator = exp_evaluator.Evaluator(builder_runner, benchmark, work_dirs, template_dir)
+  evaluator = exp_evaluator.Evaluator(builder_runner, benchmark, work_dirs,
+                                      template_dir)
 
   ai_target_pairs = [(ai_binary, target) for target in generated_targets]
   with pool.ThreadPool(NUM_EVA) as p:
@@ -302,26 +302,29 @@ def run(benchmark: Benchmark,
         builder = prompt_builder.DefaultTemplateBuilder(model, template_dir)
 
     planning_prompt = builder.build_planning_prompt(
-                              benchmark,
-                              example_pair,
-                              project_examples,
-                              project_context_content=context_info)
+        benchmark,
+        example_pair,
+        project_examples,
+        project_context_content=context_info)
     planning_prompt.save(work_dirs.planning_prompt)
-  
+
     # prompt = builder.build(benchmark.function_signature,
     #                        benchmark.file_type,
     #                        example_pair,
     #                        project_examples,
     #                        project_context_content=context_info)
     # prompt.save(work_dirs.prompt)
-    
+
     # if not dry_run:
-    spec = generate_spec(benchmark, model, planning_prompt, work_dirs, builder, debug=debug) # list
-    
-    
+    spec = generate_spec(benchmark,
+                         model,
+                         planning_prompt,
+                         work_dirs,
+                         builder,
+                         debug=debug)  # list
+
     prompt = builder.build_from_spec(spec)
     prompt.save(work_dirs.prompt)
-    
 
     if dry_run:
       return None
