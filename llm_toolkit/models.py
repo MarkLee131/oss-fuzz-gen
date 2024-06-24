@@ -428,7 +428,7 @@ class GeminiV1D5(GeminiModel):
   """Gemini 1.5."""
 
   _max_output_tokens = 8192
-  context_window = 1000000
+  context_window = 2000000
 
   name = 'vertex_ai_gemini-1-5'
   _vertex_ai_model = 'gemini-1.5-pro-preview-0409'
@@ -444,4 +444,4 @@ class AIBinaryModel(GoogleModel):
     self.name = name
 
 
-DefaultModel = VertexAICodeBison32KModel
+DefaultModel = GeminiV1D5
