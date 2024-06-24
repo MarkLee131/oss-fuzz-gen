@@ -1,0 +1,394 @@
+<!doctype html>
+
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Experiment results</title>
+<style>
+* {
+    box-sizing: border-box;
+}
+
+html {
+    line-height: 1.15;
+}
+
+body {
+    font-family: sans-serif;
+    font-size: 16px;
+}
+
+table {
+    border-collapse: collapse;
+    border-spacing: 0;
+}
+
+td, th {
+    border-right: 1px #dedede solid;
+    border-bottom: 1px #dedede solid;
+    padding: 5px;
+    text-align: left;
+}
+td:first-child, th:first-child {
+    border-left: 1px #dedede solid;
+}
+th {
+    border-top: 1px #dedede solid;
+}
+
+tbody tr:nth-child(odd) {
+    background-color: #f4f5ff;
+}
+</style>
+<body>
+    LLM: 
+    
+<h1>output-eigen-_zn5eigen6matrixidlin1elin1eli0elin1elin1eed2ev / 02</h1>
+Bug: False
+<br>
+Crash reason: NO_SEMANTIC_ERR
+<br>
+<br>
+
+
+
+
+<h3>Final code</h3>
+
+<pre>
+#include &lt;fuzzer/FuzzedDataProvider.h&gt;
+#include &lt;Eigen/Dense&gt; // Eigen library inclusion for matrix operations
+
+extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    // Initialize the Eigen library or any resources needed for the fuzzing process.
+    return 0;
+}
+
+extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    if (size &lt; sizeof(int) * 2) {
+        return 0; // Not enough data to construct a Matrix object
+    }
+
+    FuzzedDataProvider dataProvider(data, size);
+
+    // Create a Matrix&lt;int, -1, -1, 0, -1, -1&gt; object using fuzzed data
+    int rows = dataProvider.ConsumeIntegralInRange&lt;int&gt;(1, 100);
+    int cols = dataProvider.ConsumeIntegralInRange&lt;int&gt;(1, 100);
+    Eigen::Matrix&lt;int, -1, -1, 0, -1, -1&gt; *intMatrix = new Eigen::Matrix&lt;int, -1, -1, 0, -1, -1&gt;(rows, cols);
+
+    // Fill the matrix with fuzzed data
+    for (int i = 0; i &lt; rows; ++i) {
+        for (int j = 0; j &lt; cols; ++j) {
+            (*intMatrix)(i, j) = dataProvider.ConsumeIntegral&lt;int&gt;();
+        }
+    }
+
+    // Create another matrix to test assignment or other operations
+    Eigen::Matrix&lt;double, -1, -1, 0, -1, -1&gt; *doubleMatrix = new Eigen::Matrix&lt;double, -1, -1, 0, -1, -1&gt;(rows, cols);
+
+    // Perform some operations to utilize the matrices
+    // For example, assigning the intMatrix to doubleMatrix after casting
+    *doubleMatrix = intMatrix-&gt;template cast&lt;double&gt;();
+
+    // Clean up
+    delete intMatrix;
+    delete doubleMatrix;
+
+    return 0;
+}
+</pre>
+
+
+<h3>Fixer prompt #1</h3>
+<pre>
+
+Given the following C++ fuzz harness and its build error message, fix the code to make it build for fuzzing.
+
+If there is undeclared identifier or unknown type name error, fix it by finding and including the related libraries.
+
+Note that some code may need to be wrapped with &lt;code&gt;extern &#34;C&#34;&lt;/code&gt; as their source is C program.
+
+MUST RETURN THE FULL CODE, INCLUDING UNCHANGED PARTS.
+EXTREMELY IMPORTANT: AVOID USING &lt;code&gt;goto&lt;/code&gt;. If you have to write code using &lt;code&gt;goto&lt;/code&gt;, you MUST MUST also declare all variables BEFORE the &lt;code&gt;goto&lt;/code&gt;. Never introduce new variables after the &lt;code&gt;goto&lt;/code&gt;.
+
+Below is the code needs to be built:
+&lt;code&gt;
+#include &lt;fuzzer/FuzzedDataProvider.h&gt;
+#include &lt;Eigen/Dense&gt; // Eigen library inclusion for matrix operations
+
+extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    // Initialize the Eigen library or any resources needed for the fuzzing process.
+    return 0;
+}
+
+extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    if (size &lt; sizeof(Eigen::Matrix&lt;int, -1, -1, 0, -1, -1&gt;)) {
+        return 0; // Not enough data to construct a Matrix object
+    }
+
+    FuzzedDataProvider dataProvider(data, size);
+
+    // Create a Matrix&lt;int, -1, -1, 0, -1, -1&gt; object using fuzzed data
+    int rows = dataProvider.ConsumeIntegralInRange&lt;int&gt;(1, 100);
+    int cols = dataProvider.ConsumeIntegralInRange&lt;int&gt;(1, 100);
+    Eigen::Matrix&lt;int, -1, -1, 0, -1, -1&gt; *otherMatrix = new Eigen::Matrix&lt;int, -1, -1, 0, -1, -1&gt;(rows, cols);
+
+    // Fill the matrix with fuzzed data
+    for (int i = 0; i &lt; rows; ++i) {
+        for (int j = 0; j &lt; cols; ++j) {
+            (*otherMatrix)(i, j) = dataProvider.ConsumeIntegral&lt;int&gt;();
+        }
+    }
+
+    // Call the destructor
+    Eigen::Matrix&lt;double, -1, -1, 0, -1, -1&gt; *matrix = new Eigen::Matrix&lt;double, -1, -1, 0, -1, -1&gt;(rows, cols);
+    matrix-&gt;~Matrix(otherMatrix);
+
+    // Clean up
+    delete otherMatrix;
+
+    return 0;
+}
+&lt;/code&gt;
+
+The code has the following build issues:
+&lt;error&gt;
+/src/solver_fuzzer.cc:30:21: error: too many arguments to function call, expected 0, have 1
+   30 |     matrix-&gt;~Matrix(otherMatrix);
+      |     ~~~~~~~~~~~~~~~ ^~~~~~~~~~~
+./Eigen/src/Core/Matrix.h:186:7: note: &#39;~Matrix&#39; declared here
+  186 | class Matrix : public PlainObjectBase&lt;Matrix&lt;Scalar_, Rows_, Cols_, Options_, MaxRows_, MaxCols_&gt;&gt; {
+      |       ^
+&lt;/error&gt;
+
+Fix code:
+1. Consider possible solutions for the issues listed above.
+2. Choose a solution that can maximize fuzzing result, which is utilizing the function under test and feeding it not null input.
+3. Apply the solutions to the original code.
+It&#39;s important to show the complete code, not only the fixed line.
+&lt;solution&gt;
+</pre>
+
+
+
+<h3>Code #1</h3>
+
+<pre>
+Here is the corrected code with the necessary fixes applied:
+
+```cpp
+#include &lt;fuzzer/FuzzedDataProvider.h&gt;
+#include &lt;Eigen/Dense&gt; // Eigen library inclusion for matrix operations
+
+extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    // Initialize the Eigen library or any resources needed for the fuzzing process.
+    return 0;
+}
+
+extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    if (size &lt; sizeof(int) * 2) {
+        return 0; // Not enough data to construct a Matrix object
+    }
+
+    FuzzedDataProvider dataProvider(data, size);
+
+    // Create a Matrix&lt;int, -1, -1, 0, -1, -1&gt; object using fuzzed data
+    int rows = dataProvider.ConsumeIntegralInRange&lt;int&gt;(1, 100);
+    int cols = dataProvider.ConsumeIntegralInRange&lt;int&gt;(1, 100);
+    Eigen::Matrix&lt;int, -1, -1, 0, -1, -1&gt; *intMatrix = new Eigen::Matrix&lt;int, -1, -1, 0, -1, -1&gt;(rows, cols);
+
+    // Fill the matrix with fuzzed data
+    for (int i = 0; i &lt; rows; ++i) {
+        for (int j = 0; j &lt; cols; ++j) {
+            (*intMatrix)(i, j) = dataProvider.ConsumeIntegral&lt;int&gt;();
+        }
+    }
+
+    // Create another matrix to test assignment or other operations
+    Eigen::Matrix&lt;double, -1, -1, 0, -1, -1&gt; *doubleMatrix = new Eigen::Matrix&lt;double, -1, -1, 0, -1, -1&gt;(rows, cols);
+
+    // Perform some operations to utilize the matrices
+    // For example, assigning the intMatrix to doubleMatrix after casting
+    *doubleMatrix = intMatrix-&gt;template cast&lt;double&gt;();
+
+    // Clean up
+    delete intMatrix;
+    delete doubleMatrix;
+
+    return 0;
+}
+```
+
+### Changes Made:
+1. **Corrected Destructor Call**: The original code incorrectly attempted to call the destructor with an argument. The corrected code now uses the matrices in a meaningful way by performing an operation on them.
+2. **Size Check**: Modified the size check to ensure there is enough data to create a matrix.
+3. **Matrix Operations**: Added an example of matrix operations (casting and assignment) to make use of the matrices.
+4. **Memory Management**: Ensured proper cleanup of dynamically allocated matrices.
+
+This code now builds correctly and performs some meaningful operations on the matrices, which is useful for fuzzing.
+</pre>
+
+
+<h2>Logs</h2>
+<pre>
+Fixing /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-eigen-_zn5eigen6matrixidlin1elin1eli0elin1elin1eed2ev/fixed_targets/02.cc with gpt-4o, attempt 1.
+Successfully built /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-eigen-_zn5eigen6matrixidlin1elin1eli0elin1elin1eed2ev/fixed_targets/02.cc with gpt-4o in 1 iterations of fixing.
+Result for eigen-zn5eigen6matrixidlin1elin1eli0elin1elin1eed2ev-02: crashes=False, coverage=0.44954128440366975 (49/109), coverage diff=0.013223140495867768 (72/5445)
+
+</pre>
+
+<h2>Run logs</h2>
+<pre>
+INFO:__main__:Running: docker run --rm --privileged --shm-size=2g --platform linux/amd64 -e FUZZING_ENGINE=libfuzzer -e SANITIZER=address -e RUN_FUZZER_MODE=interactive -e HELPER=True -v /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-eigen-_zn5eigen6matrixidlin1elin1eli0elin1elin1eed2ev/corpora/02.cc:/tmp/solver_fuzzer_corpus -v /tmp/tmp9gg1c8dt/build/out/eigen-zn5eigen6matrixidlin1elin1eli0elin1elin1eed2ev-02:/out -t gcr.io/oss-fuzz-base/base-runner run_fuzzer solver_fuzzer -print_final_stats=1 -max_total_time=30 -len_control=0 -timeout=30.
+vm.mmap_rnd_bits = 28
+rm: cannot remove &#39;/tmp/solver_fuzzer_corpus&#39;: Device or resource busy
+/out/solver_fuzzer -rss_limit_mb=2560 -timeout=25 -print_final_stats=1 -max_total_time=30 -len_control=0 -timeout=30 /tmp/solver_fuzzer_corpus &lt; /dev/null
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 1597842397
+INFO: Loaded 1 modules   (109 inline 8-bit counters): 109 [0x5611f93de2e0, 0x5611f93de34d), 
+INFO: Loaded 1 PC tables (109 PCs): 109 [0x5611f93de350,0x5611f93dea20), 
+INFO:        0 files found in /tmp/solver_fuzzer_corpus
+INFO: -max_len is not provided; libFuzzer will not generate inputs larger than 4096 bytes
+INFO: A corpus is not provided, starting from an empty corpus
+#2	INITED cov: 2 ft: 2 corp: 1/1b exec/s: 0 rss: 30Mb
+	NEW_FUNC[1/5]: 0x5611f934d6f0 in Eigen::Matrix&lt;int, -1, -1, 0, -1, -1&gt;::Matrix&lt;int, int&gt;(int const&amp;, int const&amp;) /src/eigen/./Eigen/src/Core/Matrix.h:318
+	NEW_FUNC[2/5]: 0x5611f934da30 in Eigen::Matrix&lt;double, -1, -1, 0, -1, -1&gt;::Matrix&lt;int, int&gt;(int const&amp;, int const&amp;) /src/eigen/./Eigen/src/Core/Matrix.h:318
+#19	NEW    cov: 45 ft: 46 corp: 2/84b lim: 4096 exec/s: 0 rss: 30Mb L: 83/83 MS: 2 ChangeBinInt-InsertRepeatedBytes-
+#23	NEW    cov: 46 ft: 52 corp: 3/208b lim: 4096 exec/s: 0 rss: 30Mb L: 124/124 MS: 4 CrossOver-ChangeByte-ShuffleBytes-InsertRepeatedBytes-
+#26	NEW    cov: 46 ft: 53 corp: 4/333b lim: 4096 exec/s: 0 rss: 30Mb L: 125/125 MS: 3 ChangeByte-CrossOver-InsertRepeatedBytes-
+#28	NEW    cov: 46 ft: 54 corp: 5/390b lim: 4096 exec/s: 0 rss: 30Mb L: 57/125 MS: 2 ChangeBinInt-EraseBytes-
+#32	NEW    cov: 46 ft: 57 corp: 6/421b lim: 4096 exec/s: 0 rss: 31Mb L: 31/125 MS: 4 InsertByte-CrossOver-InsertByte-EraseBytes-
+#38	NEW    cov: 46 ft: 60 corp: 7/552b lim: 4096 exec/s: 0 rss: 31Mb L: 131/131 MS: 1 CrossOver-
+#45	REDUCE cov: 46 ft: 60 corp: 7/502b lim: 4096 exec/s: 0 rss: 31Mb L: 74/131 MS: 2 InsertByte-EraseBytes-
+#46	NEW    cov: 46 ft: 61 corp: 8/651b lim: 4096 exec/s: 0 rss: 31Mb L: 149/149 MS: 1 CrossOver-
+#48	REDUCE cov: 46 ft: 61 corp: 8/608b lim: 4096 exec/s: 0 rss: 31Mb L: 82/149 MS: 2 CopyPart-EraseBytes-
+#53	REDUCE cov: 46 ft: 61 corp: 8/591b lim: 4096 exec/s: 0 rss: 31Mb L: 40/149 MS: 5 InsertByte-ChangeByte-ChangeBinInt-ShuffleBytes-EraseBytes-
+#76	REDUCE cov: 46 ft: 61 corp: 8/587b lim: 4096 exec/s: 0 rss: 31Mb L: 27/149 MS: 3 ShuffleBytes-ChangeByte-EraseBytes-
+#93	REDUCE cov: 46 ft: 61 corp: 8/561b lim: 4096 exec/s: 0 rss: 31Mb L: 56/149 MS: 2 ShuffleBytes-EraseBytes-
+#119	REDUCE cov: 46 ft: 61 corp: 8/537b lim: 4096 exec/s: 0 rss: 31Mb L: 32/149 MS: 1 EraseBytes-
+#120	REDUCE cov: 46 ft: 63 corp: 9/554b lim: 4096 exec/s: 0 rss: 31Mb L: 17/149 MS: 1 EraseBytes-
+#163	REDUCE cov: 46 ft: 63 corp: 9/550b lim: 4096 exec/s: 0 rss: 31Mb L: 23/149 MS: 3 ChangeBinInt-ChangeByte-EraseBytes-
+#171	REDUCE cov: 49 ft: 71 corp: 10/661b lim: 4096 exec/s: 0 rss: 31Mb L: 111/149 MS: 3 ChangeBinInt-ChangeASCIIInt-CrossOver-
+#198	REDUCE cov: 49 ft: 71 corp: 10/659b lim: 4096 exec/s: 0 rss: 32Mb L: 15/149 MS: 2 InsertByte-EraseBytes-
+#199	REDUCE cov: 49 ft: 71 corp: 10/650b lim: 4096 exec/s: 0 rss: 32Mb L: 23/149 MS: 1 EraseBytes-
+#212	REDUCE cov: 49 ft: 73 corp: 11/711b lim: 4096 exec/s: 0 rss: 32Mb L: 61/149 MS: 3 InsertRepeatedBytes-InsertByte-CopyPart-
+#225	REDUCE cov: 49 ft: 73 corp: 11/676b lim: 4096 exec/s: 0 rss: 32Mb L: 76/149 MS: 3 InsertByte-ChangeByte-EraseBytes-
+#238	REDUCE cov: 49 ft: 78 corp: 12/753b lim: 4096 exec/s: 0 rss: 32Mb L: 77/149 MS: 3 InsertByte-CMP-ChangeBit- DE: &#34;\001\000\000\000\000\000\000\023&#34;-
+#272	REDUCE cov: 49 ft: 79 corp: 13/897b lim: 4096 exec/s: 0 rss: 32Mb L: 144/149 MS: 4 ChangeBinInt-ChangeBit-PersAutoDict-InsertRepeatedBytes- DE: &#34;\001\000\000\000\000\000\000\023&#34;-
+#305	REDUCE cov: 49 ft: 81 corp: 14/917b lim: 4096 exec/s: 0 rss: 33Mb L: 20/149 MS: 3 EraseBytes-ChangeBit-EraseBytes-
+#334	REDUCE cov: 49 ft: 81 corp: 14/884b lim: 4096 exec/s: 0 rss: 33Mb L: 41/149 MS: 4 ShuffleBytes-InsertByte-InsertByte-EraseBytes-
+#347	REDUCE cov: 49 ft: 81 corp: 14/862b lim: 4096 exec/s: 0 rss: 33Mb L: 55/149 MS: 3 ChangeBinInt-ChangeBinInt-EraseBytes-
+#349	REDUCE cov: 49 ft: 81 corp: 14/842b lim: 4096 exec/s: 0 rss: 33Mb L: 35/149 MS: 2 ChangeBit-EraseBytes-
+#352	REDUCE cov: 49 ft: 81 corp: 14/837b lim: 4096 exec/s: 0 rss: 33Mb L: 18/149 MS: 3 ChangeBinInt-CopyPart-EraseBytes-
+#369	REDUCE cov: 49 ft: 82 corp: 15/881b lim: 4096 exec/s: 0 rss: 33Mb L: 44/149 MS: 2 CMP-InsertByte- DE: &#34;\001\000&#34;-
+#395	NEW    cov: 49 ft: 83 corp: 16/914b lim: 4096 exec/s: 0 rss: 33Mb L: 33/149 MS: 1 EraseBytes-
+#398	REDUCE cov: 49 ft: 83 corp: 16/907b lim: 4096 exec/s: 0 rss: 33Mb L: 34/149 MS: 3 ShuffleBytes-CrossOver-EraseBytes-
+#410	REDUCE cov: 49 ft: 83 corp: 16/893b lim: 4096 exec/s: 0 rss: 34Mb L: 62/149 MS: 2 ChangeBinInt-EraseBytes-
+#437	REDUCE cov: 49 ft: 83 corp: 16/865b lim: 4096 exec/s: 0 rss: 34Mb L: 33/149 MS: 2 PersAutoDict-EraseBytes- DE: &#34;\001\000&#34;-
+#447	NEW    cov: 49 ft: 88 corp: 17/976b lim: 4096 exec/s: 0 rss: 34Mb L: 111/149 MS: 5 PersAutoDict-ShuffleBytes-ChangeBit-ChangeBit-InsertRepeatedBytes- DE: &#34;\001\000&#34;-
+#474	REDUCE cov: 49 ft: 88 corp: 17/971b lim: 4096 exec/s: 0 rss: 35Mb L: 78/149 MS: 2 InsertByte-EraseBytes-
+#486	REDUCE cov: 49 ft: 89 corp: 18/984b lim: 4096 exec/s: 0 rss: 35Mb L: 13/149 MS: 2 CopyPart-EraseBytes-
+#493	REDUCE cov: 49 ft: 89 corp: 18/966b lim: 4096 exec/s: 0 rss: 35Mb L: 26/149 MS: 2 CopyPart-EraseBytes-
+#524	REDUCE cov: 49 ft: 89 corp: 18/958b lim: 4096 exec/s: 0 rss: 35Mb L: 27/149 MS: 1 EraseBytes-
+#526	REDUCE cov: 49 ft: 90 corp: 19/1111b lim: 4096 exec/s: 0 rss: 35Mb L: 153/153 MS: 2 InsertRepeatedBytes-ChangeASCIIInt-
+#565	REDUCE cov: 49 ft: 90 corp: 19/1064b lim: 4096 exec/s: 0 rss: 36Mb L: 97/153 MS: 4 CrossOver-CopyPart-ChangeBinInt-EraseBytes-
+#616	REDUCE cov: 49 ft: 90 corp: 19/1054b lim: 4096 exec/s: 0 rss: 37Mb L: 24/153 MS: 1 EraseBytes-
+#623	REDUCE cov: 49 ft: 90 corp: 19/1051b lim: 4096 exec/s: 0 rss: 37Mb L: 94/153 MS: 2 InsertRepeatedBytes-EraseBytes-
+#635	NEW    cov: 49 ft: 92 corp: 20/1059b lim: 4096 exec/s: 0 rss: 37Mb L: 8/153 MS: 2 EraseBytes-PersAutoDict- DE: &#34;\001\000\000\000\000\000\000\023&#34;-
+#658	NEW    cov: 49 ft: 95 corp: 21/1068b lim: 4096 exec/s: 0 rss: 37Mb L: 9/153 MS: 3 EraseBytes-ChangeByte-ChangeBinInt-
+#661	REDUCE cov: 49 ft: 95 corp: 21/1036b lim: 4096 exec/s: 0 rss: 37Mb L: 79/153 MS: 3 CrossOver-ChangeBinInt-EraseBytes-
+#691	REDUCE cov: 49 ft: 95 corp: 21/1030b lim: 4096 exec/s: 0 rss: 38Mb L: 20/153 MS: 5 PersAutoDict-CrossOver-ChangeByte-PersAutoDict-EraseBytes- DE: &#34;\001\000\000\000\000\000\000\023&#34;-&#34;\001\000&#34;-
+#716	NEW    cov: 49 ft: 97 corp: 22/1115b lim: 4096 exec/s: 0 rss: 38Mb L: 85/153 MS: 5 ChangeBinInt-CMP-CopyPart-EraseBytes-CopyPart- DE: &#34;\007\000\000\000\000\000\000\000&#34;-
+#727	REDUCE cov: 49 ft: 97 corp: 22/1112b lim: 4096 exec/s: 0 rss: 38Mb L: 21/153 MS: 1 EraseBytes-
+#745	REDUCE cov: 49 ft: 97 corp: 22/1083b lim: 4096 exec/s: 0 rss: 38Mb L: 33/153 MS: 3 ChangeByte-ShuffleBytes-EraseBytes-
+#767	REDUCE cov: 49 ft: 97 corp: 22/1068b lim: 4096 exec/s: 0 rss: 38Mb L: 138/149 MS: 2 CrossOver-EraseBytes-
+#776	REDUCE cov: 49 ft: 98 corp: 23/1394b lim: 4096 exec/s: 0 rss: 38Mb L: 326/326 MS: 4 ShuffleBytes-ChangeASCIIInt-InsertRepeatedBytes-InsertRepeatedBytes-
+#798	REDUCE cov: 49 ft: 98 corp: 23/1379b lim: 4096 exec/s: 0 rss: 39Mb L: 18/326 MS: 2 InsertByte-EraseBytes-
+#830	REDUCE cov: 49 ft: 99 corp: 24/1638b lim: 4096 exec/s: 0 rss: 39Mb L: 259/326 MS: 2 CopyPart-PersAutoDict- DE: &#34;\007\000\000\000\000\000\000\000&#34;-
+#853	REDUCE cov: 49 ft: 99 corp: 24/1633b lim: 4096 exec/s: 0 rss: 39Mb L: 89/326 MS: 3 PersAutoDict-InsertRepeatedBytes-EraseBytes- 
+...truncated...
+im: 4096 exec/s: 0 rss: 52Mb L: 8/661 MS: 1 EraseBytes-
+#5080	REDUCE cov: 49 ft: 110 corp: 32/2476b lim: 4096 exec/s: 0 rss: 52Mb L: 8/661 MS: 1 EraseBytes-
+#5104	REDUCE cov: 49 ft: 110 corp: 32/2474b lim: 4096 exec/s: 0 rss: 52Mb L: 147/661 MS: 4 ShuffleBytes-InsertRepeatedBytes-ChangeBinInt-EraseBytes-
+#5155	REDUCE cov: 49 ft: 110 corp: 32/2470b lim: 4096 exec/s: 0 rss: 52Mb L: 16/661 MS: 1 EraseBytes-
+#5253	REDUCE cov: 49 ft: 110 corp: 32/2468b lim: 4096 exec/s: 0 rss: 52Mb L: 11/661 MS: 3 ChangeBinInt-CopyPart-EraseBytes-
+#5391	REDUCE cov: 49 ft: 110 corp: 32/2466b lim: 4096 exec/s: 0 rss: 52Mb L: 9/661 MS: 3 CMP-CopyPart-EraseBytes- DE: &#34;\000\000\000\000&#34;-
+#5574	REDUCE cov: 49 ft: 110 corp: 32/2465b lim: 4096 exec/s: 0 rss: 52Mb L: 8/661 MS: 3 ShuffleBytes-PersAutoDict-EraseBytes- DE: &#34;\377,&#34;-
+#5582	REDUCE cov: 49 ft: 110 corp: 32/2461b lim: 4096 exec/s: 0 rss: 52Mb L: 11/661 MS: 3 CrossOver-ShuffleBytes-EraseBytes-
+#5591	REDUCE cov: 49 ft: 110 corp: 32/2460b lim: 4096 exec/s: 0 rss: 52Mb L: 39/661 MS: 4 ChangeBit-ChangeBinInt-PersAutoDict-EraseBytes- DE: &#34;8\000&#34;-
+#5894	REDUCE cov: 49 ft: 110 corp: 32/2452b lim: 4096 exec/s: 0 rss: 52Mb L: 8/661 MS: 3 ChangeByte-ShuffleBytes-EraseBytes-
+#5928	REDUCE cov: 49 ft: 110 corp: 32/2451b lim: 4096 exec/s: 0 rss: 52Mb L: 8/661 MS: 4 ShuffleBytes-EraseBytes-ChangeByte-InsertByte-
+#6744	REDUCE cov: 49 ft: 110 corp: 32/2450b lim: 4096 exec/s: 0 rss: 53Mb L: 8/661 MS: 1 EraseBytes-
+#6884	REDUCE cov: 49 ft: 110 corp: 32/2448b lim: 4096 exec/s: 0 rss: 53Mb L: 37/661 MS: 5 CrossOver-InsertByte-CopyPart-PersAutoDict-EraseBytes- DE: &#34;\001\000\000\020&#34;-
+#7275	REDUCE cov: 49 ft: 110 corp: 32/2439b lim: 4096 exec/s: 0 rss: 53Mb L: 19/661 MS: 1 EraseBytes-
+#7282	REDUCE cov: 49 ft: 110 corp: 32/2432b lim: 4096 exec/s: 0 rss: 53Mb L: 12/661 MS: 2 InsertByte-EraseBytes-
+#7438	REDUCE cov: 49 ft: 110 corp: 32/2431b lim: 4096 exec/s: 0 rss: 53Mb L: 10/661 MS: 1 EraseBytes-
+#7582	REDUCE cov: 49 ft: 110 corp: 32/2428b lim: 4096 exec/s: 0 rss: 53Mb L: 9/661 MS: 4 ChangeByte-ChangeBinInt-InsertByte-EraseBytes-
+#7703	REDUCE cov: 49 ft: 110 corp: 32/2425b lim: 4096 exec/s: 0 rss: 53Mb L: 34/661 MS: 1 EraseBytes-
+#7940	NEW    cov: 49 ft: 111 corp: 33/2439b lim: 4096 exec/s: 0 rss: 53Mb L: 14/661 MS: 2 CopyPart-ChangeBit-
+#8483	REDUCE cov: 49 ft: 111 corp: 33/2430b lim: 4096 exec/s: 0 rss: 53Mb L: 23/661 MS: 3 ChangeByte-ChangeBinInt-EraseBytes-
+#8501	REDUCE cov: 49 ft: 111 corp: 33/2389b lim: 4096 exec/s: 0 rss: 53Mb L: 620/620 MS: 3 ChangeASCIIInt-ChangeBinInt-EraseBytes-
+#8718	REDUCE cov: 49 ft: 111 corp: 33/2387b lim: 4096 exec/s: 0 rss: 53Mb L: 8/620 MS: 2 CopyPart-EraseBytes-
+#8984	REDUCE cov: 49 ft: 111 corp: 33/2382b lim: 4096 exec/s: 0 rss: 53Mb L: 18/620 MS: 1 EraseBytes-
+#9022	REDUCE cov: 49 ft: 111 corp: 33/2379b lim: 4096 exec/s: 0 rss: 54Mb L: 11/620 MS: 3 ChangeBinInt-CopyPart-EraseBytes-
+#9066	REDUCE cov: 49 ft: 111 corp: 33/2378b lim: 4096 exec/s: 0 rss: 54Mb L: 8/620 MS: 4 ChangeByte-PersAutoDict-ShuffleBytes-EraseBytes- DE: &#34;\001\000\000\020&#34;-
+#9179	REDUCE cov: 49 ft: 111 corp: 33/2298b lim: 4096 exec/s: 0 rss: 54Mb L: 540/540 MS: 3 PersAutoDict-ChangeASCIIInt-EraseBytes- DE: &#34;\000\000\000\000&#34;-
+#9405	REDUCE cov: 49 ft: 111 corp: 33/2293b lim: 4096 exec/s: 0 rss: 54Mb L: 13/540 MS: 1 EraseBytes-
+#9669	REDUCE cov: 49 ft: 111 corp: 33/2282b lim: 4096 exec/s: 0 rss: 54Mb L: 136/540 MS: 4 ChangeBinInt-CrossOver-CMP-EraseBytes- DE: &#34;\023\000&#34;-
+#10034	REDUCE cov: 49 ft: 111 corp: 33/2279b lim: 4096 exec/s: 0 rss: 55Mb L: 10/540 MS: 5 ChangeBit-InsertByte-ChangeBinInt-ChangeASCIIInt-EraseBytes-
+#10056	REDUCE cov: 49 ft: 111 corp: 33/2277b lim: 4096 exec/s: 0 rss: 55Mb L: 8/540 MS: 2 InsertByte-EraseBytes-
+#10497	REDUCE cov: 49 ft: 111 corp: 33/2276b lim: 4096 exec/s: 0 rss: 55Mb L: 70/540 MS: 1 EraseBytes-
+#10593	REDUCE cov: 49 ft: 111 corp: 33/2267b lim: 4096 exec/s: 0 rss: 55Mb L: 531/531 MS: 1 EraseBytes-
+#11110	REDUCE cov: 49 ft: 111 corp: 33/2266b lim: 4096 exec/s: 0 rss: 55Mb L: 10/531 MS: 2 EraseBytes-CrossOver-
+#11569	REDUCE cov: 49 ft: 111 corp: 33/2262b lim: 4096 exec/s: 0 rss: 55Mb L: 66/531 MS: 4 ChangeBit-InsertByte-ChangeBinInt-EraseBytes-
+#11665	REDUCE cov: 49 ft: 111 corp: 33/2261b lim: 4096 exec/s: 0 rss: 55Mb L: 9/531 MS: 1 EraseBytes-
+#15483	REDUCE cov: 49 ft: 111 corp: 33/2259b lim: 4096 exec/s: 15483 rss: 56Mb L: 8/531 MS: 3 ChangeBinInt-ShuffleBytes-EraseBytes-
+#15724	REDUCE cov: 49 ft: 111 corp: 33/2250b lim: 4096 exec/s: 15724 rss: 56Mb L: 522/522 MS: 1 EraseBytes-
+#21425	REDUCE cov: 49 ft: 111 corp: 33/2249b lim: 4096 exec/s: 21425 rss: 56Mb L: 8/522 MS: 1 EraseBytes-
+#27353	REDUCE cov: 49 ft: 111 corp: 33/2248b lim: 4096 exec/s: 27353 rss: 56Mb L: 521/521 MS: 3 PersAutoDict-EraseBytes-InsertRepeatedBytes- DE: &#34;#\000\000\000\000\000\000\000&#34;-
+#27783	REDUCE cov: 49 ft: 111 corp: 33/2247b lim: 4096 exec/s: 27783 rss: 56Mb L: 520/520 MS: 5 EraseBytes-ChangeASCIIInt-ChangeByte-InsertRepeatedBytes-CopyPart-
+#31828	REDUCE cov: 49 ft: 111 corp: 33/2242b lim: 4096 exec/s: 31828 rss: 56Mb L: 515/515 MS: 5 CMP-CopyPart-ChangeBit-PersAutoDict-EraseBytes- DE: &#34;(\000&#34;-&#34;\000\000\000\000&#34;-
+#44605	REDUCE cov: 49 ft: 111 corp: 33/2187b lim: 4096 exec/s: 44605 rss: 56Mb L: 271/515 MS: 2 EraseBytes-CrossOver-
+#65536	pulse  cov: 49 ft: 111 corp: 33/2187b lim: 4096 exec/s: 32768 rss: 59Mb
+#97584	REDUCE cov: 49 ft: 111 corp: 33/2177b lim: 4096 exec/s: 32528 rss: 59Mb L: 261/515 MS: 4 EraseBytes-ChangeBinInt-InsertByte-CMP- DE: &#34;\001\000\000\000\000\000\000U&#34;-
+#107573	REDUCE cov: 49 ft: 111 corp: 33/2170b lim: 4096 exec/s: 26893 rss: 59Mb L: 26/515 MS: 4 CrossOver-ChangeByte-ChangeByte-EraseBytes-
+#117677	REDUCE cov: 49 ft: 111 corp: 33/2117b lim: 4096 exec/s: 29419 rss: 59Mb L: 208/515 MS: 4 ChangeBinInt-EraseBytes-ShuffleBytes-CrossOver-
+#118294	REDUCE cov: 49 ft: 111 corp: 33/2116b lim: 4096 exec/s: 29573 rss: 59Mb L: 25/515 MS: 2 InsertByte-EraseBytes-
+#131072	pulse  cov: 49 ft: 111 corp: 33/2116b lim: 4096 exec/s: 32768 rss: 59Mb
+#147670	REDUCE cov: 49 ft: 111 corp: 33/2115b lim: 4096 exec/s: 29534 rss: 59Mb L: 514/514 MS: 1 EraseBytes-
+#222495	REDUCE cov: 49 ft: 111 corp: 33/2007b lim: 4096 exec/s: 31785 rss: 59Mb L: 28/514 MS: 5 EraseBytes-ShuffleBytes-ChangeByte-EraseBytes-EraseBytes-
+#222546	REDUCE cov: 49 ft: 111 corp: 33/2000b lim: 4096 exec/s: 31792 rss: 59Mb L: 21/514 MS: 1 EraseBytes-
+#223517	REDUCE cov: 49 ft: 111 corp: 33/1991b lim: 4096 exec/s: 31931 rss: 59Mb L: 12/514 MS: 1 EraseBytes-
+#227837	REDUCE cov: 49 ft: 111 corp: 33/1990b lim: 4096 exec/s: 32548 rss: 59Mb L: 11/514 MS: 5 CMP-CrossOver-ChangeBinInt-ChangeBinInt-EraseBytes- DE: &#34;/\000\000\000\000\000\000\000&#34;-
+#232872	REDUCE cov: 49 ft: 111 corp: 33/1989b lim: 4096 exec/s: 33267 rss: 59Mb L: 10/514 MS: 5 ChangeBit-ChangeByte-ChangeBinInt-CrossOver-EraseBytes-
+#233843	REDUCE cov: 49 ft: 111 corp: 33/1987b lim: 4096 exec/s: 33406 rss: 59Mb L: 8/514 MS: 1 EraseBytes-
+#262144	pulse  cov: 49 ft: 111 corp: 33/1987b lim: 4096 exec/s: 32768 rss: 59Mb
+#491621	REDUCE cov: 49 ft: 111 corp: 33/1977b lim: 4096 exec/s: 32774 rss: 59Mb L: 15/514 MS: 3 ChangeBit-EraseBytes-ChangeByte-
+#524288	pulse  cov: 49 ft: 111 corp: 33/1977b lim: 4096 exec/s: 34952 rss: 59Mb
+#1048576	pulse  cov: 49 ft: 111 corp: 33/1977b lim: 4096 exec/s: 34952 rss: 59Mb
+#1058186	DONE   cov: 49 ft: 111 corp: 33/1977b lim: 4096 exec/s: 34135 rss: 59Mb
+###### Recommended dictionary. ######
+&#34;\001\000\000\000\000\000\000\023&#34; # Uses: 7099
+&#34;\001\000&#34; # Uses: 7252
+&#34;\007\000\000\000\000\000\000\000&#34; # Uses: 7146
+&#34;8\000&#34; # Uses: 7045
+&#34;7\000&#34; # Uses: 7277
+&#34;\377,&#34; # Uses: 7161
+&#34;#\000\000\000\000\000\000\000&#34; # Uses: 6905
+&#34;\001\000\000\020&#34; # Uses: 6981
+&#34;\377\377\3777&#34; # Uses: 7263
+&#34;\000\000\000\000&#34; # Uses: 7035
+&#34;\023\000&#34; # Uses: 7157
+&#34;(\000&#34; # Uses: 7005
+&#34;\001\000\000\000\000\000\000U&#34; # Uses: 6187
+&#34;/\000\000\000\000\000\000\000&#34; # Uses: 5386
+###### End of recommended dictionary. ######
+Done 1058186 runs in 31 second(s)
+stat::number_of_executed_units: 1058186
+stat::average_exec_per_sec:     34135
+stat::new_units_added:          183
+stat::slowest_unit_time_sec:    0
+stat::peak_rss_mb:              59
+
+</pre>
+
+</body>

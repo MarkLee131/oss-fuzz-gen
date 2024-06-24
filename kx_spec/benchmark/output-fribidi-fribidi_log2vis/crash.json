@@ -1,0 +1,43 @@
+{
+    "samples": [
+
+    {
+        "benchmark": "output-fribidi-fribidi_log2vis",
+        "sample": "01",
+        "status": "Done",
+        "compiles": "True",
+        "crashes": "False",
+        "crash_reason": "NO_SEMANTIC_ERR",
+        "bug": "True",
+        "coverage": "46.53",
+        "coverage_diff": "0.1422360248447205",
+        "coverage_report": "#",
+        "stacktrace": "/stacktrace",
+        "target_binary": "/target_binary",
+        "reproducer": "/artifacts",
+        "run_log": "run.log",
+        "source_code": "#include <fuzzer/FuzzedDataProvider.h>\\n#include <fribidi.h>\\n#include <vector> // Include vector for dynamic array management\\n\\nextern \"C\" int LLVMFuzzerInitialize(int *argc, char ***argv) {\\n    return 0;\\n}\\n\\nextern \"C\" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {\\n    if (size < sizeof(FriBidiChar) + sizeof(FriBidiStrIndex)) {\\n        return 0;\\n    }\\n\\n    FuzzedDataProvider dataProvider(data, size);\\n    FriBidiStrIndex len = dataProvider.ConsumeIntegralInRange<FriBidiStrIndex>(1, size / sizeof(FriBidiChar));\\n    \\n    // Ensure there is enough data left to consume\\n    if (dataProvider.remaining_bytes() < len * sizeof(FriBidiChar)) {\\n        return 0;\\n    }\\n\\n    // Use std::vector to manage the memory of the input string\\n    std::vector<uint8_t> strVec = dataProvider.ConsumeBytes<uint8_t>(len * sizeof(FriBidiChar));\\n    const FriBidiChar *str = reinterpret_cast<const FriBidiChar*>(strVec.data());\\n\\n    FriBidiParType pbase_dir = dataProvider.ConsumeIntegral<FriBidiParType>();\\n\\n    // Use std::vector for automatic memory management\\n    std::vector<FriBidiChar> visual_str(len);\\n    std::vector<FriBidiStrIndex> positions_L_to_V(len);\\n    std::vector<FriBidiStrIndex> positions_V_to_L(len);\\n    std::vector<FriBidiLevel> embedding_levels(len);\\n\\n    fribidi_log2vis(str, len, &pbase_dir, visual_str.data(), positions_L_to_V.data(), positions_V_to_L.data(), embedding_levels.data());\\n\\n    return 0;\\n}",
+        "model": ""
+    },
+
+    {
+        "benchmark": "output-fribidi-fribidi_log2vis",
+        "sample": "02",
+        "status": "Done",
+        "compiles": "True",
+        "crashes": "False",
+        "crash_reason": "NO_SEMANTIC_ERR",
+        "bug": "True",
+        "coverage": "45.70",
+        "coverage_diff": "0.14472049689440994",
+        "coverage_report": "#",
+        "stacktrace": "/stacktrace",
+        "target_binary": "/target_binary",
+        "reproducer": "/artifacts",
+        "run_log": "run.log",
+        "source_code": "#include <fuzzer/FuzzedDataProvider.h>\\n#include <fribidi.h>\\n#include <vector>\\n#include <stdexcept>\\n\\nextern \"C\" int LLVMFuzzerInitialize(int *argc, char ***argv) {\\n    return 0;\\n}\\n\\nextern \"C\" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {\\n    if (size < sizeof(FriBidiStrIndex)) {\\n        return 0;\\n    }\\n\\n    FuzzedDataProvider dataProvider(data, size);\\n    FriBidiStrIndex len = dataProvider.ConsumeIntegral<FriBidiStrIndex>();\\n\\n    if (len == 0 || len > size / sizeof(FriBidiChar)) {\\n        return 0;\\n    }\\n\\n    std::vector<uint8_t> str_bytes = dataProvider.ConsumeBytes<uint8_t>(len * sizeof(FriBidiChar));\\n    if (str_bytes.size() < len * sizeof(FriBidiChar)) {\\n        return 0;\\n    }\\n    const FriBidiChar *str = reinterpret_cast<const FriBidiChar *>(str_bytes.data());\\n\\n    FriBidiParType pbase_dir = dataProvider.ConsumeIntegral<FriBidiParType>();\\n    std::vector<FriBidiChar> visual_str(len);\\n    std::vector<FriBidiStrIndex> positions_L_to_V(len);\\n    std::vector<FriBidiStrIndex> positions_V_to_L(len);\\n    std::vector<FriBidiLevel> embedding_levels(len);\\n\\n    if (!fribidi_log2vis(str, len, &pbase_dir, visual_str.data(), positions_L_to_V.data(), positions_V_to_L.data(), embedding_levels.data())) {\\n        throw std::runtime_error(\"fribidi_log2vis failed\");\\n    }\\n\\n    return 0;\\n}",
+        "model": ""
+    }
+
+    ]
+}

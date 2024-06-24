@@ -1,0 +1,43 @@
+{
+    "samples": [
+
+    {
+        "benchmark": "output-hiredis-rediscommand",
+        "sample": "01",
+        "status": "Done",
+        "compiles": "False",
+        "crashes": "False",
+        "crash_reason": "-",
+        "bug": "True",
+        "coverage": "0.00",
+        "coverage_diff": "0.0",
+        "coverage_report": "#",
+        "stacktrace": "/stacktrace",
+        "target_binary": "/target_binary",
+        "reproducer": "/artifacts",
+        "run_log": "run.log",
+        "source_code": "#include <fuzzer/FuzzedDataProvider.h>\\n#include <hiredis/hiredis.h>\\n#include <cstdarg>\\n#include <cstdint>\\n#include <cstdlib>\\n#include <cstring>\\n#include <string>\\n#include <vector>\\n\\nextern \"C\" int LLVMFuzzerInitialize(int *argc, char ***argv) {\\n    return 0;\\n}\\n\\nextern \"C\" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {\\n    if (size < sizeof(redisContext)) {\\n        return 0;\\n    }\\n\\n    FuzzedDataProvider dataProvider(data, size);\\n\\n    // Allocate memory for redisContext and initialize it\\n    redisContext *context = reinterpret_cast<redisContext *>(malloc(sizeof(redisContext)));\\n    if (context == nullptr) {\\n        return 0;\\n    }\\n\\n    // Copy data into context\\n    std::vector<uint8_t> contextData = dataProvider.ConsumeBytes<uint8_t>(sizeof(redisContext));\\n    memcpy(context, contextData.data(), sizeof(redisContext));\\n\\n    std::string format = dataProvider.ConsumeRandomLengthString(size - sizeof(redisContext));\\n    if (format.empty()) {\\n        free(context);\\n        return 0;\\n    }\\n\\n    // Ensure format is null-terminated\\n    format.push_back('\\0');\\n\\n    // Simulate a simple argument for the format string\\n    std::string arg = dataProvider.ConsumeRandomLengthString(size - sizeof(redisContext) - format.length());\\n\\n    if (arg.empty()) {\\n        free(context);\\n        return 0;\\n    }\\n\\n    // Call redisCommand instead of redisvCommand\\n    void *reply = redisCommand(context, format.c_str(), arg.c_str());\\n\\n    if (reply != nullptr) {\\n        freeReplyObject(reply);\\n    }\\n\\n    free(context);\\n    return 0;\\n}",
+        "model": ""
+    },
+
+    {
+        "benchmark": "output-hiredis-rediscommand",
+        "sample": "02",
+        "status": "Done",
+        "compiles": "False",
+        "crashes": "False",
+        "crash_reason": "-",
+        "bug": "True",
+        "coverage": "0.00",
+        "coverage_diff": "0.0",
+        "coverage_report": "#",
+        "stacktrace": "/stacktrace",
+        "target_binary": "/target_binary",
+        "reproducer": "/artifacts",
+        "run_log": "run.log",
+        "source_code": "#include <fuzzer/FuzzedDataProvider.h>\\n#include <hiredis/hiredis.h>\\n#include <cstdarg>\\n#include <cstdint>\\n#include <cstdlib>\\n#include <cstring>\\n#include <string>\\n\\n// Ensure that the hiredis functions are correctly linked by using extern \"C\"\\nextern \"C\" {\\n    #include <hiredis/hiredis.h>\\n}\\n\\nextern \"C\" int LLVMFuzzerInitialize(int *argc, char ***argv) {\\n    return 0;\\n}\\n\\nextern \"C\" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {\\n    if (size < sizeof(redisContext)) {\\n        return 0; \\n    }\\n\\n    FuzzedDataProvider dataProvider(data, size);\\n\\n    // Allocate memory for redisContext and copy data into it\\n    redisContext *context = reinterpret_cast<redisContext *>(malloc(sizeof(redisContext)));\\n    if (context == nullptr) {\\n        return 0;\\n    }\\n    memcpy(context, dataProvider.ConsumeBytes<uint8_t>(sizeof(redisContext)).data(), sizeof(redisContext));\\n\\n    const std::string format = dataProvider.ConsumeRandomLengthString(size - sizeof(redisContext));\\n    if (format.empty()) {\\n        free(context);\\n        return 0;\\n    }\\n\\n    // Ensure null-termination of the format string\\n    char *format_cstr = strdup(format.c_str());\\n    if (format_cstr == nullptr) {\\n        free(context);\\n        return 0;\\n    }\\n\\n    // Initialize redisContext fields to avoid undefined behavior\\n    context->err = 0;\\n    context->errstr[0] = '\\0';\\n    context->fd = -1;\\n    context->obuf = nullptr;\\n    context->reader = nullptr;\\n\\n    void *reply = redisCommand(context, format_cstr);\\n    if (reply != nullptr) {\\n        freeReplyObject(reply);\\n    }\\n\\n    free(format_cstr);\\n    free(context);\\n\\n    return 0;\\n}",
+        "model": ""
+    }
+
+    ]
+}

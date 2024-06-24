@@ -1,0 +1,43 @@
+{
+    "samples": [
+
+    {
+        "benchmark": "output-hiredis-redisasyncread",
+        "sample": "01",
+        "status": "Done",
+        "compiles": "False",
+        "crashes": "False",
+        "crash_reason": "-",
+        "bug": "True",
+        "coverage": "0.00",
+        "coverage_diff": "0.0",
+        "coverage_report": "#",
+        "stacktrace": "/stacktrace",
+        "target_binary": "/target_binary",
+        "reproducer": "/artifacts",
+        "run_log": "run.log",
+        "source_code": "#include <fuzzer/FuzzedDataProvider.h>\\n#include <hiredis/async.h>\\n#include <hiredis/hiredis.h>\\n#include <hiredis/read.h>\\n#include <cstring> // For memset\\n\\nextern \"C\" {\\n#include <stdlib.h>\\n#include <unistd.h> // For close\\n}\\n\\nextern \"C\" int LLVMFuzzerInitialize(int *argc, char ***argv) {\\n    return 0;\\n}\\n\\nextern \"C\" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {\\n    FuzzedDataProvider dataProvider(data, size);\\n\\n    redisAsyncContext *ac = redisAsyncConnect(\"127.0.0.1\", 6379);\\n    if (ac == nullptr || ac->err) {\\n        if (ac) {\\n            redisAsyncFree(ac);\\n        }\\n        return 0;\\n    }\\n\\n    // Initialize redisAsyncContext to avoid undefined behavior\\n    memset(ac, 0, sizeof(redisAsyncContext));\\n\\n    ac->c.err = 0;\\n    ac->c.fd = -1;\\n    ac->c.flags = REDIS_CONNECTED;\\n\\n    redisAsyncRead(ac);\\n\\n    redisAsyncDisconnect(ac);\\n    redisAsyncFree(ac);\\n\\n    return 0;\\n}",
+        "model": ""
+    },
+
+    {
+        "benchmark": "output-hiredis-redisasyncread",
+        "sample": "02",
+        "status": "Done",
+        "compiles": "False",
+        "crashes": "False",
+        "crash_reason": "-",
+        "bug": "True",
+        "coverage": "0.00",
+        "coverage_diff": "0.0",
+        "coverage_report": "#",
+        "stacktrace": "/stacktrace",
+        "target_binary": "/target_binary",
+        "reproducer": "/artifacts",
+        "run_log": "run.log",
+        "source_code": "#include <fuzzer/FuzzedDataProvider.h>\\n#include <hiredis/async.h>\\n#include <hiredis/hiredis.h>\\n#include <hiredis/read.h>\\n#include <cstdlib>\\n#include <cstdint>\\n#include <cstring>\\n\\nextern \"C\" {\\n    int LLVMFuzzerInitialize(int *argc, char ***argv) {\\n        return 0;\\n    }\\n\\n    int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {\\n        FuzzedDataProvider dataProvider(data, size);\\n\\n        redisAsyncContext *ac = (redisAsyncContext *)malloc(sizeof(redisAsyncContext));\\n        if (ac == nullptr) {\\n            return 0;\\n        }\\n\\n        memset(ac, 0, sizeof(redisAsyncContext)); // Initialize the memory to avoid undefined behavior\\n\\n        ac->c.err = 0;\\n        ac->c.fd = -1;\\n        ac->c.flags = REDIS_CONNECTED;\\n\\n        // Simulate some data for the buffer\\n        ac->c.reader = redisReaderCreate();\\n        if (ac->c.reader == nullptr) {\\n            free(ac);\\n            return 0;\\n        }\\n\\n        // Feed some data to the reader\\n        size_t dataSize = dataProvider.ConsumeIntegralInRange<size_t>(1, size);\\n        char *buffer = (char *)malloc(dataSize);\\n        if (buffer == nullptr) {\\n            redisReaderFree(ac->c.reader);\\n            free(ac);\\n            return 0;\\n        }\\n        dataProvider.ConsumeData(buffer, dataSize);\\n\\n        // Simulate reading data\\n        redisReaderFeed(ac->c.reader, buffer, dataSize);\\n\\n        // Call the target function\\n        redisAsyncRead(ac);\\n\\n        // Clean up\\n        free(buffer);\\n        redisReaderFree(ac->c.reader);\\n        free(ac);\\n\\n        return 0;\\n    }\\n}",
+        "model": ""
+    }
+
+    ]
+}

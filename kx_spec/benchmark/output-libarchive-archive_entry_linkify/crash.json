@@ -1,0 +1,43 @@
+{
+    "samples": [
+
+    {
+        "benchmark": "output-libarchive-archive_entry_linkify",
+        "sample": "01",
+        "status": "Done",
+        "compiles": "False",
+        "crashes": "False",
+        "crash_reason": "-",
+        "bug": "True",
+        "coverage": "0.00",
+        "coverage_diff": "0.0",
+        "coverage_report": "#",
+        "stacktrace": "/stacktrace",
+        "target_binary": "/target_binary",
+        "reproducer": "/artifacts",
+        "run_log": "run.log",
+        "source_code": "#include <fuzzer/FuzzedDataProvider.h>\\n#include <archive.h>\\n#include <archive_entry.h>\\n\\nextern \"C\" {\\n    #include <archive.h>\\n    #include <archive_entry.h>\\n}\\n\\nextern \"C\" int LLVMFuzzerInitialize(int *argc, char ***argv) {\\n    return 0;\\n}\\n\\nextern \"C\" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {\\n    FuzzedDataProvider fuzzed_data(data, size);\\n\\n    struct archive *a = archive_read_new();\\n    if (!a) {\\n        return 0;\\n    }\\n\\n    archive_read_support_format_all(a);\\n    archive_read_support_filter_all(a);\\n\\n    struct archive_entry *entry = archive_entry_new();\\n    if (!entry) {\\n        archive_read_free(a);\\n        return 0;\\n    }\\n\\n    int r = archive_read_open_memory(a, data, size);\\n    if (r != ARCHIVE_OK) {\\n        archive_entry_free(entry);\\n        archive_read_free(a);\\n        return 0;\\n    }\\n\\n    struct archive_entry_linkresolver *resolver = archive_entry_linkresolver_new();\\n    if (!resolver) {\\n        archive_entry_free(entry);\\n        archive_read_free(a);\\n        return 0;\\n    }\\n\\n    while (archive_read_next_header(a, &entry) == ARCHIVE_OK) {\\n        struct archive_entry *sparse_entry = archive_entry_new();\\n        if (!sparse_entry) {\\n            break;\\n        }\\n        archive_entry_linkify(resolver, &entry, &sparse_entry);\\n        archive_entry_free(sparse_entry);\\n        archive_entry_clear(entry);\\n    }\\n\\n    archive_entry_linkresolver_free(resolver);\\n    archive_entry_free(entry);\\n    archive_read_free(a);\\n\\n    return 0;\\n}",
+        "model": ""
+    },
+
+    {
+        "benchmark": "output-libarchive-archive_entry_linkify",
+        "sample": "02",
+        "status": "Done",
+        "compiles": "False",
+        "crashes": "False",
+        "crash_reason": "-",
+        "bug": "True",
+        "coverage": "0.00",
+        "coverage_diff": "0.0",
+        "coverage_report": "#",
+        "stacktrace": "/stacktrace",
+        "target_binary": "/target_binary",
+        "reproducer": "/artifacts",
+        "run_log": "run.log",
+        "source_code": "#include <fuzzer/FuzzedDataProvider.h>\\n#include <archive.h>\\n#include <archive_entry.h>\\n#include <cstring> // for strlen\\n\\nextern \"C\" int LLVMFuzzerInitialize(int *argc, char ***argv) {\\n    return 0;\\n}\\n\\nextern \"C\" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {\\n    FuzzedDataProvider fuzzed_data(data, size);\\n\\n    // Create a new archive object\\n    struct archive *a = archive_read_new();\\n    if (!a) {\\n        return 0;\\n    }\\n\\n    // Add support for various formats\\n    archive_read_support_format_all(a);\\n    archive_read_support_filter_all(a); // Updated to use filter instead of compression\\n\\n    // Open the data provided by the fuzzer\\n    if (archive_read_open_memory(a, data, size) != ARCHIVE_OK) {\\n        archive_read_free(a);\\n        return 0;\\n    }\\n\\n    // Create a link resolver\\n    struct archive_entry_linkresolver *resolver = archive_entry_linkresolver_new();\\n    if (!resolver) {\\n        archive_read_free(a);\\n        return 0;\\n    }\\n\\n    // Read entries from the archive\\n    struct archive_entry *entry;\\n    while (archive_read_next_header(a, &entry) == ARCHIVE_OK) {\\n        // Process the entry (dummy processing for fuzzing)\\n        const char *pathname = archive_entry_pathname(entry);\\n        if (pathname) {\\n            // Just to simulate some processing\\n            size_t len = strlen(pathname);\\n            (void)len;\\n        }\\n\\n        // Linkify the entry\\n        struct archive_entry *sparse_entry = nullptr;\\n        archive_entry_linkify(resolver, &entry, &sparse_entry);\\n\\n        archive_read_data_skip(a);\\n    }\\n\\n    // Clean up\\n    archive_entry_linkresolver_free(resolver);\\n    archive_read_free(a);\\n\\n    return 0;\\n}",
+        "model": ""
+    }
+
+    ]
+}

@@ -1,0 +1,526 @@
+<!doctype html>
+
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Experiment results</title>
+<style>
+* {
+    box-sizing: border-box;
+}
+
+html {
+    line-height: 1.15;
+}
+
+body {
+    font-family: sans-serif;
+    font-size: 16px;
+}
+
+table {
+    border-collapse: collapse;
+    border-spacing: 0;
+}
+
+td, th {
+    border-right: 1px #dedede solid;
+    border-bottom: 1px #dedede solid;
+    padding: 5px;
+    text-align: left;
+}
+td:first-child, th:first-child {
+    border-left: 1px #dedede solid;
+}
+th {
+    border-top: 1px #dedede solid;
+}
+
+tbody tr:nth-child(odd) {
+    background-color: #f4f5ff;
+}
+</style>
+<body>
+    LLM: 
+    
+<h1>output-icu-_zn6icu_7513messageformat12applypatternerkns_13unicodestringer11uparseerrorr10uerrorcode / 01</h1>
+Bug: False
+<br>
+Crash reason: NO_SEMANTIC_ERR
+<br>
+<br>
+
+
+
+
+<h3>Final code</h3>
+
+<pre>
+#include &lt;fuzzer/FuzzedDataProvider.h&gt;
+#include &lt;unicode/unistr.h&gt;
+#include &lt;unicode/parseerr.h&gt;
+#include &lt;unicode/utypes.h&gt;
+#include &lt;unicode/msgfmt.h&gt;
+#include &lt;unicode/uclean.h&gt;
+
+extern &#34;C&#34; {
+    #include &lt;unicode/ucnv.h&gt;
+    #include &lt;unicode/ustring.h&gt;
+}
+
+extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    UErrorCode status = U_ZERO_ERROR;
+    u_init(&amp;status);
+    return 0;
+}
+
+extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    if (size &lt; 1) {
+        return 0; // Not enough data to proceed
+    }
+
+    FuzzedDataProvider dataProvider(data, size);
+
+    std::string patternString = dataProvider.ConsumeRandomLengthString(size);
+    icu::UnicodeString pattern(patternString.c_str(), patternString.length(), &#34;UTF-8&#34;);
+
+    UParseError parseError;
+    UErrorCode status = U_ZERO_ERROR;
+
+    // Create a MessageFormat object with a valid pattern
+    icu::MessageFormat messageFormat(&#34;{0}&#34;, status);
+
+    // Apply the fuzzed pattern to the MessageFormat object
+    messageFormat.applyPattern(pattern, parseError, status);
+
+    return 0;
+}
+</pre>
+
+
+<h3>Fixer prompt #1</h3>
+<pre>
+
+Given the following C++ fuzz harness and its build error message, fix the code to make it build for fuzzing.
+
+If there is undeclared identifier or unknown type name error, fix it by finding and including the related libraries.
+
+Note that some code may need to be wrapped with &lt;code&gt;extern &#34;C&#34;&lt;/code&gt; as their source is C program.
+
+MUST RETURN THE FULL CODE, INCLUDING UNCHANGED PARTS.
+EXTREMELY IMPORTANT: AVOID USING &lt;code&gt;goto&lt;/code&gt;. If you have to write code using &lt;code&gt;goto&lt;/code&gt;, you MUST MUST also declare all variables BEFORE the &lt;code&gt;goto&lt;/code&gt;. Never introduce new variables after the &lt;code&gt;goto&lt;/code&gt;.
+
+Below is the code needs to be built:
+&lt;code&gt;
+#include &lt;fuzzer/FuzzedDataProvider.h&gt;
+#include &lt;unicode/unistr.h&gt;
+#include &lt;unicode/parseerr.h&gt;
+#include &lt;unicode/utypes.h&gt;
+#include &lt;unicode/msgfmt.h&gt;
+
+extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    UErrorCode status = U_ZERO_ERROR;
+    u_init(&amp;status);
+    return 0;
+}
+
+extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    if (size &lt; 1) {
+        return 0; // Not enough data to proceed
+    }
+
+    FuzzedDataProvider dataProvider(data, size);
+
+    std::string patternString = dataProvider.ConsumeRandomLengthString(size);
+    icu::UnicodeString pattern(patternString.c_str(), patternString.length(), &#34;UTF-8&#34;);
+
+    UParseError parseError;
+    UErrorCode status = U_ZERO_ERROR;
+
+    icu::MessageFormat messageFormat;
+
+    messageFormat.applyPattern(pattern, parseError, status);
+
+    return 0;
+}
+&lt;/code&gt;
+
+The code has the following build issues:
+&lt;error&gt;
+/src/icu/icu4c/source/test/fuzzer/relative_date_time_formatter_fuzzer.cpp:9:5: error: use of undeclared identifier &#39;u_init_76&#39;
+    9 |     u_init(&amp;status);
+      |     ^
+/src/icu/icu4c/source/common/unicode/urename.h:294:16: note: expanded from macro &#39;u_init&#39;
+  294 | #define u_init U_ICU_ENTRY_POINT_RENAME(u_init)
+      |                ^
+/src/icu/icu4c/source/common/unicode/uvernum.h:123:47: note: expanded from macro &#39;U_ICU_ENTRY_POINT_RENAME&#39;
+  123 | #       define U_ICU_ENTRY_POINT_RENAME(x)    U_DEF2_ICU_ENTRY_POINT_RENAME(x,U_ICU_VERSION_SUFFIX)
+      |                                               ^
+/src/icu/icu4c/source/common/unicode/uvernum.h:122:51: note: expanded from macro &#39;U_DEF2_ICU_ENTRY_POINT_RENAME&#39;
+  122 | #       define U_DEF2_ICU_ENTRY_POINT_RENAME(x,y) U_DEF_ICU_ENTRY_POINT_RENAME(x,y)
+      |                                                   ^
+/src/icu/icu4c/source/common/unicode/uvernum.h:121:50: note: expanded from macro &#39;U_DEF_ICU_ENTRY_POINT_RENAME&#39;
+  121 | #       define U_DEF_ICU_ENTRY_POINT_RENAME(x,y) x ## y
+      |                                                  ^
+&lt;scratch space&gt;:56:1: note: expanded from here
+   56 | u_init_76
+      | ^
+/src/icu/icu4c/source/test/fuzzer/relative_date_time_formatter_fuzzer.cpp:26:24: error: call to deleted constructor of &#39;icu::MessageFormat&#39;
+   26 |     icu::MessageFormat messageFormat;
+      |                        ^
+/src/icu/icu4c/source/i18n/unicode/msgfmt.h:889:5: note: &#39;MessageFormat&#39; has been explicitly marked deleted here
+  889 |     MessageFormat() = delete; // default constructor not implemented
+      |     ^
+&lt;/error&gt;
+
+Fix code:
+1. Consider possible solutions for the issues listed above.
+2. Choose a solution that can maximize fuzzing result, which is utilizing the function under test and feeding it not null input.
+3. Apply the solutions to the original code.
+It&#39;s important to show the complete code, not only the fixed line.
+&lt;solution&gt;
+</pre>
+
+
+
+<h3>Code #1</h3>
+
+<pre>
+Here is the fixed code with the necessary changes to address the build issues:
+
+```cpp
+#include &lt;fuzzer/FuzzedDataProvider.h&gt;
+#include &lt;unicode/unistr.h&gt;
+#include &lt;unicode/parseerr.h&gt;
+#include &lt;unicode/utypes.h&gt;
+#include &lt;unicode/msgfmt.h&gt;
+#include &lt;unicode/uclean.h&gt;
+
+extern &#34;C&#34; {
+    #include &lt;unicode/ucnv.h&gt;
+    #include &lt;unicode/ustring.h&gt;
+}
+
+extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    UErrorCode status = U_ZERO_ERROR;
+    u_init(&amp;status);
+    return 0;
+}
+
+extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    if (size &lt; 1) {
+        return 0; // Not enough data to proceed
+    }
+
+    FuzzedDataProvider dataProvider(data, size);
+
+    std::string patternString = dataProvider.ConsumeRandomLengthString(size);
+    icu::UnicodeString pattern(patternString.c_str(), patternString.length(), &#34;UTF-8&#34;);
+
+    UParseError parseError;
+    UErrorCode status = U_ZERO_ERROR;
+
+    // Create a MessageFormat object with a valid pattern
+    icu::MessageFormat messageFormat(&#34;{0}&#34;, status);
+
+    // Apply the fuzzed pattern to the MessageFormat object
+    messageFormat.applyPattern(pattern, parseError, status);
+
+    return 0;
+}
+```
+
+### Explanation of Changes:
+1. **Include necessary libraries**: Added `#include &lt;unicode/uclean.h&gt;` to ensure proper initialization and cleanup of ICU.
+2. **Wrap C functions with `extern &#34;C&#34;`**: Wrapped the inclusion of `unicode/ucnv.h` and `unicode/ustring.h` with `extern &#34;C&#34;` to prevent C++ name mangling, as these headers are from the C API of ICU.
+3. **Fix `u_init` undeclared identifier**: The `u_init` function is part of the ICU initialization process. This function is correctly used but requires the inclusion of `unicode/uclean.h`.
+4. **Correct `MessageFormat` constructor usage**: The default constructor of `MessageFormat` is deleted. Instead, we initialize `MessageFormat` with a simple valid pattern `&#34;{0}&#34;` to ensure it is properly constructed before applying the fuzzed pattern.
+
+With these changes, the code should compile successfully and be ready for fuzzing.
+</pre>
+
+
+<h2>Logs</h2>
+<pre>
+Fixing /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-icu-_zn6icu_7513messageformat12applypatternerkns_13unicodestringer11uparseerrorr10uerrorcode/fixed_targets/01.cpp with gpt-4o, attempt 1.
+Successfully built /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-icu-_zn6icu_7513messageformat12applypatternerkns_13unicodestringer11uparseerrorr10uerrorcode/fixed_targets/01.cpp with gpt-4o in 1 iterations of fixing.
+Result for icu-zn6icu_7513messageformat12applypatternerkns_13unicodestringer11uparseerrorr10uerrorcode-01: crashes=False, coverage=0.008530632726609188 (935/109605), coverage diff=0.0029482446795332357 (476/161452)
+
+</pre>
+
+<h2>Run logs</h2>
+<pre>
+INFO:__main__:Running: docker run --rm --privileged --shm-size=2g --platform linux/amd64 -e FUZZING_ENGINE=libfuzzer -e SANITIZER=address -e RUN_FUZZER_MODE=interactive -e HELPER=True -v /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-icu-_zn6icu_7513messageformat12applypatternerkns_13unicodestringer11uparseerrorr10uerrorcode/corpora/01.cpp:/tmp/relative_date_time_formatter_fuzzer_corpus -v /tmp/tmp9gg1c8dt/build/out/icu-zn6icu_7513messageformat12applypatternerkns_13unicodestringer11uparseerrorr10uerrorcode-01:/out -t gcr.io/oss-fuzz-base/base-runner run_fuzzer relative_date_time_formatter_fuzzer -print_final_stats=1 -max_total_time=30 -len_control=0 -timeout=30.
+vm.mmap_rnd_bits = 28
+rm: cannot remove &#39;/tmp/relative_date_time_formatter_fuzzer_corpus&#39;: Device or resource busy
+/out/relative_date_time_formatter_fuzzer -rss_limit_mb=2560 -timeout=25 -print_final_stats=1 -max_total_time=30 -len_control=0 -timeout=30 /tmp/relative_date_time_formatter_fuzzer_corpus &lt; /dev/null
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 2921388919
+INFO: Loaded 1 modules   (109605 inline 8-bit counters): 109605 [0x55bfb33c20c0, 0x55bfb33dcce5), 
+INFO: Loaded 1 PC tables (109605 PCs): 109605 [0x55bfb33dcce8,0x55bfb3588f38), 
+INFO:        0 files found in /tmp/relative_date_time_formatter_fuzzer_corpus
+INFO: -max_len is not provided; libFuzzer will not generate inputs larger than 4096 bytes
+INFO: A corpus is not provided, starting from an empty corpus
+#2	INITED cov: 450 ft: 451 corp: 1/1b exec/s: 0 rss: 41Mb
+	NEW_FUNC[1/3]: 0x55bfb13459a0 in UCNV_TO_U_CALLBACK_SUBSTITUTE_76 /src/icu/icu4c/source/common/ucnv_err.cpp:389
+	NEW_FUNC[2/3]: 0x55bfb13d19d0 in ucnv_cbToUWriteSub_76 /src/icu/icu4c/source/common/ucnv_cb.cpp:250
+#3	NEW    cov: 501 ft: 537 corp: 2/120b lim: 4096 exec/s: 3 rss: 42Mb L: 119/119 MS: 1 InsertRepeatedBytes-
+#5	NEW    cov: 501 ft: 538 corp: 3/239b lim: 4096 exec/s: 5 rss: 42Mb L: 119/119 MS: 2 ShuffleBytes-ChangeByte-
+#9	NEW    cov: 501 ft: 539 corp: 4/359b lim: 4096 exec/s: 9 rss: 42Mb L: 120/120 MS: 4 ChangeBit-CrossOver-ChangeBinInt-ChangeBit-
+#10	NEW    cov: 501 ft: 540 corp: 5/479b lim: 4096 exec/s: 10 rss: 42Mb L: 120/120 MS: 1 ChangeByte-
+#14	NEW    cov: 501 ft: 579 corp: 6/664b lim: 4096 exec/s: 14 rss: 42Mb L: 185/185 MS: 4 ChangeBinInt-ChangeByte-InsertByte-CopyPart-
+#15	NEW    cov: 503 ft: 581 corp: 7/792b lim: 4096 exec/s: 15 rss: 42Mb L: 128/185 MS: 1 CMP- DE: &#34;\377\377\377\377\377\377\377\263&#34;-
+#17	NEW    cov: 507 ft: 587 corp: 8/1005b lim: 4096 exec/s: 17 rss: 42Mb L: 213/213 MS: 2 ChangeBit-InsertRepeatedBytes-
+#20	NEW    cov: 507 ft: 588 corp: 9/1112b lim: 4096 exec/s: 20 rss: 42Mb L: 107/213 MS: 3 ChangeByte-EraseBytes-ChangeBinInt-
+#22	NEW    cov: 507 ft: 611 corp: 10/1413b lim: 4096 exec/s: 22 rss: 42Mb L: 301/301 MS: 2 CrossOver-CopyPart-
+#23	NEW    cov: 507 ft: 637 corp: 11/1414b lim: 4096 exec/s: 23 rss: 42Mb L: 1/301 MS: 1 ChangeBit-
+#35	NEW    cov: 507 ft: 638 corp: 12/1735b lim: 4096 exec/s: 35 rss: 42Mb L: 321/321 MS: 2 ChangeBit-InsertRepeatedBytes-
+#36	NEW    cov: 507 ft: 639 corp: 13/1921b lim: 4096 exec/s: 36 rss: 42Mb L: 186/321 MS: 1 CopyPart-
+#37	NEW    cov: 507 ft: 643 corp: 14/2320b lim: 4096 exec/s: 37 rss: 42Mb L: 399/399 MS: 1 CrossOver-
+#44	NEW    cov: 507 ft: 647 corp: 15/2719b lim: 4096 exec/s: 44 rss: 42Mb L: 399/399 MS: 2 ChangeByte-ChangeBit-
+#52	NEW    cov: 507 ft: 648 corp: 16/3146b lim: 4096 exec/s: 52 rss: 42Mb L: 427/427 MS: 3 ChangeBit-CrossOver-InsertRepeatedBytes-
+#60	NEW    cov: 507 ft: 650 corp: 17/3790b lim: 4096 exec/s: 60 rss: 43Mb L: 644/644 MS: 3 CrossOver-InsertRepeatedBytes-InsertRepeatedBytes-
+#63	NEW    cov: 511 ft: 656 corp: 18/4998b lim: 4096 exec/s: 63 rss: 43Mb L: 1208/1208 MS: 3 InsertRepeatedBytes-CMP-CopyPart- DE: &#34;\377\377\377\377\377\377\001\264&#34;-
+#68	NEW    cov: 511 ft: 662 corp: 19/5286b lim: 4096 exec/s: 68 rss: 43Mb L: 288/1208 MS: 5 CopyPart-InsertRepeatedBytes-InsertByte-PersAutoDict-EraseBytes- DE: &#34;\377\377\377\377\377\377\377\263&#34;-
+#69	NEW    cov: 511 ft: 696 corp: 20/5295b lim: 4096 exec/s: 69 rss: 43Mb L: 9/1208 MS: 1 PersAutoDict- DE: &#34;\377\377\377\377\377\377\377\263&#34;-
+#80	NEW    cov: 516 ft: 704 corp: 21/5415b lim: 4096 exec/s: 80 rss: 43Mb L: 120/1208 MS: 1 ChangeBinInt-
+#87	REDUCE cov: 516 ft: 704 corp: 21/5392b lim: 4096 exec/s: 87 rss: 43Mb L: 621/1208 MS: 2 InsertByte-EraseBytes-
+#91	NEW    cov: 516 ft: 711 corp: 22/6688b lim: 4096 exec/s: 91 rss: 43Mb L: 1296/1296 MS: 4 ChangeBinInt-CrossOver-CrossOver-InsertRepeatedBytes-
+#97	NEW    cov: 516 ft: 713 corp: 23/8006b lim: 4096 exec/s: 97 rss: 43Mb L: 1318/1318 MS: 1 InsertRepeatedBytes-
+#108	REDUCE cov: 516 ft: 713 corp: 23/7990b lim: 4096 exec/s: 108 rss: 43Mb L: 103/1318 MS: 1 EraseBytes-
+#113	NEW    cov: 516 ft: 716 corp: 24/9287b lim: 4096 exec/s: 113 rss: 43Mb L: 1297/1318 MS: 5 CrossOver-ShuffleBytes-ShuffleBytes-CMP-InsertByte- DE: &#34;\377\000&#34;-
+#133	NEW    cov: 516 ft: 718 corp: 25/9559b lim: 4096 exec/s: 133 rss: 43Mb L: 272/1318 MS: 5 InsertRepeatedBytes-ChangeBit-InsertByte-ChangeBit-CrossOver-
+#135	NEW    cov: 516 ft: 720 corp: 26/10490b lim: 4096 exec/s: 135 rss: 43Mb L: 931/1318 MS: 2 EraseBytes-InsertRepeatedBytes-
+#137	NEW    cov: 516 ft: 729 corp: 27/10775b lim: 4096 exec/s: 137 rss: 43Mb L: 285/1318 MS: 2 ChangeByte-CrossOver-
+#138	NEW    cov: 516 ft: 743 corp: 28/12317b lim: 4096 exec/s: 138 rss: 43Mb L: 1542/1542 MS: 1 CrossOver-
+#150	NEW    cov: 516 ft: 744 corp: 29/13615b lim: 4096 exec/s: 150 rss: 43Mb L: 1298/1542 MS: 2 ChangeBit-InsertByte-
+#160	NEW    cov: 516 ft: 750 corp: 30/15281b lim: 4096 exec/s: 160 rss: 43Mb L: 1666/1666 MS: 5 CrossOver-ChangeBit-ChangeByte-CopyPart-CopyPart-
+#172	NEW    cov: 516 ft: 752 corp: 31/15642b lim: 4096 exec/s: 172 rss: 44Mb L: 361/1666 MS: 2 CMP-EraseBytes- DE: &#34;\000\000\000\000\000\000\000\000&#34;-
+#176	NEW    cov: 516 ft: 770 corp: 32/15651b lim: 4096 exec/s: 176 rss: 44Mb L: 9/1666 MS: 4 InsertByte-CMP-ChangeBinInt-EraseBytes- DE: &#34;f\001\000\000&#34;-
+#192	NEW    cov: 516 ft: 807 corp: 33/15653b lim: 4096 exec/s: 192 rss: 44Mb L: 2/1666 MS: 1 CopyPart-
+#193	REDUCE cov: 516 ft: 807 corp: 33/15628b lim: 4096 exec/s: 193 rss: 44Mb L: 82/1666 MS: 1 EraseBytes-
+#199	REDUCE cov: 516 ft: 807 corp: 33/15609b lim: 4096 exec/s: 199 rss: 44Mb L: 167/1666 MS: 1 EraseBytes-
+#235	NEW    cov: 516 ft: 810 corp: 34/15611b lim: 4096 exec/s: 235 rss: 44Mb L: 2/1666 MS: 1 CrossOver-
+#253	REDUCE cov: 516 ft: 810 corp: 34/15581b lim: 4096 exec/s: 253 rss: 44Mb L: 73/1666 MS: 3 InsertByte-ChangeBinInt-EraseBytes-
+#254	NEW    cov: 517 ft: 811 corp: 35/15701b lim: 4096 exec/s: 254 rss: 44Mb L: 120/1666 MS: 1 InsertRepeatedBytes-
+#258	NEW    cov: 517 ft: 812 corp: 36/15902b lim: 4096 exec/s: 258 rss: 44Mb L: 201/1666 MS: 4 PersAutoDict-ChangeByte-ShuffleBytes-CMP- DE: &#34;\377\377\377\377\377\377\001\264&#34;-&#34;\354\001\000\000\000\000\000\000&#34;-
+#261	NEW    cov: 517 ft: 814 corp: 37/16Kb lim: 4096 exec/s: 261 rss: 44Mb L: 1344/1666 MS: 3 EraseBytes-InsertRepeatedBytes-CopyPart-
+#268	NEW    cov: 517 ft: 819 corp: 38/17Kb lim: 4096 exec/s: 268 rss: 44Mb L: 263/1666 MS: 2 ChangeBit-EraseBytes-
+#272	REDUCE cov: 517 ft: 819 corp: 38/17Kb lim: 4096 exec/s: 272 rss: 44Mb L: 113/1666 MS: 4 ShuffleBytes-InsertRepeatedBytes-ChangeBit-EraseBytes-
+#274	NEW    cov: 517 ft: 820 corp: 39/17Kb lim: 4096 exec/s: 274 rss: 44Mb L: 202/1666 MS: 2 CrossOver-PersAutoDict- DE: &#34;\354\001\000\000\000\000\000\000&#34;-
+#289	NEW    cov: 517 ft: 822 corp: 40/17Kb lim: 4096 exec/s: 289 rss: 44Mb L: 277/1666 MS: 5 InsertByte-CrossOver-ChangeASCIIInt-ShuffleBytes-EraseBytes-
+#313	REDUCE cov: 518 ft: 823 corp: 41/17Kb lim: 4096 exec/s: 313 rss: 44Mb L: 234/1666 MS: 4 CrossOver-ChangeBinInt-InsertRepeatedBytes-InsertByte-
+#314	NEW    cov: 520 ft: 825 corp: 42/19Kb lim: 4096 exec/s: 314 rss: 45Mb L: 1297/1666 MS: 1 InsertByte-
+#334	NEW    cov: 523 ft: 828 corp: 43/19Kb lim: 4096 exec/s: 334 rss: 45Mb L: 400/1666 MS: 5 ChangeByte-ChangeASCIIInt-InsertByte-ChangeBinInt-ChangeBit-
+#338	NEW    cov: 523 ft: 834 corp: 44/19Kb lim: 4096 exec/s: 338 rss: 45Mb L: 383/1666 MS: 4 InsertRepeatedBytes-ChangeBit-InsertByte-PersAutoDict- DE: &#34;\377\377\377\377\377\377\001\264&#34;-
+#340	NEW    cov: 523 ft: 835 corp: 4
+...truncated...
+exec/s: 5272 rss: 68Mb L: 891/3823 MS: 3 ShuffleBytes-ChangeBinInt-EraseBytes-
+#158304	REDUCE cov: 935 ft: 2336 corp: 404/207Kb lim: 4096 exec/s: 5276 rss: 68Mb L: 3/3823 MS: 3 ShuffleBytes-ChangeByte-EraseBytes-
+#158358	REDUCE cov: 935 ft: 2336 corp: 404/207Kb lim: 4096 exec/s: 5278 rss: 68Mb L: 94/3823 MS: 4 ChangeByte-ShuffleBytes-ChangeByte-EraseBytes-
+#158457	REDUCE cov: 935 ft: 2336 corp: 404/207Kb lim: 4096 exec/s: 5281 rss: 68Mb L: 151/3823 MS: 4 CMP-EraseBytes-InsertByte-CopyPart- DE: &#34;\377\377&#34;-
+#158501	REDUCE cov: 935 ft: 2337 corp: 405/208Kb lim: 4096 exec/s: 5283 rss: 68Mb L: 1563/3823 MS: 4 InsertByte-ChangeBit-CopyPart-CrossOver-
+#158592	REDUCE cov: 935 ft: 2339 corp: 406/210Kb lim: 4096 exec/s: 5286 rss: 68Mb L: 1649/3823 MS: 1 ShuffleBytes-
+#158685	REDUCE cov: 935 ft: 2339 corp: 406/209Kb lim: 4096 exec/s: 5289 rss: 68Mb L: 618/3823 MS: 3 CrossOver-ChangeByte-EraseBytes-
+#158745	DONE   cov: 935 ft: 2339 corp: 406/209Kb lim: 4096 exec/s: 5120 rss: 68Mb
+###### Recommended dictionary. ######
+&#34;\377\377\377\377\377\377\377\263&#34; # Uses: 169
+&#34;\377\377\377\377\377\377\001\264&#34; # Uses: 171
+&#34;\377\000&#34; # Uses: 183
+&#34;\000\000\000\000\000\000\000\000&#34; # Uses: 198
+&#34;f\001\000\000&#34; # Uses: 176
+&#34;\354\001\000\000\000\000\000\000&#34; # Uses: 148
+&#34;\3772&#34; # Uses: 182
+&#34;\377\377\377\377\377\377\377\377&#34; # Uses: 147
+&#34;\002\035&#34; # Uses: 176
+&#34;\001\000\000\000\000\000\000\003&#34; # Uses: 163
+&#34;\000\000\000\000\000\000\0006&#34; # Uses: 145
+&#34;\037\000\000\000\000\000\000\000&#34; # Uses: 141
+&#34;\020\000&#34; # Uses: 159
+&#34;\331\001\000\000\000\000\000\000&#34; # Uses: 137
+&#34;\016\005&#34; # Uses: 165
+&#34;\000\000\000\000\000\000\002Z&#34; # Uses: 135
+&#34;\000\002\000\000&#34; # Uses: 156
+&#34;\377\377\377\377\377\377\377\020&#34; # Uses: 131
+&#34;\370\000\000\000\000\000\000\000&#34; # Uses: 153
+&#34;\024\000\000\000\000\000\000\000&#34; # Uses: 139
+&#34;\003\000\000\000\000\000\000\000&#34; # Uses: 123
+&#34;\377\377\377\377\377\377\377\312&#34; # Uses: 155
+&#34;\001\000\000\000\177\377\377\376&#34; # Uses: 136
+&#34;5\003\000\000\000\000\000\000&#34; # Uses: 147
+&#34;\000\000\000\000\000\000\000\026&#34; # Uses: 121
+&#34;art__LOJBAN&#34; # Uses: 146
+&#34;\001\000\000\000\000\000\002\027&#34; # Uses: 119
+&#34;\000\000\004\270&#34; # Uses: 135
+&#34;\000\000\000\000\177\377\377\377&#34; # Uses: 155
+&#34;\377\377\377\377\377\377\001\205&#34; # Uses: 137
+&#34;\021\002\000\000\000\000\000\000&#34; # Uses: 124
+&#34;\377\377\377\377\377\377\377\304&#34; # Uses: 123
+&#34;\000\001&#34; # Uses: 144
+&#34;\000\000\000\000\000\000\000\036&#34; # Uses: 136
+&#34;en_US_POSIX&#34; # Uses: 111
+&#34;\000\000\000\000\000\000\000\007&#34; # Uses: 138
+&#34;\001\344&#34; # Uses: 101
+&#34;.\000\000\000&#34; # Uses: 126
+&#34;#\000&#34; # Uses: 107
+&#34;\000\000\000\313&#34; # Uses: 124
+&#34;\031\000\000\000\000\000\000\000&#34; # Uses: 132
+&#34;\015\000\000\000\000\000\000\000&#34; # Uses: 111
+&#34;\377\377\377O&#34; # Uses: 133
+&#34;\013\000\000\000\000\000\000\000&#34; # Uses: 109
+&#34;\001\000\000\000\000\000\005f&#34; # Uses: 135
+&#34;hy__AREVMDA&#34; # Uses: 112
+&#34;\017\002\000\000\000\000\000\000&#34; # Uses: 104
+&#34;\301\012\000\000\000\000\000\000&#34; # Uses: 124
+&#34;\034\000\000\000&#34; # Uses: 115
+&#34;en_US&#34; # Uses: 97
+&#34;\023\004\000\000\000\000\000\000&#34; # Uses: 98
+&#34;&amp;\005\000\000\000\000\000\000&#34; # Uses: 108
+&#34;\001\011&#34; # Uses: 113
+&#34;\377\002&#34; # Uses: 100
+&#34;\260\004\000\000&#34; # Uses: 111
+&#34;\001\000\000\000\000\000\000\000&#34; # Uses: 98
+&#34;\000\000\000\341&#34; # Uses: 111
+&#34;\000)&#34; # Uses: 98
+&#34;\027\000\000\000\000\000\000\000&#34; # Uses: 107
+&#34;\001\000\000\000\000\000\006\006&#34; # Uses: 108
+&#34;\000\223&#34; # Uses: 99
+&#34;*\005\000\000&#34; # Uses: 107
+&#34;\000\000&#34; # Uses: 113
+&#34;\305\002\000\000&#34; # Uses: 89
+&#34;\245\000&#34; # Uses: 93
+&#34;\377J&#34; # Uses: 99
+&#34;\001\010&#34; # Uses: 98
+&#34;\000a&#34; # Uses: 107
+&#34;+\000\000\000&#34; # Uses: 95
+&#34;\000\000\000\000\000\000\000\002&#34; # Uses: 98
+&#34;\033\000\000\000\000\000\000\000&#34; # Uses: 87
+&#34;\003\000&#34; # Uses: 101
+&#34;\030\000\000\000\000\000\000\000&#34; # Uses: 96
+&#34;\023\000\000\000\000\000\000\000&#34; # Uses: 87
+&#34;\017\000\000\000\000\000\000\000&#34; # Uses: 70
+&#34;\004\000\000\000\000\000\000\000&#34; # Uses: 90
+&#34;Z\000\000\000\000\000\000\000&#34; # Uses: 88
+&#34;)\007&#34; # Uses: 85
+&#34;\373\014\000\000\000\000\000\000&#34; # Uses: 74
+&#34;\377\377\377\017&#34; # Uses: 91
+&#34;\001\000\001w&#34; # Uses: 79
+&#34;\367\000\000\000&#34; # Uses: 76
+&#34;\001\000\000\204&#34; # Uses: 74
+&#34;\377\204&#34; # Uses: 98
+&#34;\001\000\000\000\000\000\005\274&#34; # Uses: 91
+&#34;\001\000\000\000\000\000\000\012&#34; # Uses: 87
+&#34;D\004\000\000\000\000\000\000&#34; # Uses: 89
+&#34;:\004\000\000&#34; # Uses: 91
+&#34;\001\314&#34; # Uses: 88
+&#34;\012\000\000\000\000\000\000\000&#34; # Uses: 75
+&#34;\001\000&#34; # Uses: 65
+&#34;\001\000\003\207&#34; # Uses: 80
+&#34;\232\000\000\000&#34; # Uses: 80
+&#34;\001\000\000\000\000\000\000&gt;&#34; # Uses: 73
+&#34;1\000&#34; # Uses: 83
+&#34;\207\001\000\000\000\000\000\000&#34; # Uses: 74
+&#34;\377\377\377\377\377\377\377\023&#34; # Uses: 62
+&#34;/\000\000\000\000\000\000\000&#34; # Uses: 62
+&#34;\000\000\000\000\000\000\000\014&#34; # Uses: 80
+&#34;\000\000\000\005&#34; # Uses: 68
+&#34;\000\000\000\200\000\000\000\000&#34; # Uses: 73
+&#34;\343\000\000\000&#34; # Uses: 70
+&#34;\001\001\000\000\000\000\000\000&#34; # Uses: 61
+&#34;\377$&#34; # Uses: 59
+&#34;\001\000\000\000\000\000\000h&#34; # Uses: 64
+&#34;\377\007&#34; # Uses: 71
+&#34;\001#&#34; # Uses: 63
+&#34;\234\002\000\000\000\000\000\000&#34; # Uses: 65
+&#34;\377\377\377\377\377\377\000;&#34; # Uses: 67
+&#34;\000\000\000\000\000\000\000\034&#34; # Uses: 64
+&#34;=\006\000\000\000\000\000\000&#34; # Uses: 68
+&#34;\377\377\377\377\377\377\377\002&#34; # Uses: 69
+&#34;(\002\000\000&#34; # Uses: 67
+&#34;\025\001&#34; # Uses: 68
+&#34;\006\001\000\000\000\000\000\000&#34; # Uses: 64
+&#34;\000\000\000\000\000\000\000P&#34; # Uses: 63
+&#34;\001\000\000\000\000\000\001k&#34; # Uses: 48
+&#34;\000\000\000\000\000\000\000\005&#34; # Uses: 55
+&#34;8\000\000\000\000\000\000\000&#34; # Uses: 48
+&#34;\000\000\000\000\000\000\003,&#34; # Uses: 57
+&#34;\377\377\377k&#34; # Uses: 64
+&#34;\001\001&#34; # Uses: 46
+&#34;\000\000\000E&#34; # Uses: 35
+&#34;\000\000\000\002&#34; # Uses: 56
+&#34;POSIX&#34; # Uses: 60
+&#34;\377\377\377\001&#34; # Uses: 49
+&#34;\235\000\000\000&#34; # Uses: 51
+&#34;\001\000\000\017&#34; # Uses: 43
+&#34;\377\267&#34; # Uses: 58
+&#34;;\000&#34; # Uses: 48
+&#34;\377\216&#34; # Uses: 52
+&#34;.\000\000\000\000\000\000\000&#34; # Uses: 28
+&#34;\000\000\000\000\000\000\000V&#34; # Uses: 35
+&#34;\377\377\377\377\377\377\377\201&#34; # Uses: 40
+&#34;R\000&#34; # Uses: 40
+&#34;\001\000\000\000\000\000\000\260&#34; # Uses: 36
+&#34;f\000\000\000&#34; # Uses: 36
+&#34;\001\225&#34; # Uses: 37
+&#34;N\000\000\000&#34; # Uses: 34
+&#34;(\000&#34; # Uses: 31
+&#34;I\000\000\000\000\000\000\000&#34; # Uses: 41
+&#34;\377\377\377\377\377\377\377\010&#34; # Uses: 31
+&#34;\377f&#34; # Uses: 33
+&#34;\237\000\000\000&#34; # Uses: 41
+&#34;\377\377\377\377\377\377\377\215&#34; # Uses: 26
+&#34;\004\000&#34; # Uses: 30
+&#34;\263\000\000\000&#34; # Uses: 32
+&#34;p\002\000\000&#34; # Uses: 29
+&#34;\006\001\000\000&#34; # Uses: 23
+&#34;\000\000\000\000\000\000\000=&#34; # Uses: 29
+&#34;\377\377\377\177\000\000\000\000&#34; # Uses: 27
+&#34;\035\000\000\000\000\000\000\000&#34; # Uses: 25
+&#34;\322\001\000\000\000\000\000\000&#34; # Uses: 20
+&#34;:\000\000\000\000\000\000\000&#34; # Uses: 22
+&#34;\377\377\377\377\377\377\377&gt;&#34; # Uses: 12
+&#34;\377\377\3773&#34; # Uses: 24
+&#34;\001\000\000\000\000\000\000c&#34; # Uses: 20
+&#34;\003\000\000\000&#34; # Uses: 21
+&#34;\014\000\000\000\000\000\000\000&#34; # Uses: 18
+&#34;\000\000\000\000\000\000\000\022&#34; # Uses: 18
+&#34;\001 &#34; # Uses: 23
+&#34;!\000\000\000&#34; # Uses: 18
+&#34;\025\000&#34; # Uses: 17
+&#34;\035\001\000\000\000\000\000\000&#34; # Uses: 20
+&#34;\001\007&#34; # Uses: 16
+&#34;\000\000\000\000\000\000\000:&#34; # Uses: 14
+&#34;!\004&#34; # Uses: 15
+&#34;\001\000\000\001&#34; # Uses: 18
+&#34;\000\000\000_&#34; # Uses: 8
+&#34;\001\000\000\000\000\000\004\323&#34; # Uses: 12
+&#34;\374\000\000\000\000\000\000\000&#34; # Uses: 13
+&#34;\377\377\377\377\377\377\377U&#34; # Uses: 13
+&#34;;\000\000\000&#34; # Uses: 6
+&#34;\001\000\001\330&#34; # Uses: 6
+&#34;\003\352&#34; # Uses: 4
+&#34;;\000\000\000\000\000\000\000&#34; # Uses: 15
+&#34;@\000\000\000\000\000\000\000&#34; # Uses: 6
+&#34;\377\377\377\377\377\377\001\020&#34; # Uses: 6
+&#34;\012\000&#34; # Uses: 13
+&#34;\215\005\000\000\000\000\000\000&#34; # Uses: 1
+&#34;\001\000\000a&#34; # Uses: 4
+&#34;\000\000\000\000\000\000\005\270&#34; # Uses: 5
+&#34;D\000&#34; # Uses: 3
+&#34;7\007\000\000\000\000\000\000&#34; # Uses: 1
+&#34;\027\000\000\000&#34; # Uses: 2
+&#34;\001\000\000\000\000\000\000\014&#34; # Uses: 3
+&#34;\000\000\000\000\000\000\000\012&#34; # Uses: 3
+&#34;\001\000\000\000\000\000\000(&#34; # Uses: 3
+&#34;:\012&#34; # Uses: 2
+&#34;\377\377&#34; # Uses: 0
+###### End of recommended dictionary. ######
+Done 158745 runs in 31 second(s)
+stat::number_of_executed_units: 158745
+stat::average_exec_per_sec:     5120
+stat::new_units_added:          2342
+stat::slowest_unit_time_sec:    0
+stat::peak_rss_mb:              68
+
+</pre>
+
+</body>

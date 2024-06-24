@@ -1,0 +1,43 @@
+{
+    "samples": [
+
+    {
+        "benchmark": "output-jsonnet-_zn7jsonnet8internal12_global__n_111interpreter13builtinextvarerkns0_13locationrangeerknst3__16vectorins1",
+        "sample": "01",
+        "status": "Done",
+        "compiles": "False",
+        "crashes": "False",
+        "crash_reason": "-",
+        "bug": "True",
+        "coverage": "0.00",
+        "coverage_diff": "0.0",
+        "coverage_report": "#",
+        "stacktrace": "/stacktrace",
+        "target_binary": "/target_binary",
+        "reproducer": "/artifacts",
+        "run_log": "run.log",
+        "source_code": "#include <fuzzer/FuzzedDataProvider.h>\\n#include <vector>\\n#include <string>\\n#include <cstdint> // For uint8_t\\n#include <cstddef> // For size_t\\n\\n// Assuming the core headers are in a directory named \"core\"\\n#include \"core/ast.h\"\\n#include \"core/static_error.h\"\\n#include \"core/json.h\"\\n#include \"core/lexer.h\"\\n#include \"core/state.h\"\\n#include \"core/vm.h\"\\n#include \"core/pass.h\"\\n#include \"core/unicode.h\"\\n#include \"core/formatter.h\"\\n#include \"core/string_utils.h\"\\n\\nusing namespace jsonnet::internal;\\n\\nextern \"C\" int LLVMFuzzerInitialize(int *argc, char ***argv) {\\n    return 0;\\n}\\n\\nextern \"C\" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {\\n    FuzzedDataProvider dataProvider(data, size);\\n\\n    std::string fileName = dataProvider.ConsumeRandomLengthString(100);\\n    int beginLine = dataProvider.ConsumeIntegral<int>();\\n    int beginColumn = dataProvider.ConsumeIntegral<int>();\\n    int endLine = dataProvider.ConsumeIntegral<int>();\\n    int endColumn = dataProvider.ConsumeIntegral<int>();\\n    LocationRange location(fileName, beginLine, beginColumn, endLine, endColumn);\\n\\n    size_t numValues = dataProvider.ConsumeIntegralInRange<size_t>(1, 10);\\n    std::vector<Value> args;\\n    for (size_t i = 0; i < numValues; ++i) {\\n        std::string valueStr = dataProvider.ConsumeRandomLengthString(100);\\n        Value value(valueStr);\\n        args.push_back(value);\\n    }\\n\\n    const AST *result = Interpreter::builtinExtVar(location, args);\\n\\n    if (result != nullptr) {\\n        // Perform additional checks on the returned AST node if necessary\\n    }\\n\\n    return 0;\\n}",
+        "model": ""
+    },
+
+    {
+        "benchmark": "output-jsonnet-_zn7jsonnet8internal12_global__n_111interpreter13builtinextvarerkns0_13locationrangeerknst3__16vectorins1",
+        "sample": "02",
+        "status": "Done",
+        "compiles": "False",
+        "crashes": "False",
+        "crash_reason": "-",
+        "bug": "True",
+        "coverage": "0.00",
+        "coverage_diff": "0.0",
+        "coverage_report": "#",
+        "stacktrace": "/stacktrace",
+        "target_binary": "/target_binary",
+        "reproducer": "/artifacts",
+        "run_log": "run.log",
+        "source_code": "#include <fuzzer/FuzzedDataProvider.h>\\n#include <vector>\\n#include <string>\\n#include \"libjsonnet.h\"\\n#include \"libjsonnet_fmt.h\"\\n\\n// Ensure C linkage for the Jsonnet functions\\nextern \"C\" {\\n    #include \"libjsonnet.h\"\\n    #include \"libjsonnet_fmt.h\"\\n}\\n\\nextern \"C\" int LLVMFuzzerInitialize(int *argc, char ***argv) {\\n    return 0;\\n}\\n\\nextern \"C\" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {\\n    FuzzedDataProvider dataProvider(data, size);\\n\\n    std::string fileName = dataProvider.ConsumeRandomLengthString(100);\\n    int beginLine = dataProvider.ConsumeIntegral<int>();\\n    int beginColumn = dataProvider.ConsumeIntegral<int>();\\n    int endLine = dataProvider.ConsumeIntegral<int>();\\n    int endColumn = dataProvider.ConsumeIntegral<int>();\\n    JsonnetVm *vm = jsonnet_make();\\n    std::string jsonnetCode = dataProvider.ConsumeRandomLengthString(1000);\\n\\n    // Ensure the Jsonnet code is not empty to maximize fuzzing result\\n    if (jsonnetCode.empty()) {\\n        jsonnetCode = \"{}\";\\n    }\\n\\n    char *output = jsonnet_fmt_snippet(vm, fileName.c_str(), jsonnetCode.c_str());\\n    if (output != nullptr) {\\n        jsonnet_realloc(vm, output, 0); // Free the output\\n    }\\n\\n    // Create a LocationRange object\\n    struct JsonnetLocationRange locRange;\\n    locRange.begin.line = beginLine;\\n    locRange.begin.column = beginColumn;\\n    locRange.end.line = endLine;\\n    locRange.end.column = endColumn;\\n\\n    // Create a vector of values to pass to the function\\n    std::vector<std::string> values;\\n    values.push_back(jsonnetCode);\\n\\n    // Call the target function\\n    // Note: The internal functions and classes are not accessible directly, so we need to use the public API\\n    // Assuming the public API has a similar function we can use for testing\\n    jsonnet_ext_var(vm, \"extVarName\", jsonnetCode.c_str());\\n\\n    jsonnet_destroy(vm);\\n\\n    return 0;\\n}",
+        "model": ""
+    }
+
+    ]
+}
