@@ -1,0 +1,710 @@
+<!doctype html>
+
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Experiment results</title>
+<style>
+* {
+    box-sizing: border-box;
+}
+
+html {
+    line-height: 1.15;
+}
+
+body {
+    font-family: sans-serif;
+    font-size: 16px;
+}
+
+table {
+    border-collapse: collapse;
+    border-spacing: 0;
+}
+
+td, th {
+    border-right: 1px #dedede solid;
+    border-bottom: 1px #dedede solid;
+    padding: 5px;
+    text-align: left;
+}
+td:first-child, th:first-child {
+    border-left: 1px #dedede solid;
+}
+th {
+    border-top: 1px #dedede solid;
+}
+
+tbody tr:nth-child(odd) {
+    background-color: #f4f5ff;
+}
+</style>
+<body>
+    LLM: 
+    
+<h1>output-hunspell-_zn8hunspell8generateepppcpkcs4_ / 02</h1>
+Bug: False
+<br>
+Crash reason: NO_SEMANTIC_ERR
+<br>
+<br>
+
+
+
+
+<h3>Final code</h3>
+
+<pre>
+#include &lt;fuzzer/FuzzedDataProvider.h&gt;
+#include &lt;vector&gt;
+#include &lt;string&gt;
+#include &lt;cstdlib&gt;  // For free()
+#include &lt;hunspell/hunspell.hxx&gt;  // Include the Hunspell header
+
+extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+  FuzzedDataProvider stream(data, size);
+
+  // Generate inputs for the function
+  std::string word = stream.ConsumeRandomLengthString();
+  std::string pattern = stream.ConsumeRandomLengthString();
+
+  // Prepare the output parameter
+  char **slst = nullptr;
+
+  // Create an instance of Hunspell
+  Hunspell hunspell(&#34;en_US.aff&#34;, &#34;en_US.dic&#34;);
+
+  // Call the function
+  int result = hunspell.generate(&amp;slst, word.c_str(), pattern.c_str());
+
+  // Clean up the allocated memory if needed
+  if (slst != nullptr) {
+    for (int i = 0; slst[i] != nullptr; ++i) {
+      free(slst[i]);
+    }
+    free(slst);
+  }
+
+  return 0;
+}
+</pre>
+
+
+<h3>Fixer prompt #1</h3>
+<pre>
+
+Given the following C++ fuzz harness and its build error message, fix the code to make it build for fuzzing.
+
+If there is undeclared identifier or unknown type name error, fix it by finding and including the related libraries.
+
+Note that some code may need to be wrapped with &lt;code&gt;extern &#34;C&#34;&lt;/code&gt; as their source is C program.
+
+MUST RETURN THE FULL CODE, INCLUDING UNCHANGED PARTS.
+EXTREMELY IMPORTANT: AVOID USING &lt;code&gt;goto&lt;/code&gt;. If you have to write code using &lt;code&gt;goto&lt;/code&gt;, you MUST MUST also declare all variables BEFORE the &lt;code&gt;goto&lt;/code&gt;. Never introduce new variables after the &lt;code&gt;goto&lt;/code&gt;.
+
+Below is the code needs to be built:
+&lt;code&gt;
+#include &lt;fuzzer/FuzzedDataProvider.h&gt;
+#include &lt;vector&gt;
+#include &lt;string&gt;
+#include &#34;hunspell.hxx&#34;  // Include the Hunspell header
+
+extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+  FuzzedDataProvider stream(data, size);
+
+  // Generate inputs for the function
+  std::string word = stream.ConsumeRandomLengthString();
+  std::string pattern = stream.ConsumeRandomLengthString();
+
+  // Prepare the output parameter
+  char **slst = nullptr;
+
+  // Create an instance of Hunspell
+  Hunspell hunspell(&#34;en_US.aff&#34;, &#34;en_US.dic&#34;);
+
+  // Call the function
+  int result = hunspell.generate(&amp;slst, word.c_str(), pattern.c_str());
+
+  // Clean up the allocated memory if needed
+  if (slst != nullptr) {
+    for (int i = 0; slst[i] != nullptr; ++i) {
+      free(slst[i]);
+    }
+    free(slst);
+  }
+
+  return 0;
+}
+&lt;/code&gt;
+
+The code has the following build issues:
+&lt;error&gt;
+./src/tools/fuzzer.cxx:4:10: fatal error: &#39;hunspell.hxx&#39; file not found
+    4 | #include &#34;hunspell.hxx&#34;  // Include the Hunspell header
+      |          ^~~~~~~~~~~~~~
+&lt;/error&gt;
+
+Fix code:
+1. Consider possible solutions for the issues listed above.
+2. Choose a solution that can maximize fuzzing result, which is utilizing the function under test and feeding it not null input.
+3. Apply the solutions to the original code.
+It&#39;s important to show the complete code, not only the fixed line.
+&lt;solution&gt;
+</pre>
+
+
+
+<h3>Code #1</h3>
+
+<pre>
+To fix the build issue, we need to make sure that the `hunspell.hxx` file is correctly included. This might require ensuring that the Hunspell library is installed and the include path is correctly set up. Additionally, we need to ensure that the Hunspell library is linked correctly during the build process.
+
+Here&#39;s the fixed code:
+
+```cpp
+#include &lt;fuzzer/FuzzedDataProvider.h&gt;
+#include &lt;vector&gt;
+#include &lt;string&gt;
+#include &lt;cstdlib&gt;  // For free()
+#include &lt;hunspell/hunspell.hxx&gt;  // Include the Hunspell header
+
+extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+  FuzzedDataProvider stream(data, size);
+
+  // Generate inputs for the function
+  std::string word = stream.ConsumeRandomLengthString();
+  std::string pattern = stream.ConsumeRandomLengthString();
+
+  // Prepare the output parameter
+  char **slst = nullptr;
+
+  // Create an instance of Hunspell
+  Hunspell hunspell(&#34;en_US.aff&#34;, &#34;en_US.dic&#34;);
+
+  // Call the function
+  int result = hunspell.generate(&amp;slst, word.c_str(), pattern.c_str());
+
+  // Clean up the allocated memory if needed
+  if (slst != nullptr) {
+    for (int i = 0; slst[i] != nullptr; ++i) {
+      free(slst[i]);
+    }
+    free(slst);
+  }
+
+  return 0;
+}
+```
+
+### Additional Notes:
+1. Ensure that the Hunspell library and its development headers are installed on your system. On Debian-based systems, you can install it using:
+   ```sh
+   sudo apt-get install libhunspell-dev
+   ```
+
+2. Make sure the compiler can find the Hunspell headers and libraries. This might involve setting include paths and library paths correctly, for example:
+   ```sh
+   g++ -I/usr/include/hunspell -L/usr/lib -lhunspell-1.7 -fsanitize=fuzzer,address -o fuzz_target fuzz_target.cpp
+   ```
+
+3. The `Hunspell` constructor requires the paths to the `.aff` and `.dic` files. Ensure these files are available in the working directory or provide the correct paths.
+
+The provided code should now compile and run correctly, assuming the Hunspell library is properly installed and the paths to the `.aff` and `.dic` files are correct.
+</pre>
+
+
+<h2>Logs</h2>
+<pre>
+Fixing /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-hunspell-_zn8hunspell8generateepppcpkcs4_/fixed_targets/02.cxx with gpt-4o, attempt 1.
+Successfully built /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-hunspell-_zn8hunspell8generateepppcpkcs4_/fixed_targets/02.cxx with gpt-4o in 1 iterations of fixing.
+Result for hunspell-zn8hunspell8generateepppcpkcs4-02: crashes=False, coverage=0.028494396278282937 (539/18916), coverage diff=0.016442451420029897 (165/10035)
+
+</pre>
+
+<h2>Run logs</h2>
+<pre>
+INFO:__main__:Running: docker run --rm --privileged --shm-size=2g --platform linux/amd64 -e FUZZING_ENGINE=libfuzzer -e SANITIZER=address -e RUN_FUZZER_MODE=interactive -e HELPER=True -v /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-hunspell-_zn8hunspell8generateepppcpkcs4_/corpora/02.cxx:/tmp/fuzzer_corpus -v /tmp/tmptrp7ybx_/build/out/hunspell-zn8hunspell8generateepppcpkcs4-02:/out -t gcr.io/oss-fuzz-base/base-runner run_fuzzer fuzzer -print_final_stats=1 -max_total_time=30 -len_control=0 -timeout=30.
+vm.mmap_rnd_bits = 28
+rm: cannot remove &#39;/tmp/fuzzer_corpus&#39;: Device or resource busy
+/out/fuzzer -rss_limit_mb=2560 -timeout=25 -print_final_stats=1 -max_total_time=30 -len_control=0 -timeout=30 /tmp/fuzzer_corpus -max_len=262144 &lt; /dev/null
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 1813790293
+INFO: Loaded 1 modules   (18916 inline 8-bit counters): 18916 [0x560133e92c18, 0x560133e975fc), 
+INFO: Loaded 1 PC tables (18916 PCs): 18916 [0x560133e97600,0x560133ee1440), 
+INFO:        0 files found in /tmp/fuzzer_corpus
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+INFO: A corpus is not provided, starting from an empty corpus
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+#2	INITED cov: 333 ft: 334 corp: 1/1b exec/s: 0 rss: 33Mb
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+#4	NEW    cov: 333 ft: 338 corp: 2/3b lim: 262144 exec/s: 0 rss: 34Mb L: 2/2 MS: 2 ShuffleBytes-CrossOver-
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+#7	NEW    cov: 333 ft: 342 corp: 3/6b lim: 262144 exec/s: 0 rss: 35Mb L: 3/3 MS: 3 CopyPart-CopyPart-InsertByte-
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+#13	NEW    cov: 340 ft: 356 corp: 4/118b lim: 262144 exec/s: 0 rss: 37Mb L: 112/112 MS: 1 InsertRepeatedBytes-
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+#31	NEW    cov: 340 ft: 360 corp: 5/246b lim: 262144 exec/s: 0 rss: 39Mb L: 128/128 MS: 3 InsertRepeatedBytes-ChangeByte-InsertRepeatedBytes-
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+#42	NEW    cov: 340 ft: 364 corp: 6/250b lim: 262144 exec/s: 0 rss: 39Mb L: 4/128 MS: 1 InsertByte-
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+#45	NEW    cov: 341 ft: 369 corp: 7/281b lim: 262144 exec/s: 0 rss: 39Mb L: 31/128 MS: 3 EraseBytes-ChangeByte-InsertRepeatedBytes-
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+#46	NEW    cov: 341 ft: 373 corp: 8/293b lim: 262144 exec/s: 0 rss: 39Mb L: 12/128 MS: 1 CMP- DE: &#34;\377\377\377\377\377\377\377\017&#34;-
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot
+...truncated...
+r: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+#119748	DONE   cov: 539 ft: 850 corp: 76/1399b lim: 262144 exec/s: 3862 rss: 42Mb
+###### Recommended dictionary. ######
+&#34;\377\377\377\377\377\377\377\017&#34; # Uses: 655
+&#34;\000\001&#34; # Uses: 591
+&#34;\001\000\000\000\000\000\000\017&#34; # Uses: 555
+&#34;\001\000&#34; # Uses: 658
+&#34;\000\000\000\000\000\000\000\004&#34; # Uses: 552
+&#34;\000\000\000\000&#34; # Uses: 610
+&#34;\000\000\000\011&#34; # Uses: 613
+&#34;\001\003&#34; # Uses: 601
+&#34;\006UUUUUUU&#34; # Uses: 577
+&#34;\376\377\377\377\377\377\377\357&#34; # Uses: 501
+&#34;\021\000&#34; # Uses: 581
+&#34;\004\000\000\000\000\000\000\000&#34; # Uses: 495
+&#34;\024\000\000\000&#34; # Uses: 520
+&#34;\377\377\377\377\377\377\377\377&#34; # Uses: 509
+&#34;\002\000\000\000\000\000\000\000&#34; # Uses: 475
+&#34;\001\000\000\000\000\000\000\000&#34; # Uses: 439
+&#34;\012\000\000\000&#34; # Uses: 495
+&#34;\012\000\000\000\000\000\000\000&#34; # Uses: 398
+&#34;\001\000\000\000\000\000\000\023&#34; # Uses: 363
+&#34;\000\000\000\000\000\000\000c&#34; # Uses: 326
+&#34;VUUUUUU\005&#34; # Uses: 212
+###### End of recommended dictionary. ######
+Done 119748 runs in 31 second(s)
+stat::number_of_executed_units: 119748
+stat::average_exec_per_sec:     3862
+stat::new_units_added:          611
+stat::slowest_unit_time_sec:    0
+stat::peak_rss_mb:              42
+
+</pre>
+
+</body>

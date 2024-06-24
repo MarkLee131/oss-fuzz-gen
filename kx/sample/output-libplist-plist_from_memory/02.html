@@ -1,0 +1,596 @@
+<!doctype html>
+
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Experiment results</title>
+<style>
+* {
+    box-sizing: border-box;
+}
+
+html {
+    line-height: 1.15;
+}
+
+body {
+    font-family: sans-serif;
+    font-size: 16px;
+}
+
+table {
+    border-collapse: collapse;
+    border-spacing: 0;
+}
+
+td, th {
+    border-right: 1px #dedede solid;
+    border-bottom: 1px #dedede solid;
+    padding: 5px;
+    text-align: left;
+}
+td:first-child, th:first-child {
+    border-left: 1px #dedede solid;
+}
+th {
+    border-top: 1px #dedede solid;
+}
+
+tbody tr:nth-child(odd) {
+    background-color: #f4f5ff;
+}
+</style>
+<body>
+    LLM: 
+    
+<h1>output-libplist-plist_from_memory / 02</h1>
+Bug: False
+<br>
+Crash reason: NO_SEMANTIC_ERR
+<br>
+<br>
+
+
+
+
+<h3>Final code</h3>
+
+<pre>
+#include &lt;fuzzer/FuzzedDataProvider.h&gt;
+#include &lt;cstdint&gt;
+#include &lt;cstdlib&gt;
+#include &lt;string&gt;
+
+// Assuming the necessary enums and types are defined as follows
+typedef int plist_err_t;
+typedef void* plist_t;
+typedef int plist_format_t;
+
+#define PLIST_ERR_UNKNOWN -1
+#define PLIST_ERR_INVALID_ARG -2
+#define PLIST_ERR_PARSE -3
+#define PLIST_ERR_SUCCESS 0
+#define PLIST_FORMAT_NONE 0
+#define PLIST_FORMAT_BINARY 1
+#define PLIST_FORMAT_XML 2
+#define PLIST_FORMAT_JSON 3
+#define PLIST_FORMAT_OSTEP 4
+
+extern &#34;C&#34; {
+    extern plist_err_t plist_from_memory(const char *, uint32_t, plist_t *, plist_format_t *);
+}
+
+extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    FuzzedDataProvider stream(data, size);
+
+    // Extract a string from the input data
+    std::string plist_data = stream.ConsumeRandomLengthString(size);
+    const char *plist_data_ptr = plist_data.c_str();
+
+    // Use the actual length of the string instead of consuming another uint32_t
+    uint32_t length = static_cast&lt;uint32_t&gt;(plist_data.size());
+
+    // Allocate memory for plist and format
+    plist_t plist = nullptr;
+    plist_format_t format = PLIST_FORMAT_NONE;
+
+    // Call the function to fuzz
+    plist_from_memory(plist_data_ptr, length, &amp;plist, &amp;format);
+
+    return 0;
+}
+</pre>
+
+
+<h3>Fixer prompt #1</h3>
+<pre>
+
+Given the following C++ fuzz harness and its build error message, fix the code to make it build for fuzzing.
+
+If there is undeclared identifier or unknown type name error, fix it by finding and including the related libraries.
+
+Note that some code may need to be wrapped with &lt;code&gt;extern &#34;C&#34;&lt;/code&gt; as their source is C program.
+
+MUST RETURN THE FULL CODE, INCLUDING UNCHANGED PARTS.
+EXTREMELY IMPORTANT: AVOID USING &lt;code&gt;goto&lt;/code&gt;. If you have to write code using &lt;code&gt;goto&lt;/code&gt;, you MUST MUST also declare all variables BEFORE the &lt;code&gt;goto&lt;/code&gt;. Never introduce new variables after the &lt;code&gt;goto&lt;/code&gt;.
+
+Below is the code needs to be built:
+&lt;code&gt;
+#include &lt;fuzzer/FuzzedDataProvider.h&gt;
+#include &lt;cstdint&gt;
+#include &lt;cstdlib&gt;
+
+// Assuming the necessary enums and types are defined as follows
+typedef int plist_err_t;
+typedef void* plist_t;
+typedef int plist_format_t;
+
+#define PLIST_ERR_UNKNOWN -1
+#define PLIST_ERR_INVALID_ARG -2
+#define PLIST_ERR_PARSE -3
+#define PLIST_ERR_SUCCESS 0
+#define PLIST_FORMAT_NONE 0
+#define PLIST_FORMAT_BINARY 1
+#define PLIST_FORMAT_XML 2
+#define PLIST_FORMAT_JSON 3
+#define PLIST_FORMAT_OSTEP 4
+
+extern plist_err_t plist_from_memory(const char *, uint32_t, plist_t *, plist_format_t *);
+
+int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    FuzzedDataProvider stream(data, size);
+
+    // Extract a string from the input data
+    std::string plist_data = stream.ConsumeRandomLengthString();
+    const char *plist_data_ptr = plist_data.c_str();
+
+    // Extract a uint32_t value for the length
+    uint32_t length = stream.ConsumeIntegral&lt;uint32_t&gt;();
+
+    // Allocate memory for plist and format
+    plist_t plist;
+    plist_format_t format;
+
+    // Call the function to fuzz
+    plist_from_memory(plist_data_ptr, length, &amp;plist, &amp;format);
+
+    return 0;
+}
+&lt;/code&gt;
+
+The code has the following build issues:
+&lt;error&gt;
+(.text.main+0x12): undefined reference to `LLVMFuzzerTestOneInput&#39;
+oplist_fuzzer.cc:(.text._Z22LLVMFuzzerTestOneInputPKhm[_Z22LLVMFuzzerTestOneInputPKhm]+0x2ce): undefined reference to `plist_from_memory(char const*, unsigned int, void**, int*)&#39;
+&lt;/error&gt;
+
+Fix code:
+1. Consider possible solutions for the issues listed above.
+2. Choose a solution that can maximize fuzzing result, which is utilizing the function under test and feeding it not null input.
+3. Apply the solutions to the original code.
+It&#39;s important to show the complete code, not only the fixed line.
+&lt;solution&gt;
+</pre>
+
+
+
+<h3>Code #1</h3>
+
+<pre>
+Certainly! To address the build issues, we need to ensure that the `plist_from_memory` function is correctly linked and that all necessary headers are included. Additionally, we need to make sure that the `LLVMFuzzerTestOneInput` function is correctly defined and linked.
+
+Given that `plist_from_memory` is likely a C function, we should wrap its declaration with `extern &#34;C&#34;`. We also need to include the necessary headers for the types and functions used.
+
+Here&#39;s the fixed code:
+
+```cpp
+#include &lt;fuzzer/FuzzedDataProvider.h&gt;
+#include &lt;cstdint&gt;
+#include &lt;cstdlib&gt;
+#include &lt;string&gt;
+
+// Assuming the necessary enums and types are defined as follows
+typedef int plist_err_t;
+typedef void* plist_t;
+typedef int plist_format_t;
+
+#define PLIST_ERR_UNKNOWN -1
+#define PLIST_ERR_INVALID_ARG -2
+#define PLIST_ERR_PARSE -3
+#define PLIST_ERR_SUCCESS 0
+#define PLIST_FORMAT_NONE 0
+#define PLIST_FORMAT_BINARY 1
+#define PLIST_FORMAT_XML 2
+#define PLIST_FORMAT_JSON 3
+#define PLIST_FORMAT_OSTEP 4
+
+extern &#34;C&#34; {
+    extern plist_err_t plist_from_memory(const char *, uint32_t, plist_t *, plist_format_t *);
+}
+
+extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    FuzzedDataProvider stream(data, size);
+
+    // Extract a string from the input data
+    std::string plist_data = stream.ConsumeRandomLengthString(size);
+    const char *plist_data_ptr = plist_data.c_str();
+
+    // Extract a uint32_t value for the length
+    uint32_t length = stream.ConsumeIntegral&lt;uint32_t&gt;();
+
+    // Allocate memory for plist and format
+    plist_t plist = nullptr;
+    plist_format_t format = PLIST_FORMAT_NONE;
+
+    // Call the function to fuzz
+    plist_from_memory(plist_data_ptr, length, &amp;plist, &amp;format);
+
+    return 0;
+}
+```
+
+### Explanation of Changes:
+1. **Include Necessary Headers:**
+   - Included `&lt;string&gt;` to use `std::string`.
+
+2. **Wrap `plist_from_memory` Declaration:**
+   - Wrapped the declaration of `plist_from_memory` with `extern &#34;C&#34;` to ensure proper linkage with C code.
+
+3. **Correct Function Definition:**
+   - Ensured `LLVMFuzzerTestOneInput` is correctly defined with `extern &#34;C&#34;` to avoid linkage issues.
+
+4. **Consume String Correctly:**
+   - Passed `size` to `ConsumeRandomLengthString` to ensure it extracts a string of appropriate length.
+
+5. **Initialize `plist` and `format`:**
+   - Initialized `plist` to `nullptr` and `format` to `PLIST_FORMAT_NONE` to ensure they have valid initial values.
+
+With these changes, the code should now build correctly and be ready for fuzzing.
+</pre>
+
+
+<h3>Fixer prompt #2</h3>
+<pre>
+
+Given the following C++ fuzz harness and its build error message, fix the code to make it build for fuzzing.
+
+If there is undeclared identifier or unknown type name error, fix it by finding and including the related libraries.
+
+Note that some code may need to be wrapped with &lt;code&gt;extern &#34;C&#34;&lt;/code&gt; as their source is C program.
+
+MUST RETURN THE FULL CODE, INCLUDING UNCHANGED PARTS.
+EXTREMELY IMPORTANT: AVOID USING &lt;code&gt;goto&lt;/code&gt;. If you have to write code using &lt;code&gt;goto&lt;/code&gt;, you MUST MUST also declare all variables BEFORE the &lt;code&gt;goto&lt;/code&gt;. Never introduce new variables after the &lt;code&gt;goto&lt;/code&gt;.
+
+Below is the code needs to be built:
+&lt;code&gt;
+#include &lt;fuzzer/FuzzedDataProvider.h&gt;
+#include &lt;cstdint&gt;
+#include &lt;cstdlib&gt;
+#include &lt;string&gt;
+
+// Assuming the necessary enums and types are defined as follows
+typedef int plist_err_t;
+typedef void* plist_t;
+typedef int plist_format_t;
+
+#define PLIST_ERR_UNKNOWN -1
+#define PLIST_ERR_INVALID_ARG -2
+#define PLIST_ERR_PARSE -3
+#define PLIST_ERR_SUCCESS 0
+#define PLIST_FORMAT_NONE 0
+#define PLIST_FORMAT_BINARY 1
+#define PLIST_FORMAT_XML 2
+#define PLIST_FORMAT_JSON 3
+#define PLIST_FORMAT_OSTEP 4
+
+extern &#34;C&#34; {
+    extern plist_err_t plist_from_memory(const char *, uint32_t, plist_t *, plist_format_t *);
+}
+
+extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    FuzzedDataProvider stream(data, size);
+
+    // Extract a string from the input data
+    std::string plist_data = stream.ConsumeRandomLengthString(size);
+    const char *plist_data_ptr = plist_data.c_str();
+
+    // Extract a uint32_t value for the length
+    uint32_t length = stream.ConsumeIntegral&lt;uint32_t&gt;();
+
+    // Allocate memory for plist and format
+    plist_t plist = nullptr;
+    plist_format_t format = PLIST_FORMAT_NONE;
+
+    // Call the function to fuzz
+    plist_from_memory(plist_data_ptr, length, &amp;plist, &amp;format);
+
+    return 0;
+}
+&lt;/code&gt;
+
+The code can build successfully but has a runtime issue: Fuzzing crashed immediately at runtime (ASAN-ERROR: AddressSanitizer: heap-buffer-overflow on address 0x5120000005f0 at pc 0x55aee6a33bc5 bp 0x7ffc2c7c3390 sp 0x7ffc2c7c3388
+), indicating fuzz target code for invoking the function under test is incorrect or unrobust.
+&lt;error&gt;
+Crash stacks:
+Stack 0:
+#0 0x55aee6a33bc4 in node_from_openstep /src/libplist/src/oplist.c:762:21
+#1 0x55aee6a34033 in parse_dict_data /src/libplist/src/oplist.c:547:20
+#2 0x55aee6a3122b in node_from_openstep /src/libplist/src/oplist.c:626:13
+#3 0x55aee6a30bed in plist_from_openstep /src/libplist/src/oplist.c:910:23
+#4 0x55aee6a060c9 in plist_from_memory /src/libplist/src/plist.c:329:19
+#5 0x55aee6a04e39 in LLVMFuzzerTestOneInput /src/libplist/fuzz/oplist_fuzzer.cc:40:5
+#6 0x55aee68b7520 in fuzzer::Fuzzer::ExecuteCallback(unsigned char const*, unsigned long) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:614:13
+#7 0x55aee68b6d45 in fuzzer::Fuzzer::RunOne(unsigned char const*, unsigned long, bool, fuzzer::InputInfo*, bool, bool*) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:516:7
+#8 0x55aee68b8cd2 in fuzzer::Fuzzer::ReadAndExecuteSeedCorpora(std::__Fuzzer::vector&lt;fuzzer::SizedFile, std::__Fuzzer::allocator&lt;fuzzer::SizedFile&gt;&gt;&amp;) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:829:7
+#9 0x55aee68b9007 in fuzzer::Fuzzer::Loop(std::__Fuzzer::vector&lt;fuzzer::SizedFile, std::__Fuzzer::allocator&lt;fuzzer::SizedFile&gt;&gt;&amp;) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:867:3
+#10 0x55aee68a7616 in fuzzer::FuzzerDriver(int*, char***, int (*)(unsigned char const*, unsigned long)) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerDriver.cpp:914:6
+#11 0x55aee68d3b42 in main /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerMain.cpp:20:10
+#12 0x7f4d48cef082 in __libc_start_main (/lib/x86_64-linux-gnu/libc.so.6+0x24082) (BuildId: 0702430aef5fa3dda43986563e9ffcc47efbd75e)
+#13 0x55aee689878d in _start (/out/oplist_fuzzer+0x6678d)
+Stack 1:
+#0 0x55aee6a0284d in operator new(unsigned long) /src/llvm-project/compiler-rt/lib/asan/asan_new_delete.cpp:95:3
+#1 0x55aee6a05735 in __libcpp_operator_new&lt;unsigned long&gt; /usr/local/bin/../include/c++/v1/new:268:10
+#2 0x55aee6a05735 in __libcpp_allocate /usr/local/bin/../include/c++/v1/new:294:10
+#3 0x55aee6a05735 in allocate /usr/local/bin/../include/c++/v1/__memory/allocator.h:114:38
+#4 0x55aee6a05735 in __allocate_at_least&lt;std::__1::allocator&lt;char&gt; &gt; /usr/local/bin/../include/c++/v1/__memory/allocate_at_least.h:55:19
+#5 0x55aee6a05735 in std::__1::basic_string&lt;char, std::__1::char_traits&lt;char&gt;, std::__1::allocator&lt;char&gt;&gt;::__shrink_or_extend[abi:v180000](unsigned long) /usr/local/bin/../include/c++/v1/string:3295:37
+#6 0x55aee6a05495 in shrink_to_fit /usr/local/bin/../include/c++/v1/string:3262:5
+#7 0x55aee6a05495 in FuzzedDataProvider::ConsumeRandomLengthString(unsigned long) /usr/local/lib/clang/18/include/fuzzer/FuzzedDataProvider.h:175:10
+#8 0x55aee6a04c6e in LLVMFuzzerTestOneInput /src/libplist/fuzz/oplist_fuzzer.cc:29:37
+#9 0x55aee68b7520 in fuzzer::Fuzzer::ExecuteCallback(unsigned char const*, unsigned long) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:614:13
+#10 0x55aee68b6d45 in fuzzer::Fuzzer::RunOne(unsigned char const*, unsigned long, bool, fuzzer::InputInfo*, bool, bool*) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:516:7
+&lt;/error&gt;
+
+Fix code:
+1. Consider possible solutions for the issues listed above.
+2. Choose a solution that can maximize fuzzing result, which is utilizing the function under test and feeding it not null input.
+3. Apply the solutions to the original code.
+It&#39;s important to show the complete code, not only the fixed line.
+&lt;solution&gt;
+</pre>
+
+
+
+<h3>Code #2</h3>
+
+<pre>
+To address the runtime issue, we need to ensure that the inputs to the `plist_from_memory` function are valid and within expected ranges. Specifically, we need to make sure that the length of the string passed to the function matches the actual size of the string, and that the string is not empty.
+
+Here&#39;s the full code with the necessary fixes:
+
+```cpp
+#include &lt;fuzzer/FuzzedDataProvider.h&gt;
+#include &lt;cstdint&gt;
+#include &lt;cstdlib&gt;
+#include &lt;string&gt;
+
+// Assuming the necessary enums and types are defined as follows
+typedef int plist_err_t;
+typedef void* plist_t;
+typedef int plist_format_t;
+
+#define PLIST_ERR_UNKNOWN -1
+#define PLIST_ERR_INVALID_ARG -2
+#define PLIST_ERR_PARSE -3
+#define PLIST_ERR_SUCCESS 0
+#define PLIST_FORMAT_NONE 0
+#define PLIST_FORMAT_BINARY 1
+#define PLIST_FORMAT_XML 2
+#define PLIST_FORMAT_JSON 3
+#define PLIST_FORMAT_OSTEP 4
+
+extern &#34;C&#34; {
+    extern plist_err_t plist_from_memory(const char *, uint32_t, plist_t *, plist_format_t *);
+}
+
+extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    FuzzedDataProvider stream(data, size);
+
+    // Extract a string from the input data
+    std::string plist_data = stream.ConsumeRandomLengthString(size);
+    const char *plist_data_ptr = plist_data.c_str();
+
+    // Use the actual length of the string instead of consuming another uint32_t
+    uint32_t length = static_cast&lt;uint32_t&gt;(plist_data.size());
+
+    // Allocate memory for plist and format
+    plist_t plist = nullptr;
+    plist_format_t format = PLIST_FORMAT_NONE;
+
+    // Call the function to fuzz
+    plist_from_memory(plist_data_ptr, length, &amp;plist, &amp;format);
+
+    return 0;
+}
+```
+
+### Explanation of Changes:
+1. **String Length Handling**: Instead of consuming an additional `uint32_t` for the length, we directly use the size of the extracted string. This ensures that the length parameter passed to `plist_from_memory` correctly matches the actual length of the string.
+2. **Validity of Inputs**: By ensuring the length matches the string size, we prevent potential buffer overflows and invalid memory accesses.
+
+This should help in preventing the AddressSanitizer error related to heap-buffer-overflow by ensuring that the function receives valid and consistent input data.
+</pre>
+
+
+<h2>Logs</h2>
+<pre>
+Fixing /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-libplist-plist_from_memory/fixed_targets/02.cc with gpt-4o, attempt 1.
+Fixing /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-libplist-plist_from_memory/fixed_targets/02.cc with gpt-4o, attempt 2.
+Successfully built /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-libplist-plist_from_memory/fixed_targets/02.cc with gpt-4o in 2 iterations of fixing.
+Result for libplist-plist_from_memory-02: crashes=False, coverage=0.0 (0/3840), coverage diff=0.0050477489768076395 (37/7330)
+
+</pre>
+
+<h2>Run logs</h2>
+<pre>
+INFO:__main__:Running: docker run --rm --privileged --shm-size=2g --platform linux/amd64 -e FUZZING_ENGINE=libfuzzer -e SANITIZER=address -e RUN_FUZZER_MODE=interactive -e HELPER=True -v /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-libplist-plist_from_memory/corpora/02.cc:/tmp/oplist_fuzzer_corpus -v /tmp/tmptrp7ybx_/build/out/libplist-plist_from_memory-02:/out -t gcr.io/oss-fuzz-base/base-runner run_fuzzer oplist_fuzzer -print_final_stats=1 -max_total_time=30 -len_control=0 -timeout=30.
+vm.mmap_rnd_bits = 28
+rm: cannot remove &#39;/tmp/oplist_fuzzer_corpus&#39;: Device or resource busy
+Using seed corpus: oplist_fuzzer_seed_corpus.zip
+/out/oplist_fuzzer -rss_limit_mb=2560 -timeout=25 -print_final_stats=1 -max_total_time=30 -len_control=0 -timeout=30 /tmp/oplist_fuzzer_corpus -max_len=4096 -dict=oplist.dict &lt; /dev/null
+Dictionary: 41 entries
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 4066955593
+INFO: Loaded 1 modules   (3840 inline 8-bit counters): 3840 [0x55dd15a136d8, 0x55dd15a145d8), 
+INFO: Loaded 1 PC tables (3840 PCs): 3840 [0x55dd15a145d8,0x55dd15a235d8), 
+INFO:        3 files found in /tmp/oplist_fuzzer_corpus
+INFO: seed corpus: files: 3 min: 341b max: 566b total: 1368b rss: 30Mb
+
+=================================================================
+[1m[31m==17==ERROR: LeakSanitizer: detected memory leaks
+[1m[0m
+[1m[34mIndirect leak of 192 byte(s) in 4 object(s) allocated from:
+[1m[0m    #0 0x55dd158e1ca8 in calloc /src/llvm-project/compiler-rt/lib/asan/asan_malloc_linux.cpp:77:3
+    #1 0x55dd1592e816 in node_create /src/libplist/libcnary/node.c:51:24
+    #2 0x55dd15925a9f in plist_new_node /src/libplist/src/plist.c:382:22
+    #3 0x55dd15925a9f in plist_new_key /src/libplist/src/plist.c:490:12
+    #4 0x55dd15925a9f in plist_dict_set_item /src/libplist/src/plist.c:945:24
+    #5 0x55dd15950135 in parse_dict_data /src/libplist/src/oplist.c:595:9
+    #6 0x55dd1594d12b in node_from_openstep /src/libplist/src/oplist.c:626:13
+    #7 0x55dd1594d31b in node_from_openstep /src/libplist/src/oplist.c:654:28
+    #8 0x55dd1594caed in plist_from_openstep /src/libplist/src/oplist.c:910:23
+    #9 0x55dd15921fc9 in plist_from_memory /src/libplist/src/plist.c:329:19
+    #10 0x55dd15920d61 in LLVMFuzzerTestOneInput /src/libplist/fuzz/oplist_fuzzer.cc:40:5
+    #11 0x55dd157d3520 in fuzzer::Fuzzer::ExecuteCallback(unsigned char const*, unsigned long) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:614:13
+    #12 0x55dd157d2d45 in fuzzer::Fuzzer::RunOne(unsigned char const*, unsigned long, bool, fuzzer::InputInfo*, bool, bool*) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:516:7
+    #13 0x55dd157d4cd2 in fuzzer::Fuzzer::ReadAndExecuteSeedCorpora(std::__Fuzzer::vector&lt;fuzzer::SizedFile, std::__Fuzzer::allocator&lt;fuzzer::SizedFile&gt;&gt;&amp;) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:829:7
+    #14 0x55dd157d5007 in fuzzer::Fuzzer::Loop(std::__Fuzzer::vector&lt;fuzzer::SizedFile, std::__Fuzzer::allocator&lt;fuzzer::SizedFile&gt;&gt;&amp;) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:867:3
+    #15 0x55dd157c3616 in fuzzer::FuzzerDriver(int*, char***, int (*)(unsigned char const*, unsigned long)) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerDriver.cpp:914:6
+    #16 0x55dd157efb42 in main /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerMain.cpp:20:10
+    #17 0x7fc780292082 in __libc_start_main (/lib/x86_64-linux-gnu/libc.so.6+0x24082) (BuildId: 0702430aef5fa3dda43986563e9ffcc47efbd75e)
+
+DEDUP_TOKEN: __interceptor_calloc--node_create--plist_new_node
+[1m[34mIndirect leak of 192 byte(s) in 4 object(s) allocated from:
+[1m[0m    #0 0x55dd158e1ca8 in calloc /src/llvm-project/compiler-rt/lib/asan/asan_malloc_linux.cpp:77:3
+    #1 0x55dd1592e816 in node_create /src/libplist/libcnary/node.c:51:24
+    #2 0x55dd1594f11c in node_from_openstep /src/libplist/src/oplist.c:855:22
+    #3 0x55dd15950066 in parse_dict_data /src/libplist/src/oplist.c:574:20
+    #4 0x55dd1594d12b in node_from_openstep /src/libplist/src/oplist.c:626:13
+    #5 0x55dd1594d31b in node_from_openstep /src/libplist/src/oplist.c:654:28
+    #6 0x55dd1594caed in plist_from_openstep /src/libplist/src/oplist.c:910:23
+    #7 0x55dd15921fc9 in plist_from_memory /src/libplist/src/plist.c:329:19
+    #8 0x55dd15920d61 in LLVMFuzzerTestOneInput /src/libplist/fuzz/oplist_fuzzer.cc:40:5
+    #9 0x55dd157d3520 in fuzzer::Fuzzer::ExecuteCallback(unsigned char const*, unsigned long) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:614:13
+    #10 0x55dd157d2d45 in fuzzer::Fuzzer::RunOne(unsigned char const*, unsigned long, bool, fuzzer::InputInfo*, bool, bool*) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:516:7
+    #11 0x55dd157d4cd2 in fuzzer::Fuzzer::ReadAndExecuteSeedCorpora(std::__Fuzzer::vector&lt;fuzzer::SizedFile, std::__Fuzzer::allocator&lt;fuzzer::SizedFile&gt;&gt;&amp;) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:829:7
+    #12 0x55dd157d5007 in fuzzer::Fuzzer::Loop(std::__Fuzzer::vector&lt;fuzzer::SizedFile, std::__Fuzzer::allocator&lt;fuzzer::SizedFile&gt;&gt;&amp;) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:867:3
+    #13 0x55dd157c3616 in fuzzer::FuzzerDriver(int*, char***, int (*)(unsigned char const*, unsigned long)) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerDriver.cpp:914:6
+    #14 0x55dd157efb42 in main /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerMain.cpp:20:10
+    #15 0x7fc780292082 in __libc_start_main (/lib/x86_64-linux-gnu/libc.so.6+0x24082) (BuildId: 0702430aef5fa3dda43986563e9ffcc47efbd75e)
+
+DEDUP_TOKEN: __interceptor_calloc--node_create--node_from_openstep
+[1m[34mIndirect leak of 96 byte(s) in 4 object(s) allocated from:
+[1m[0m    #0 0x55dd158e1ca8 in calloc /src/llvm-project/compiler-rt/lib/asan/asan_malloc_linux.cpp:77:3
+    #1 0x55dd15925a29 in plist_new_plist_data /src/libplist/src/plist.c:394:40
+    #2 0x55dd15925a29 in plist_new_key /src/libplist/src/plist.c:486:25
+    #3 0x55dd15925a29 in plist_dict_set_item /src/libplist/src/plist.c:945:24
+    #4 0x55dd15950135 in parse_dict_data /src/libplist/src/oplist.c:595:9
+    #5 0x55dd1594d12b in node_from_openstep /src/libplist/src/oplist.c:626:13
+    #6 0x55dd1594d31b in node_from_openstep /src/libplist/src/oplist.c:654:28
+    #7 0x55dd1594caed in plist_from_openstep /src/libplist/src/oplist.c:910:23
+    #8 0x55dd15921fc9 in plist_from_memory /src/libplist/src/plist.c:329:19
+    #9 0x55dd15920d61 in LLVMFuzzerTestOneInput /src/libplist/fuzz/oplist_fuzzer.cc:40:5
+    #10 0x55dd157d3520 in fuzzer::Fuzzer::ExecuteCallback(unsigned char const*, unsigned long) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:614:13
+    #11 0x55dd157d2d45 in fuzzer::Fuzzer::RunOne(unsigned char const*, unsigned long, bool, fuzzer::InputInfo*, bool, bool*) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:516:7
+    #12 0x55dd157d4cd2 in fuzzer::Fuzzer::ReadAndExecuteSeedCorpora(std::__Fuzzer::vector&lt;fuzzer::SizedFile, std::__Fuzzer::allocator&lt;fuzzer::SizedFile&gt;&gt;&amp;) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:829:7
+    #13 0x55dd157d5007 in fuzzer::Fuzzer::Loop(std::__Fuzzer::vector&lt;fuzzer::SizedFile, std::__Fuzzer::allocator&lt;fuzzer::SizedFile&gt;&gt;&amp;) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:867:3
+    #14 0x55dd157c3616 in fuzzer::FuzzerDriver(int*, char***, int (*)(unsigned char const*, unsigned long)) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerDriver.cpp:914:6
+    #15 0x55dd157efb42 in main /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerMain.cpp:20:10
+    #16 0x7fc780292082 in __libc_start_main (/lib/x86_64-linux-gnu/libc.so.6+0x24082) (BuildId: 0702430aef5fa3dda43986563e9ffcc47efbd75e)
+
+DEDUP_TOKEN: __interceptor_calloc--plist_new_plist_data--plist_new_key
+[1m[34mIndirect leak of 96 byte(s) in 4 object(s) allocated from:
+[1m[0m    #0 0x55dd158e1ca8 in calloc /src/llvm-project/compiler-rt/lib/asan/asan_malloc_linux.cpp:77:3
+    #1 0x55dd1594d081 in node_from_openstep /src/libplist/src/oplist.c:621:29
+    #2 0x55dd15950066 in parse_dict_data /src/libplist/src/oplist.c:574:20
+    #3 0x55dd1594d12b in node_from_openstep /src/libplist/src/oplist.c:626:13
+    #4 0x55dd1594d31b in node_from_openstep /src/libplist/src/oplist.c:654:28
+    #5 0x55dd1594caed in plist_
+...truncated...
+d75e)
+
+DEDUP_TOKEN: __interceptor_calloc--node_create--node_from_openstep
+[1m[34mIndirect leak of 48 byte(s) in 2 object(s) allocated from:
+[1m[0m    #0 0x55dd158e1ca8 in calloc /src/llvm-project/compiler-rt/lib/asan/asan_malloc_linux.cpp:77:3
+    #1 0x55dd1594d081 in node_from_openstep /src/libplist/src/oplist.c:621:29
+    #2 0x55dd1594d31b in node_from_openstep /src/libplist/src/oplist.c:654:28
+    #3 0x55dd1594caed in plist_from_openstep /src/libplist/src/oplist.c:910:23
+    #4 0x55dd15921fc9 in plist_from_memory /src/libplist/src/plist.c:329:19
+    #5 0x55dd15920d61 in LLVMFuzzerTestOneInput /src/libplist/fuzz/oplist_fuzzer.cc:40:5
+    #6 0x55dd157d3520 in fuzzer::Fuzzer::ExecuteCallback(unsigned char const*, unsigned long) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:614:13
+    #7 0x55dd157d2d45 in fuzzer::Fuzzer::RunOne(unsigned char const*, unsigned long, bool, fuzzer::InputInfo*, bool, bool*) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:516:7
+    #8 0x55dd157d4cd2 in fuzzer::Fuzzer::ReadAndExecuteSeedCorpora(std::__Fuzzer::vector&lt;fuzzer::SizedFile, std::__Fuzzer::allocator&lt;fuzzer::SizedFile&gt;&gt;&amp;) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:829:7
+    #9 0x55dd157d5007 in fuzzer::Fuzzer::Loop(std::__Fuzzer::vector&lt;fuzzer::SizedFile, std::__Fuzzer::allocator&lt;fuzzer::SizedFile&gt;&gt;&amp;) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:867:3
+    #10 0x55dd157c3616 in fuzzer::FuzzerDriver(int*, char***, int (*)(unsigned char const*, unsigned long)) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerDriver.cpp:914:6
+    #11 0x55dd157efb42 in main /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerMain.cpp:20:10
+    #12 0x7fc780292082 in __libc_start_main (/lib/x86_64-linux-gnu/libc.so.6+0x24082) (BuildId: 0702430aef5fa3dda43986563e9ffcc47efbd75e)
+
+DEDUP_TOKEN: __interceptor_calloc--node_from_openstep--node_from_openstep
+[1m[34mIndirect leak of 42 byte(s) in 4 object(s) allocated from:
+[1m[0m    #0 0x55dd158c99fd in strdup /src/llvm-project/compiler-rt/lib/asan/asan_interceptors.cpp:565:3
+    #1 0x55dd15925a56 in plist_new_key /src/libplist/src/plist.c:488:20
+    #2 0x55dd15925a56 in plist_dict_set_item /src/libplist/src/plist.c:945:24
+    #3 0x55dd15950135 in parse_dict_data /src/libplist/src/oplist.c:595:9
+    #4 0x55dd1594d12b in node_from_openstep /src/libplist/src/oplist.c:626:13
+    #5 0x55dd1594d31b in node_from_openstep /src/libplist/src/oplist.c:654:28
+    #6 0x55dd1594caed in plist_from_openstep /src/libplist/src/oplist.c:910:23
+    #7 0x55dd15921fc9 in plist_from_memory /src/libplist/src/plist.c:329:19
+    #8 0x55dd15920d61 in LLVMFuzzerTestOneInput /src/libplist/fuzz/oplist_fuzzer.cc:40:5
+    #9 0x55dd157d3520 in fuzzer::Fuzzer::ExecuteCallback(unsigned char const*, unsigned long) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:614:13
+    #10 0x55dd157d2d45 in fuzzer::Fuzzer::RunOne(unsigned char const*, unsigned long, bool, fuzzer::InputInfo*, bool, bool*) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:516:7
+    #11 0x55dd157d4cd2 in fuzzer::Fuzzer::ReadAndExecuteSeedCorpora(std::__Fuzzer::vector&lt;fuzzer::SizedFile, std::__Fuzzer::allocator&lt;fuzzer::SizedFile&gt;&gt;&amp;) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:829:7
+    #12 0x55dd157d5007 in fuzzer::Fuzzer::Loop(std::__Fuzzer::vector&lt;fuzzer::SizedFile, std::__Fuzzer::allocator&lt;fuzzer::SizedFile&gt;&gt;&amp;) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:867:3
+    #13 0x55dd157c3616 in fuzzer::FuzzerDriver(int*, char***, int (*)(unsigned char const*, unsigned long)) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerDriver.cpp:914:6
+    #14 0x55dd157efb42 in main /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerMain.cpp:20:10
+    #15 0x7fc780292082 in __libc_start_main (/lib/x86_64-linux-gnu/libc.so.6+0x24082) (BuildId: 0702430aef5fa3dda43986563e9ffcc47efbd75e)
+
+DEDUP_TOKEN: ___interceptor_strdup--plist_new_key--plist_dict_set_item
+[1m[34mIndirect leak of 24 byte(s) in 1 object(s) allocated from:
+[1m[0m    #0 0x55dd158e1ca8 in calloc /src/llvm-project/compiler-rt/lib/asan/asan_malloc_linux.cpp:77:3
+    #1 0x55dd1592f67b in node_list_create /src/libplist/libcnary/node_list.c:38:34
+    #2 0x55dd1592ea8a in node_attach /src/libplist/libcnary/node.c:83:22
+    #3 0x55dd15924020 in plist_array_append_item /src/libplist/src/plist.c:752:9
+    #4 0x55dd1594d376 in node_from_openstep /src/libplist/src/oplist.c:662:17
+    #5 0x55dd1594caed in plist_from_openstep /src/libplist/src/oplist.c:910:23
+    #6 0x55dd15921fc9 in plist_from_memory /src/libplist/src/plist.c:329:19
+    #7 0x55dd15920d61 in LLVMFuzzerTestOneInput /src/libplist/fuzz/oplist_fuzzer.cc:40:5
+    #8 0x55dd157d3520 in fuzzer::Fuzzer::ExecuteCallback(unsigned char const*, unsigned long) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:614:13
+    #9 0x55dd157d2d45 in fuzzer::Fuzzer::RunOne(unsigned char const*, unsigned long, bool, fuzzer::InputInfo*, bool, bool*) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:516:7
+    #10 0x55dd157d4cd2 in fuzzer::Fuzzer::ReadAndExecuteSeedCorpora(std::__Fuzzer::vector&lt;fuzzer::SizedFile, std::__Fuzzer::allocator&lt;fuzzer::SizedFile&gt;&gt;&amp;) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:829:7
+    #11 0x55dd157d5007 in fuzzer::Fuzzer::Loop(std::__Fuzzer::vector&lt;fuzzer::SizedFile, std::__Fuzzer::allocator&lt;fuzzer::SizedFile&gt;&gt;&amp;) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:867:3
+    #12 0x55dd157c3616 in fuzzer::FuzzerDriver(int*, char***, int (*)(unsigned char const*, unsigned long)) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerDriver.cpp:914:6
+    #13 0x55dd157efb42 in main /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerMain.cpp:20:10
+    #14 0x7fc780292082 in __libc_start_main (/lib/x86_64-linux-gnu/libc.so.6+0x24082) (BuildId: 0702430aef5fa3dda43986563e9ffcc47efbd75e)
+
+DEDUP_TOKEN: __interceptor_calloc--node_list_create--node_attach
+[1m[34mIndirect leak of 24 byte(s) in 1 object(s) allocated from:
+[1m[0m    #0 0x55dd158e1ca8 in calloc /src/llvm-project/compiler-rt/lib/asan/asan_malloc_linux.cpp:77:3
+    #1 0x55dd1594d081 in node_from_openstep /src/libplist/src/oplist.c:621:29
+    #2 0x55dd1594caed in plist_from_openstep /src/libplist/src/oplist.c:910:23
+    #3 0x55dd15921fc9 in plist_from_memory /src/libplist/src/plist.c:329:19
+    #4 0x55dd15920d61 in LLVMFuzzerTestOneInput /src/libplist/fuzz/oplist_fuzzer.cc:40:5
+    #5 0x55dd157d3520 in fuzzer::Fuzzer::ExecuteCallback(unsigned char const*, unsigned long) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:614:13
+    #6 0x55dd157d2d45 in fuzzer::Fuzzer::RunOne(unsigned char const*, unsigned long, bool, fuzzer::InputInfo*, bool, bool*) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:516:7
+    #7 0x55dd157d4cd2 in fuzzer::Fuzzer::ReadAndExecuteSeedCorpora(std::__Fuzzer::vector&lt;fuzzer::SizedFile, std::__Fuzzer::allocator&lt;fuzzer::SizedFile&gt;&gt;&amp;) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:829:7
+    #8 0x55dd157d5007 in fuzzer::Fuzzer::Loop(std::__Fuzzer::vector&lt;fuzzer::SizedFile, std::__Fuzzer::allocator&lt;fuzzer::SizedFile&gt;&gt;&amp;) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:867:3
+    #9 0x55dd157c3616 in fuzzer::FuzzerDriver(int*, char***, int (*)(unsigned char const*, unsigned long)) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerDriver.cpp:914:6
+    #10 0x55dd157efb42 in main /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerMain.cpp:20:10
+    #11 0x7fc780292082 in __libc_start_main (/lib/x86_64-linux-gnu/libc.so.6+0x24082) (BuildId: 0702430aef5fa3dda43986563e9ffcc47efbd75e)
+
+DEDUP_TOKEN: __interceptor_calloc--node_from_openstep--plist_from_openstep
+SUMMARY: AddressSanitizer: 974 byte(s) leaked in 33 allocation(s).
+
+INFO: a leak has been found in the initial corpus.
+
+INFO: to ignore leaks on libFuzzer side use -detect_leaks=0.
+
+MS: 0 ; base unit: 0000000000000000000000000000000000000000
+artifact_prefix=&#39;./&#39;; Test unit written to ./leak-6ea683a62ede5dc8b58753742c09c0cdc98ca6fe
+stat::number_of_executed_units: 3
+stat::average_exec_per_sec:     0
+stat::new_units_added:          0
+stat::slowest_unit_time_sec:    0
+stat::peak_rss_mb:              31
+
+</pre>
+
+</body>

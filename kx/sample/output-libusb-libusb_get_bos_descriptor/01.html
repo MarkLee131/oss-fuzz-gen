@@ -1,0 +1,552 @@
+<!doctype html>
+
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Experiment results</title>
+<style>
+* {
+    box-sizing: border-box;
+}
+
+html {
+    line-height: 1.15;
+}
+
+body {
+    font-family: sans-serif;
+    font-size: 16px;
+}
+
+table {
+    border-collapse: collapse;
+    border-spacing: 0;
+}
+
+td, th {
+    border-right: 1px #dedede solid;
+    border-bottom: 1px #dedede solid;
+    padding: 5px;
+    text-align: left;
+}
+td:first-child, th:first-child {
+    border-left: 1px #dedede solid;
+}
+th {
+    border-top: 1px #dedede solid;
+}
+
+tbody tr:nth-child(odd) {
+    background-color: #f4f5ff;
+}
+</style>
+<body>
+    LLM: 
+    
+<h1>output-libusb-libusb_get_bos_descriptor / 01</h1>
+Bug: False
+<br>
+Crash reason: NO_SEMANTIC_ERR
+<br>
+<br>
+
+
+
+
+<h3>Final code</h3>
+
+<pre>
+#include &lt;fuzzer/FuzzedDataProvider.h&gt;
+#include &lt;libusb.h&gt;
+#include &lt;vector&gt;
+
+extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
+    FuzzedDataProvider stream(data, size);
+
+    // Initialize libusb context
+    libusb_context* ctx = nullptr;
+    if (libusb_init(&amp;ctx) != 0) {
+        return 0;
+    }
+
+    // Get the list of USB devices
+    libusb_device** dev_list = nullptr;
+    ssize_t dev_count = libusb_get_device_list(ctx, &amp;dev_list);
+    if (dev_count &lt; 0) {
+        libusb_exit(ctx);
+        return 0;
+    }
+
+    // Select a device from the list
+    libusb_device* dev = nullptr;
+    if (dev_count &gt; 0) {
+        size_t index = stream.ConsumeIntegralInRange&lt;size_t&gt;(0, dev_count - 1);
+        dev = dev_list[index];
+    }
+
+    // Open the selected device
+    libusb_device_handle* handle = nullptr;
+    if (dev != nullptr) {
+        if (libusb_open(dev, &amp;handle) != 0) {
+            libusb_free_device_list(dev_list, 1);
+            libusb_exit(ctx);
+            return 0;
+        }
+    }
+
+    // Free the device list
+    libusb_free_device_list(dev_list, 1);
+
+    // Prepare the libusb_bos_descriptor pointer
+    libusb_bos_descriptor* bos_desc = nullptr;
+
+    // Call the target function if the handle is valid
+    if (handle != nullptr) {
+        libusb_get_bos_descriptor(handle, &amp;bos_desc);
+    }
+
+    // Free the BOS descriptor if it was allocated
+    if (bos_desc != nullptr) {
+        libusb_free_bos_descriptor(bos_desc);
+    }
+
+    // Close the device handle and exit libusb context
+    if (handle != nullptr) {
+        libusb_close(handle);
+    }
+    libusb_exit(ctx);
+
+    return 0;
+}
+</pre>
+
+
+<h3>Fixer prompt #1</h3>
+<pre>
+
+Given the following C++ fuzz harness and its build error message, fix the code to make it build for fuzzing.
+
+If there is undeclared identifier or unknown type name error, fix it by finding and including the related libraries.
+
+Note that some code may need to be wrapped with &lt;code&gt;extern &#34;C&#34;&lt;/code&gt; as their source is C program.
+
+MUST RETURN THE FULL CODE, INCLUDING UNCHANGED PARTS.
+EXTREMELY IMPORTANT: AVOID USING &lt;code&gt;goto&lt;/code&gt;. If you have to write code using &lt;code&gt;goto&lt;/code&gt;, you MUST MUST also declare all variables BEFORE the &lt;code&gt;goto&lt;/code&gt;. Never introduce new variables after the &lt;code&gt;goto&lt;/code&gt;.
+
+Below is the code needs to be built:
+&lt;code&gt;
+&lt;solution&gt;
+#include &lt;fuzzer/FuzzedDataProvider.h&gt;
+#include &lt;libusb-1.0/libusb.h&gt;
+
+extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
+    FuzzedDataProvider stream(data, size);
+
+    // Initialize libusb context
+    libusb_context* ctx = nullptr;
+    if (libusb_init(&amp;ctx) != 0) {
+        return 0;
+    }
+
+    // Create a dummy libusb_device_handle
+    libusb_device_handle* handle = libusb_open_device_with_vid_pid(ctx, 0x1234, 0x5678);
+    if (handle == nullptr) {
+        libusb_exit(ctx);
+        return 0;
+    }
+
+    // Prepare the libusb_bos_descriptor pointer
+    libusb_bos_descriptor* bos_desc = nullptr;
+
+    // Call the target function
+    libusb_get_bos_descriptor(handle, &amp;bos_desc);
+
+    // Free the BOS descriptor if it was allocated
+    if (bos_desc != nullptr) {
+        libusb_free_bos_descriptor(bos_desc);
+    }
+
+    // Close the device handle and exit libusb context
+    libusb_close(handle);
+    libusb_exit(ctx);
+
+    return 0;
+}
+&lt;/code&gt;
+
+The code has the following build issues:
+&lt;error&gt;
+/src/libusb_fuzzer.cc:1:1: error: expected unqualified-id
+    1 | &lt;solution&gt;
+      | ^
+/src/libusb_fuzzer.cc:3:10: fatal error: &#39;libusb-1.0/libusb.h&#39; file not found
+    3 | #include &lt;libusb-1.0/libusb.h&gt;
+      |          ^~~~~~~~~~~~~~~~~~~~~
+&lt;/error&gt;
+
+Fix code:
+1. Consider possible solutions for the issues listed above.
+2. Choose a solution that can maximize fuzzing result, which is utilizing the function under test and feeding it not null input.
+3. Apply the solutions to the original code.
+It&#39;s important to show the complete code, not only the fixed line.
+&lt;solution&gt;
+</pre>
+
+
+
+<h3>Code #1</h3>
+
+<pre>
+```cpp
+#include &lt;fuzzer/FuzzedDataProvider.h&gt;
+#include &lt;libusb-1.0/libusb.h&gt;
+
+extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
+    FuzzedDataProvider stream(data, size);
+
+    // Initialize libusb context
+    libusb_context* ctx = nullptr;
+    if (libusb_init(&amp;ctx) != 0) {
+        return 0;
+    }
+
+    // Create a dummy libusb_device_handle
+    libusb_device_handle* handle = libusb_open_device_with_vid_pid(ctx, 0x1234, 0x5678);
+    if (handle == nullptr) {
+        libusb_exit(ctx);
+        return 0;
+    }
+
+    // Prepare the libusb_bos_descriptor pointer
+    libusb_bos_descriptor* bos_desc = nullptr;
+
+    // Call the target function
+    libusb_get_bos_descriptor(handle, &amp;bos_desc);
+
+    // Free the BOS descriptor if it was allocated
+    if (bos_desc != nullptr) {
+        libusb_free_bos_descriptor(bos_desc);
+    }
+
+    // Close the device handle and exit libusb context
+    libusb_close(handle);
+    libusb_exit(ctx);
+
+    return 0;
+}
+```
+</pre>
+
+
+<h3>Fixer prompt #2</h3>
+<pre>
+
+Given the following C++ fuzz harness and its build error message, fix the code to make it build for fuzzing.
+
+If there is undeclared identifier or unknown type name error, fix it by finding and including the related libraries.
+
+Note that some code may need to be wrapped with &lt;code&gt;extern &#34;C&#34;&lt;/code&gt; as their source is C program.
+
+MUST RETURN THE FULL CODE, INCLUDING UNCHANGED PARTS.
+EXTREMELY IMPORTANT: AVOID USING &lt;code&gt;goto&lt;/code&gt;. If you have to write code using &lt;code&gt;goto&lt;/code&gt;, you MUST MUST also declare all variables BEFORE the &lt;code&gt;goto&lt;/code&gt;. Never introduce new variables after the &lt;code&gt;goto&lt;/code&gt;.
+
+Below is the code needs to be built:
+&lt;code&gt;
+#include &lt;fuzzer/FuzzedDataProvider.h&gt;
+#include &lt;libusb-1.0/libusb.h&gt;
+
+extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
+    FuzzedDataProvider stream(data, size);
+
+    // Initialize libusb context
+    libusb_context* ctx = nullptr;
+    if (libusb_init(&amp;ctx) != 0) {
+        return 0;
+    }
+
+    // Create a dummy libusb_device_handle
+    libusb_device_handle* handle = libusb_open_device_with_vid_pid(ctx, 0x1234, 0x5678);
+    if (handle == nullptr) {
+        libusb_exit(ctx);
+        return 0;
+    }
+
+    // Prepare the libusb_bos_descriptor pointer
+    libusb_bos_descriptor* bos_desc = nullptr;
+
+    // Call the target function
+    libusb_get_bos_descriptor(handle, &amp;bos_desc);
+
+    // Free the BOS descriptor if it was allocated
+    if (bos_desc != nullptr) {
+        libusb_free_bos_descriptor(bos_desc);
+    }
+
+    // Close the device handle and exit libusb context
+    libusb_close(handle);
+    libusb_exit(ctx);
+
+    return 0;
+}
+&lt;/code&gt;
+
+The code has the following build issues:
+&lt;error&gt;
+/src/libusb_fuzzer.cc:2:10: fatal error: &#39;libusb-1.0/libusb.h&#39; file not found
+    2 | #include &lt;libusb-1.0/libusb.h&gt;
+      |          ^~~~~~~~~~~~~~~~~~~~~
+&lt;/error&gt;
+
+Fix code:
+1. Consider possible solutions for the issues listed above.
+2. Choose a solution that can maximize fuzzing result, which is utilizing the function under test and feeding it not null input.
+3. Apply the solutions to the original code.
+It&#39;s important to show the complete code, not only the fixed line.
+&lt;solution&gt;
+</pre>
+
+
+
+<h3>Code #2</h3>
+
+<pre>
+Here is the fixed code with the necessary adjustments to ensure it builds correctly:
+
+```cpp
+#include &lt;fuzzer/FuzzedDataProvider.h&gt;
+#include &lt;libusb.h&gt;
+
+extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
+    FuzzedDataProvider stream(data, size);
+
+    // Initialize libusb context
+    libusb_context* ctx = nullptr;
+    if (libusb_init(&amp;ctx) != 0) {
+        return 0;
+    }
+
+    // Create a dummy libusb_device_handle
+    libusb_device_handle* handle = libusb_open_device_with_vid_pid(ctx, 0x1234, 0x5678);
+    if (handle == nullptr) {
+        libusb_exit(ctx);
+        return 0;
+    }
+
+    // Prepare the libusb_bos_descriptor pointer
+    libusb_bos_descriptor* bos_desc = nullptr;
+
+    // Call the target function
+    libusb_get_bos_descriptor(handle, &amp;bos_desc);
+
+    // Free the BOS descriptor if it was allocated
+    if (bos_desc != nullptr) {
+        libusb_free_bos_descriptor(bos_desc);
+    }
+
+    // Close the device handle and exit libusb context
+    libusb_close(handle);
+    libusb_exit(ctx);
+
+    return 0;
+}
+```
+
+**Explanation of the changes:**
+
+1. **Include Path Correction:** The include path for `libusb.h` was corrected from `#include &lt;libusb-1.0/libusb.h&gt;` to `#include &lt;libusb.h&gt;`. This is because the header file is typically found directly under the include path without the `libusb-1.0` directory prefix.
+
+2. **Full Code Display:** The full code is provided, including both the unchanged and changed parts, to ensure clarity and completeness.
+
+This should resolve the build issue and allow the fuzz harness to compile and run correctly.
+</pre>
+
+
+<h3>Fixer prompt #3</h3>
+<pre>
+
+Given the following C++ fuzz harness and its build error message, fix the code to make it build for fuzzing.
+
+If there is undeclared identifier or unknown type name error, fix it by finding and including the related libraries.
+
+Note that some code may need to be wrapped with &lt;code&gt;extern &#34;C&#34;&lt;/code&gt; as their source is C program.
+
+MUST RETURN THE FULL CODE, INCLUDING UNCHANGED PARTS.
+EXTREMELY IMPORTANT: AVOID USING &lt;code&gt;goto&lt;/code&gt;. If you have to write code using &lt;code&gt;goto&lt;/code&gt;, you MUST MUST also declare all variables BEFORE the &lt;code&gt;goto&lt;/code&gt;. Never introduce new variables after the &lt;code&gt;goto&lt;/code&gt;.
+
+Below is the code needs to be built:
+&lt;code&gt;
+#include &lt;fuzzer/FuzzedDataProvider.h&gt;
+#include &lt;libusb.h&gt;
+
+extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
+    FuzzedDataProvider stream(data, size);
+
+    // Initialize libusb context
+    libusb_context* ctx = nullptr;
+    if (libusb_init(&amp;ctx) != 0) {
+        return 0;
+    }
+
+    // Create a dummy libusb_device_handle
+    libusb_device_handle* handle = libusb_open_device_with_vid_pid(ctx, 0x1234, 0x5678);
+    if (handle == nullptr) {
+        libusb_exit(ctx);
+        return 0;
+    }
+
+    // Prepare the libusb_bos_descriptor pointer
+    libusb_bos_descriptor* bos_desc = nullptr;
+
+    // Call the target function
+    libusb_get_bos_descriptor(handle, &amp;bos_desc);
+
+    // Free the BOS descriptor if it was allocated
+    if (bos_desc != nullptr) {
+        libusb_free_bos_descriptor(bos_desc);
+    }
+
+    // Close the device handle and exit libusb context
+    libusb_close(handle);
+    libusb_exit(ctx);
+
+    return 0;
+}
+&lt;/code&gt;
+
+The code can build successfully but has a runtime issue: No code coverage increasement, indicating the fuzz target ineffectively invokes the function under test.
+
+Fix code:
+1. Consider possible solutions for the issues listed above.
+2. Choose a solution that can maximize fuzzing result, which is utilizing the function under test and feeding it not null input.
+3. Apply the solutions to the original code.
+It&#39;s important to show the complete code, not only the fixed line.
+&lt;solution&gt;
+</pre>
+
+
+
+<h3>Code #3</h3>
+
+<pre>
+To address the issue of no code coverage increase, we need to ensure that the function under test (`libusb_get_bos_descriptor`) is invoked with meaningful input. The current implementation uses a fixed Vendor ID (VID) and Product ID (PID) which may not correspond to any connected USB device, resulting in `libusb_open_device_with_vid_pid` returning `nullptr`.
+
+To improve the fuzzing effectiveness, we can:
+1. Enumerate connected USB devices and select one for testing.
+2. Use fuzzed data to simulate different USB device configurations.
+
+Here is the revised code that incorporates these changes:
+
+```cpp
+#include &lt;fuzzer/FuzzedDataProvider.h&gt;
+#include &lt;libusb.h&gt;
+#include &lt;vector&gt;
+
+extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
+    FuzzedDataProvider stream(data, size);
+
+    // Initialize libusb context
+    libusb_context* ctx = nullptr;
+    if (libusb_init(&amp;ctx) != 0) {
+        return 0;
+    }
+
+    // Get the list of USB devices
+    libusb_device** dev_list = nullptr;
+    ssize_t dev_count = libusb_get_device_list(ctx, &amp;dev_list);
+    if (dev_count &lt; 0) {
+        libusb_exit(ctx);
+        return 0;
+    }
+
+    // Select a device from the list
+    libusb_device* dev = nullptr;
+    if (dev_count &gt; 0) {
+        size_t index = stream.ConsumeIntegralInRange&lt;size_t&gt;(0, dev_count - 1);
+        dev = dev_list[index];
+    }
+
+    // Open the selected device
+    libusb_device_handle* handle = nullptr;
+    if (dev != nullptr) {
+        if (libusb_open(dev, &amp;handle) != 0) {
+            libusb_free_device_list(dev_list, 1);
+            libusb_exit(ctx);
+            return 0;
+        }
+    }
+
+    // Free the device list
+    libusb_free_device_list(dev_list, 1);
+
+    // Prepare the libusb_bos_descriptor pointer
+    libusb_bos_descriptor* bos_desc = nullptr;
+
+    // Call the target function if the handle is valid
+    if (handle != nullptr) {
+        libusb_get_bos_descriptor(handle, &amp;bos_desc);
+    }
+
+    // Free the BOS descriptor if it was allocated
+    if (bos_desc != nullptr) {
+        libusb_free_bos_descriptor(bos_desc);
+    }
+
+    // Close the device handle and exit libusb context
+    if (handle != nullptr) {
+        libusb_close(handle);
+    }
+    libusb_exit(ctx);
+
+    return 0;
+}
+```
+
+### Changes made:
+1. Enumerated connected USB devices using `libusb_get_device_list`.
+2. Selected a device from the list using fuzzed data to ensure variability.
+3. Opened the selected device and invoked the target function `libusb_get_bos_descriptor`.
+4. Ensured proper cleanup of resources, including freeing the device list and closing the device handle.
+
+These changes should improve the fuzzing effectiveness by ensuring that the function under test is invoked with meaningful input.
+</pre>
+
+
+<h2>Logs</h2>
+<pre>
+Fixing /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-libusb-libusb_get_bos_descriptor/fixed_targets/01.cc with gpt-4o, attempt 1.
+Fixing /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-libusb-libusb_get_bos_descriptor/fixed_targets/01.cc with gpt-4o, attempt 2.
+Fixing /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-libusb-libusb_get_bos_descriptor/fixed_targets/01.cc with gpt-4o, attempt 3.
+Successfully built /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-libusb-libusb_get_bos_descriptor/fixed_targets/01.cc with gpt-4o in 3 iterations of fixing.
+Result for libusb-libusb_get_bos_descriptor-01: crashes=False, coverage=0.12432012432012432 (320/2574), coverage diff=0.2724046140195209 (1535/5635)
+
+</pre>
+
+<h2>Run logs</h2>
+<pre>
+INFO:__main__:Running: docker run --rm --privileged --shm-size=2g --platform linux/amd64 -e FUZZING_ENGINE=libfuzzer -e SANITIZER=address -e RUN_FUZZER_MODE=interactive -e HELPER=True -v /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-libusb-libusb_get_bos_descriptor/corpora/01.cc:/tmp/libusb_fuzzer_corpus -v /tmp/tmptrp7ybx_/build/out/libusb-libusb_get_bos_descriptor-01:/out -t gcr.io/oss-fuzz-base/base-runner run_fuzzer libusb_fuzzer -print_final_stats=1 -max_total_time=30 -len_control=0 -timeout=30.
+vm.mmap_rnd_bits = 28
+rm: cannot remove &#39;/tmp/libusb_fuzzer_corpus&#39;: Device or resource busy
+/out/libusb_fuzzer -rss_limit_mb=2560 -timeout=25 -print_final_stats=1 -max_total_time=30 -len_control=0 -timeout=30 /tmp/libusb_fuzzer_corpus &lt; /dev/null
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 1521369677
+INFO: Loaded 1 modules   (2574 inline 8-bit counters): 2574 [0x563c2ae51dc0, 0x563c2ae527ce), 
+INFO: Loaded 1 PC tables (2574 PCs): 2574 [0x563c2ae527d0,0x563c2ae5c8b0), 
+INFO:        0 files found in /tmp/libusb_fuzzer_corpus
+INFO: -max_len is not provided; libFuzzer will not generate inputs larger than 4096 bytes
+INFO: A corpus is not provided, starting from an empty corpus
+#2	INITED cov: 315 ft: 316 corp: 1/1b exec/s: 0 rss: 33Mb
+#3	NEW    cov: 320 ft: 414 corp: 2/2b lim: 4096 exec/s: 0 rss: 34Mb L: 1/1 MS: 1 ChangeBit-
+#128	pulse  cov: 320 ft: 414 corp: 2/2b lim: 4096 exec/s: 42 rss: 51Mb
+#256	pulse  cov: 320 ft: 414 corp: 2/2b lim: 4096 exec/s: 42 rss: 52Mb
+#512	pulse  cov: 320 ft: 414 corp: 2/2b lim: 4096 exec/s: 51 rss: 52Mb
+#1024	pulse  cov: 320 ft: 414 corp: 2/2b lim: 4096 exec/s: 46 rss: 52Mb
+#1398	DONE   cov: 320 ft: 414 corp: 2/2b lim: 4096 exec/s: 45 rss: 52Mb
+Done 1398 runs in 31 second(s)
+stat::number_of_executed_units: 1398
+stat::average_exec_per_sec:     45
+stat::new_units_added:          1
+stat::slowest_unit_time_sec:    0
+stat::peak_rss_mb:              52
+
+</pre>
+
+</body>
