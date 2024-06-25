@@ -244,7 +244,7 @@ def parse_args() -> argparse.Namespace:
                       action='store_true',
                       default=False,
                       help='Manually fix the harnesses.')
-  
+
   args = parser.parse_args()
   if args.num_samples:
     assert args.num_samples > 0, '--num-samples must take a positive integer.'
