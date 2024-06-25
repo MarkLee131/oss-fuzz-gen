@@ -344,7 +344,7 @@ def llm_fix(ai_binary: str,
             error_desc: Optional[str],
             errors: list[str],
             fixer_model_name: str,
-            template_dir: Optional[str] = None) -> None:
+            template_dir: str = prompt_builder.DEFAULT_TEMPLATE_DIR) -> None:
   """Reads and fixes |target_path| in place with LLM based on |error_log|."""
   fuzz_target_source_code = parser.parse_code(target_path)
 
@@ -394,16 +394,17 @@ def llm_fix(ai_binary: str,
   parser.save_output(preferred_fix_code, target_path)
 
 
-def apply_llm_fix(ai_binary: str,
-                  benchmark: benchmarklib.Benchmark,
-                  fuzz_target_source_code: str,
-                  error_desc: Optional[str],
-                  errors: list[str],
-                  prompt_path: str,
-                  response_dir: str,
-                  fixer_model_name: str = models.DefaultModel.name,
-                  temperature: float = 0.4,
-                  template_dir: Optional[str] = None):
+def apply_llm_fix(
+    ai_binary: str,
+    benchmark: benchmarklib.Benchmark,
+    fuzz_target_source_code: str,
+    error_desc: Optional[str],
+    errors: list[str],
+    prompt_path: str,
+    response_dir: str,
+    fixer_model_name: str = models.DefaultModel.name,
+    temperature: float = 0.4,
+    template_dir: str = prompt_builder.DEFAULT_TEMPLATE_DIR) -> None:
   """Queries LLM to fix the code."""
   fixer_model = models.LLM.setup(
       ai_binary=ai_binary,

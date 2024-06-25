@@ -194,15 +194,17 @@ def aggregate_results(target_stats: list[tuple[int, exp_evaluator.Result]],
                           max_coverage_diff_report)
 
 
-def check_targets(ai_binary: str,
-                  benchmark: Benchmark,
-                  work_dirs: WorkDirs,
-                  generated_targets: List[str],
-                  cloud_experiment_name: str = '',
-                  cloud_experiment_bucket: str = '',
-                  run_timeout: int = RUN_TIMEOUT,
-                  fixer_model_name: str = models.DefaultModel.name,
-                  template_dir: str = None) -> Optional[AggregatedResult]:
+def check_targets(
+    ai_binary: str,
+    benchmark: Benchmark,
+    work_dirs: WorkDirs,
+    generated_targets: List[str],
+    cloud_experiment_name: str = '',
+    cloud_experiment_bucket: str = '',
+    run_timeout: int = RUN_TIMEOUT,
+    fixer_model_name: str = models.DefaultModel.name,
+    template_dir: str = prompt_builder.DEFAULT_TEMPLATE_DIR
+) -> Optional[AggregatedResult]:
   """Builds all targets in the fixed target directory."""
   target_stats = []
 
@@ -253,7 +255,7 @@ def run(benchmark: Benchmark,
         work_dirs: WorkDirs,
         example_pair: Optional[list[list[str]]] = None,
         debug: bool = DEBUG,
-        manual_fix: bool = False,
+        manual_fix: bool = True,
         cloud_experiment_name: str = '',
         cloud_experiment_bucket: str = '',
         use_context: bool = False,
@@ -322,6 +324,11 @@ def run(benchmark: Benchmark,
                          work_dirs,
                          builder,
                          debug=debug)  # list
+
+    ## after that, we need to use another prompt to generate targets
+    ## so we need to discard the prompt content above, and use the new prompt
+
+    builder = prompt_builder.DefaultTemplateBuilder(model, template_dir)
 
     prompt = builder.build_from_spec(spec)
     prompt.save(work_dirs.prompt)

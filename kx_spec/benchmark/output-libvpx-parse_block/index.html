@@ -40,8 +40,8 @@ tbody tr:nth-child(odd) {
 }
 </style>
 <body>
-    LLM: 
-    
+    LLM:
+
 <style>
 td, th {
     border-right: 1px #dedede solid;
@@ -61,38 +61,370 @@ td, th {
         <th>Coverage</th>
         <th>Line coverage diff</th>
     </tr>
-    
+
     <tr>
         <td><a href="../../sample/output-libvpx-parse_block/01.html">01</a></li></td>
         <td>Done</td>
-        
+
         <td style="color: black">False</td>
         <td style="color: black">False</td>
         <td style="color: black">False</td>
         <td>- </td>
         <td>0.00</td>
         <td><a href="#">0.00</a></td>
-        
+
     </tr>
-    
+
     <tr>
         <td><a href="../../sample/output-libvpx-parse_block/02.html">02</a></li></td>
         <td>Done</td>
-        
+
         <td style="color: black">False</td>
         <td style="color: black">False</td>
         <td style="color: black">False</td>
         <td>- </td>
         <td>0.00</td>
         <td><a href="#">0.00</a></td>
-        
+
     </tr>
-    
+
 </table>
 
 <h2>Prompt</h2>
 <pre>
-None
+
+&lt;system&gt;
+You are an expert in requirement analysis and fuzzing. You MUST carefully study the function signature and its parameters, and write a specification that can be used to generate fuzz drivers for the given API from OSS projects.
+Note that the format of supposed specification content needs include the following information:
+    - The functionality of the function and the project it belongs to.
+    - Preconditions and postconditions of the function.
+        - The data type, meaning, and constraints (preconditions, postconditions, and invariants) of each parameter.
+        - The data type, meaning, and constraints (preconditions, postconditions, and invariants) of the return value.
+    - The possible side effects of the function.
+    - The possible branch conditions of the function, if any.
+    - The possible error conditions of the function, if any.
+
+An example specification for the function ``get_src_uri` within `kamailio` project can be:
+&lt;code&gt;
+// take care the header files if the project is written in C, since the fuzz driver is written in C++
+
+#include &lt;fuzzer/FuzzedDataProvider.h&gt;
+/*
+** necessary C++ headers here!
+*/
+extern &#34;C&#34; { // since this project is written in C, we need to use extern &#34;C&#34; to avoid name mangling
+// C header files we need to include if any
+}
+
+extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    // Initialize the library or any resources `get_src_uri` witin `kamailio` project needed for the fuzzing process.
+      return 0;
+  }
+
+extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+  /**
+    * Goal: The fuzz driver should test`get_src_uri` witin `kamailio` project.
+    *        - kamailio is an open-source SIP server, which is a very popular open-source project.
+    *        - `get_src_uri` is a function that is used to get the source IP, port, and protocol in SIP URI format.
+
+    * Precondition: 1. The function is provided by the library `msg_parser.h` and implemented in `msg_parser.c`.
+    *               2. The function `get_src_uri` is called with the following parameters:
+    *                 - @m: a pointer to a `sip_msg_t` structure, which is a structure that represents a SIP message.
+    *                   - Precondition:
+    *                       a. Non-Null Requirement: The `m` pointer must be non-null before calling `get_src_uri`. If `m` is null, the function return `-1`.
+    *                       b. Proper Initialization: The `sip_msg_t` structure pointed to by `m` should be properly initialized, particularly ensuring that any previous pointers or lengths are correctly set or reset prior to the call to prevent unintended behavior.
+    *                       c. Buffer Setup: The `buf` field should contain the complete raw SIP message before any processing begins.
+    *                   - Postcondition:
+    *                       a. Resource Management: the @m pointer should be properly released after the function call by using `free_sip_msg` if available.
+    *                   - `sip_msg_t` Structure: The `sip_msg_t` structure contains fields that store information about a SIP message, including the raw message buffer, parsed headers, and parsed URIs.
+    *                     * - Precondition:
+    *                        a.Initialization: The `sip_msg_t` structure must be fully initialized, with all pointer fields set to `NULL` and integers to zero or default flags.
+    *                         b. Buffer Setup: The `buf` field should contain the complete raw SIP message before any processing begins.
+    *                     * - Postcondition:
+    *                          a. Header Integrity: After parsing, header pointers (e.g., `headers`, `last_header`) should accurately reference sections of `buf`.
+    *                          b. End-of-Headers: The `eoh` field must accurately mark the end of the header section.
+    *                          c. URI Validity: If URIs (`new_uri`, `dst_uri`) are modified, `parsed_uri_ok` should be reset to 0 to ensure re-parsing.
+    *                          d. Memory Management: Properly manage memory to prevent leaks or double frees, especially for fields with shared pointers.
+    *                          e. Modification Safety: Any modification to URIs or headers should prompt appropriate updates to relevant flags and pointers to maintain state consistency.
+
+    *                 - @tmode: an integer that specifies the transport mode. This argument allows the user to specify whether the default transport protocol (UDP) should be explicitly mentioned in the URI or omitted for brevity. The value of `tmode` directly affects how the URI is formatted, specifically in terms of displaying or omitting the transport protocol details.
+    *                    * - Precondition:
+    *                        - a. `tmode` should be an integer. It can be either `0` (for short format) or any non-zero value (for full format).
+    *                    * - Postcondition:
+    *                        - a. The value of `tmode` should not be modified by the function.
+    *                        - b. The function should handle the transport mode as specified by the input value.
+    *                        - c. Output URI Format:
+    *                             (i) If `tmode` is 0:
+    *                                 UDP as Default: If the protocol is UDP, the URI does not include the transport protocol parameter (`;transport=udp`), as UDP is considered the default. Other Protocols: For protocols other than UDP, the function adds the transport protocol type to the URI using the format `;transport=protocol_type`.
+    *                             (ii) If `tmode` is non-zero:
+    *                                Always Include Protocol: The transport protocol parameter is included for all protocols, including UDP, using the format `;transport=protocol_type`.
+
+    *                 - @uri: a pointer to a `str` structure that will store the constructed SIP URI. The `str` structure is a string structure that contains a pointer to a character buffer and a length field to indicate the size of the string.
+
+    *                   * - Preconditions: a. Non-Null Requirement: The `uri` pointer must be non-null before calling `get_src_uri`. If `uri` is null, the function will log an error message (&#34;invalid parameter value&#34;) and return `-1`.
+    *                                       b. Proper Initialization: The `str` structure pointed to by `uri` should be properly initialized, particularly ensuring that any previous pointers or lengths are correctly set or reset prior to the call to prevent unintended behavior.
+
+    *                   * - Postconditions:
+    *                           a. URI Storage: On successful execution, the `uri` pointer’s fields (`s` and `len`) are updated:
+    *                             (i) `uri-&gt;s` will point to an internal static buffer that contains the constructed SIP URI.
+    *                             (ii) `uri-&gt;len` will reflect the length of this URI, calculated based on the components included (e.g., IP, port, transport protocol).
+    *                           b. Memory Management: Since `uri-&gt;s` points to a static buffer (`buf`), the content it points to should not be modified or freed by the caller. The caller must also ensure that this pointer is used before any subsequent calls to `get_src_uri`, as subsequent calls will overwrite the buffer.
+
+    * Postcondition: 1. The function should be called with the mutated data to test the functionality of the function, returning 0 if successful and -1 if an error occurs.
+    *                   a. URI Validation: Ensure the SIP URI is correctly formatted according to RFC 3261 specifications, regardless of input variations.
+    *                   b. Transport Inclusion: Verify that the transport protocol is included or omitted from the URI correctly based on tmode and the protocol used:
+    *                   c. If tmode is 0 and the protocol is UDP, the URI should not contain the transport parameter.
+For non-UDP protocols with tmode being 0, or any protocol when tmode is non-zero, the URI must include the transport=protocol parameter.
+    *                   d. IPv6 Handling: Confirm that IPv6 addresses are correctly enclosed in brackets.
+
+    *                2. Resources should be released properly after the function call. Note that the specfied API is preferred to use for resource release if available.
+**/
+
+}
+&lt;/code&gt;
+You MUST write a new specification for the following function:
+&lt;code&gt;
+void parse_block(TileWorkerData *, const VP9Decoder *, int, int, BLOCK_SIZE, int, int)
+&lt;/code&gt;
+
+&lt;/system&gt;
+&lt;task&gt;
+Your goal is to write a specification for guiding the generation of a fuzzing harness for the provided function-under-test signature using &lt;code&gt;LLVMFuzzerTestOneInput&lt;/code&gt;. The function signature of the function-under-test is:
+&lt;function signature&gt;
+void parse_block(TileWorkerData *, const VP9Decoder *, int, int, BLOCK_SIZE, int, int)
+&lt;/function signature&gt;
+&lt;/task&gt;
+
+The code context of the function-under-test is:
+Function source code is:
+static void parse_block(TileWorkerData *twd, VP9Decoder *const pbi, int mi_row,
+                        int mi_col, BLOCK_SIZE bsize, int bwl, int bhl) {
+  VP9_COMMON *const cm = &amp;pbi-&gt;common;
+  const int bw = 1 &lt;&lt; (bwl - 1);
+  const int bh = 1 &lt;&lt; (bhl - 1);
+  const int x_mis = VPXMIN(bw, cm-&gt;mi_cols - mi_col);
+  const int y_mis = VPXMIN(bh, cm-&gt;mi_rows - mi_row);
+  vpx_reader *r = &amp;twd-&gt;bit_reader;
+  MACROBLOCKD *const xd = &amp;twd-&gt;xd;
+
+  MODE_INFO *mi = set_offsets(cm, xd, bsize, mi_row, mi_col, bw, bh, x_mis,
+                              y_mis, bwl, bhl);
+
+  if (bsize &gt;= BLOCK_8X8 &amp;&amp; (cm-&gt;subsampling_x || cm-&gt;subsampling_y)) {
+    const BLOCK_SIZE uv_subsize =
+        ss_size_lookup[bsize][cm-&gt;subsampling_x][cm-&gt;subsampling_y];
+    if (uv_subsize == BLOCK_INVALID)
+      vpx_internal_error(xd-&gt;error_info, VPX_CODEC_CORRUPT_FRAME,
+                         &#34;Invalid block size.&#34;);
+  }
+
+  vp9_read_mode_info(twd, pbi, mi_row, mi_col, x_mis, y_mis);
+
+  if (mi-&gt;skip) {
+    dec_reset_skip_context(xd);
+  }
+
+  if (!is_inter_block(mi)) {
+    predict_recon_intra(xd, mi, twd, parse_intra_block_row_mt);
+  } else {
+    if (!mi-&gt;skip) {
+      tran_low_t *dqcoeff[MAX_MB_PLANE];
+      int *eob[MAX_MB_PLANE];
+      int plane;
+      int eobtotal;
+      // Based on eobtotal and bsize, this may be mi-&gt;skip may be set to true
+      // In that case dqcoeff and eob need to be backed up and restored as
+      // recon_block will not increment these pointers for skip cases
+      for (plane = 0; plane &lt; MAX_MB_PLANE; ++plane) {
+        const struct macroblockd_plane *const pd = &amp;xd-&gt;plane[plane];
+        dqcoeff[plane] = pd-&gt;dqcoeff;
+        eob[plane] = pd-&gt;eob;
+      }
+      eobtotal = predict_recon_inter(xd, mi, twd, parse_inter_block_row_mt);
+
+      if (bsize &gt;= BLOCK_8X8 &amp;&amp; eobtotal == 0) {
+        mi-&gt;skip = 1;  // skip loopfilter
+        for (plane = 0; plane &lt; MAX_MB_PLANE; ++plane) {
+          struct macroblockd_plane *pd = &amp;xd-&gt;plane[plane];
+          pd-&gt;dqcoeff = dqcoeff[plane];
+          pd-&gt;eob = eob[plane];
+        }
+      }
+    }
+  }
+
+  xd-&gt;corrupted |= vpx_reader_has_error(r);
+}
+
+Function declaration is:
+void parse_block(TileWorkerData *, const VP9Decoder *, int, int, BLOCK_SIZE, int, int);
+header files within this project are:
+/src/libvpx/vp9/common/vp9_thread_common.h, /src/libvpx/vpx_util/vpx_atomics.h, /src/libvpx/vpx_dsp/x86/transpose_sse2.h, /src/libvpx/vp8/common/vp8_entropymodedata.h, /src/libvpx/vpx_dsp/x86/convolve_avx2.h, /work/build/vp8_rtcd.h, /src/libvpx/vp9/common/vp9_entropymode.h, /src/libvpx/vp8/common/findnearmv.h, /src/libvpx/vp8/common/postproc.h, /src/libvpx/vp8/common/default_coef_probs.h, /src/libvpx/vp8/decoder/treereader.h, /src/libvpx/vpx/internal/vpx_codec_internal.h, /src/libvpx/vpx_dsp/x86/highbd_inv_txfm_sse4.h, /src/libvpx/vp9/vp9_dx_iface.h, /src/libvpx/vpx/vpx_encoder.h, /src/libvpx/vp8/common/mv.h, /src/libvpx/vpx_dsp/vpx_dsp_common.h, /src/libvpx/vp9/common/vp9_blockd.h, /src/libvpx/vpx_dsp/bitreader_buffer.h, /src/libvpx/vp9/common/vp9_seg_common.h, /src/libvpx/vp9/common/vp9_ppflags.h, /work/build/vpx_scale_rtcd.h, /src/libvpx/vp9/common/vp9_entropymv.h, /src/libvpx/vp8/common/treecoder.h, /src/libvpx/vpx_util/endian_inl.h, /src/libvpx/vp8/common/setupintrarecon.h, /src/libvpx/vpx_dsp/vpx_convolve.h, /src/libvpx/vp9/common/vp9_filter.h, /src/libvpx/vp9/common/vp9_pred_common.h, /src/libvpx/vp8/common/coefupdateprobs.h, /src/libvpx/vpx_dsp/x86/inv_txfm_ssse3.h, /src/libvpx/vp9/common/vp9_scale.h, /src/libvpx/vpx_dsp/x86/mem_sse2.h, /src/libvpx/vpx_ports/bitops.h, /src/libvpx/vp9/common/vp9_tile_common.h, /src/libvpx/vp9/common/vp9_mv.h, /src/libvpx/vpx/vpx_decoder.h, /src/libvpx/vp8/common/entropy.h, /src/libvpx/vpx_dsp/x86/highbd_inv_txfm_sse2.h, /src/libvpx/vp8/common/entropymode.h, /src/libvpx/vpx_mem/vpx_mem.h, /src/libvpx/vpx_ports/vpx_once.h, /src/libvpx/vp9/common/vp9_common.h, /src/libvpx/vp8/decoder/dboolhuff.h, /src/libvpx/vpx_ports/system_state.h, /src/libvpx/vpx_dsp/x86/convolve_sse2.h, /src/libvpx/vp8/common/reconintra4x4.h, /src/libvpx/vpx/vpx_image.h, /src/libvpx/vp9/common/vp9_frame_buffers.h, /src/libvpx/vpx_dsp/x86/inv_txfm_sse2.h, /src/libvpx/vpx_scale/yv12config.h, /src/libvpx/vpx_dsp/x86/convolve_ssse3.h, /src/libvpx/vpx/vp8.h, /src/libvpx/vpx/vpx_codec.h, /src/libvpx/vpx_dsp/txfm_common.h, /src/libvpx/vpx_util/vpx_thread.h, /src/libvpx/vpx_ports/x86.h, /src/libvpx/vp9/vp9_iface_common.h, /src/libvpx/vp8/common/ppflags.h, /src/libvpx/vp8/common/blockd.h, /src/libvpx/vp9/common/vp9_scan.h, /src/libvpx/vpx_dsp/inv_txfm.h, /src/libvpx/vp8/common/threading.h, /src/libvpx/vp8/decoder/onyxd_int.h, /src/libvpx/vp9/common/vp9_entropy.h, /src/libvpx/vpx/vpx_frame_buffer.h, /src/libvpx/vp9/common/vp9_onyxc_int.h, /work/build/vp9_rtcd.h, /src/libvpx/vp9/common/vp9_enums.h, /src/libvpx/vpx_dsp/vpx_filter.h, /src/libvpx/vp9/common/vp9_reconinter.h, /src/libvpx/vp8/common/loopfilter.h, /src/libvpx/vp8/common/entropymv.h, /src/libvpx/vp9/decoder/vp9_job_queue.h, /src/libvpx/vpx_dsp/prob.h, /src/libvpx/vp9/common/vp9_loopfilter.h, /src/libvpx/vp9/common/vp9_idct.h, /src/libvpx/vpx_ports/mem_ops.h, /src/libvpx/vp8/common/onyxc_int.h, /work/build/vpx_dsp_rtcd.h, /src/libvpx/vpx/vp8dx.h, /src/libvpx/vp9/common/vp9_mvref_common.h, /src/libvpx/vp8/common/onyxd.h, /src/libvpx/vpx_dsp/bitreader.h, /src/libvpx/vp9/decoder/vp9_decoder.h
+ Choose the appropriate header files to our specification.
+The target function takes the following arguments:
+- TileWorkerData *
+- const VP9Decoder *
+- int
+- int
+- BLOCK_SIZE
+- int
+- int
+Review them carefully and set the specification accordingly like the given example before.
+The target function is used in various places of the target project.Please see the following usage example to guide you to write the specification:
+Example usage:
+```cstatic void parse_tile_row(TileWorkerData *tile_data, VP9Decoder *pbi,
+                           int mi_row, int cur_tile_col, uint8_t **data_end) {
+  int mi_col;
+  VP9_COMMON *const cm = &amp;pbi-&gt;common;
+  RowMTWorkerData *const row_mt_worker_data = pbi-&gt;row_mt_worker_data;
+  TileInfo *tile = &amp;tile_data-&gt;xd.tile;
+  TileBuffer *const buf = &amp;pbi-&gt;tile_buffers[cur_tile_col];
+  const int aligned_cols = mi_cols_aligned_to_sb(cm-&gt;mi_cols);
+
+  vp9_zero(tile_data-&gt;dqcoeff);
+  vp9_tile_init(tile, cm, 0, cur_tile_col);
+
+  /* Update reader only at the beginning of each row in a tile */
+  if (mi_row == 0) {
+    setup_token_decoder(buf-&gt;data, *data_end, buf-&gt;size, &amp;tile_data-&gt;error_info,
+                        &amp;tile_data-&gt;bit_reader, pbi-&gt;decrypt_cb,
+                        pbi-&gt;decrypt_state);
+  }
+  vp9_init_macroblockd(cm, &amp;tile_data-&gt;xd, tile_data-&gt;dqcoeff);
+  tile_data-&gt;xd.error_info = &amp;tile_data-&gt;error_info;
+
+  vp9_zero(tile_data-&gt;xd.left_context);
+  vp9_zero(tile_data-&gt;xd.left_seg_context);
+  for (mi_col = tile-&gt;mi_col_start; mi_col &lt; tile-&gt;mi_col_end;
+       mi_col += MI_BLOCK_SIZE) {
+    const int r = mi_row &gt;&gt; MI_BLOCK_SIZE_LOG2;
+    const int c = mi_col &gt;&gt; MI_BLOCK_SIZE_LOG2;
+    int plane;
+    const int sb_num = (r * (aligned_cols &gt;&gt; MI_BLOCK_SIZE_LOG2) + c);
+    for (plane = 0; plane &lt; MAX_MB_PLANE; ++plane) {
+      tile_data-&gt;xd.plane[plane].eob =
+          row_mt_worker_data-&gt;eob[plane] + (sb_num &lt;&lt; EOBS_PER_SB_LOG2);
+      tile_data-&gt;xd.plane[plane].dqcoeff =
+          row_mt_worker_data-&gt;dqcoeff[plane] + (sb_num &lt;&lt; DQCOEFFS_PER_SB_LOG2);
+    }
+    tile_data-&gt;xd.partition =
+        row_mt_worker_data-&gt;partition + sb_num * PARTITIONS_PER_SB;
+    process_partition(tile_data, pbi, mi_row, mi_col, BLOCK_64X64, 4, PARSE,
+                      parse_block);
+  }
+}
+
+```
+
+&lt;system&gt;
+You are an expert in writing fuzz driver for a given API from OSS project. You have been given a task to write a fuzz driver for a given API according to the specification below.
+
+The driver code you need to complete is as follows, fill it carefully by strictly following the specification within the comments correctly to make the fuzzing test work, especially for the Precondition and Postcondition sections.
+Note that you need to follow the specification exactly as it is given and write the fuzz driver correctly and efficiently.
+
+&lt;instruction&gt;
+#include &lt;fuzzer/FuzzedDataProvider.h&gt;
+#include &#34;vp9/decoder/vp9_decoder.h&#34;
+#include &#34;vp9/common/vp9_blockd.h&#34;
+#include &#34;vp9/common/vp9_enums.h&#34;
+#include &#34;vp9/common/vp9_onyxc_int.h&#34;
+#include &#34;vp9/common/vp9_tile_common.h&#34;
+
+/**
+ * Goal: The fuzz driver should test `parse_block` within the VP9 decoder project.
+ *       - VP9 is an open and royalty-free video coding format developed by Google.
+ *       - `parse_block` is a function that parses a block of video data within a tile during VP9 decoding.
+ *
+ * Precondition:
+ * 1. The function `parse_block` is called with the following parameters:
+ *    - @twd: a pointer to a `TileWorkerData` structure, which contains data specific to the tile being processed.
+ *      - Precondition:
+ *        a. Non-Null Requirement: The `twd` pointer must be non-null before calling `parse_block`. If `twd` is null, the function behavior is undefined.
+ *        b. Proper Initialization: The `TileWorkerData` structure should be properly initialized, particularly ensuring that the `bit_reader` and `xd` fields are correctly set up.
+ *      - Postcondition:
+ *        a. Resource Management: The `twd` pointer should be properly managed after the function call, ensuring no memory leaks.
+ *    - @pbi: a pointer to a `VP9Decoder` structure, which contains the state of the VP9 decoder.
+ *      - Precondition:
+ *        a. Non-Null Requirement: The `pbi` pointer must be non-null before calling `parse_block`. If `pbi` is null, the function behavior is undefined.
+ *        b. Proper Initialization: The `VP9Decoder` structure should be properly initialized, particularly ensuring that the `common` field is correctly set up.
+ *      - Postcondition:
+ *        a. Resource Management: The `pbi` pointer should be properly managed after the function call, ensuring no memory leaks.
+ *    - @mi_row: an integer representing the row index of the macroblock.
+ *      - Precondition:
+ *        a. Valid Range: `mi_row` should be within the valid range of macroblock rows for the current frame.
+ *      - Postcondition:
+ *        a. The value of `mi_row` should not be modified by the function.
+ *    - @mi_col: an integer representing the column index of the macroblock.
+ *      - Precondition:
+ *        a. Valid Range: `mi_col` should be within the valid range of macroblock columns for the current frame.
+ *      - Postcondition:
+ *        a. The value of `mi_col` should not be modified by the function.
+ *    - @bsize: an enumeration of type `BLOCK_SIZE` representing the size of the block.
+ *      - Precondition:
+ *        a. Valid Value: `bsize` should be a valid `BLOCK_SIZE` enumeration value.
+ *      - Postcondition:
+ *        a. The value of `bsize` should not be modified by the function.
+ *    - @bwl: an integer representing the block width in log2 units.
+ *      - Precondition:
+ *        a. Valid Range: `bwl` should be within the valid range for block widths.
+ *      - Postcondition:
+ *        a. The value of `bwl` should not be modified by the function.
+ *    - @bhl: an integer representing the block height in log2 units.
+ *      - Precondition:
+ *        a. Valid Range: `bhl` should be within the valid range for block heights.
+ *      - Postcondition:
+ *        a. The value of `bhl` should not be modified by the function.
+ *
+ * Postcondition:
+ * 1. The function should be called with the mutated data to test the functionality of the function, returning void.
+ *    a. Block Parsing: Ensure that the block is parsed correctly according to the VP9 specifications.
+ *    b. Error Handling: Verify that any errors during parsing are correctly handled and reported.
+ * 2. Resources should be released properly after the function call. Note that the specified API is preferred to use for resource release if available.
+ *
+ * Possible Side Effects:
+ * - The function may modify the state of the `TileWorkerData` and `VP9Decoder` structures.
+ *
+ * Possible Branch Conditions:
+ * - The function contains several conditional branches based on the block size, subsampling, and other parameters.
+ *
+ * Possible Error Conditions:
+ * - The function may encounter errors if the block size is invalid or if there are issues with the bitstream.
+ */
+
+extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    // Initialize the library or any resources `parse_block` within the VP9 decoder project needed for the fuzzing process.
+    return 0;
+}
+
+extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    FuzzedDataProvider dataProvider(data, size);
+
+    // Create and initialize the TileWorkerData structure
+    TileWorkerData twd;
+    // Proper initialization of twd fields
+    // ...
+
+    // Create and initialize the VP9Decoder structure
+    VP9Decoder pbi;
+    // Proper initialization of pbi fields
+    // ...
+
+    // Generate random values for the parameters
+    int mi_row = dataProvider.ConsumeIntegral&lt;int&gt;();
+    int mi_col = dataProvider.ConsumeIntegral&lt;int&gt;();
+    BLOCK_SIZE bsize = static_cast&lt;BLOCK_SIZE&gt;(dataProvider.ConsumeEnum&lt;BLOCK_SIZE&gt;());
+    int bwl = dataProvider.ConsumeIntegral&lt;int&gt;();
+    int bhl = dataProvider.ConsumeIntegral&lt;int&gt;();
+
+    // Call the target function with the generated parameters
+    parse_block(&amp;twd, &amp;pbi, mi_row, mi_col, bsize, bwl, bhl);
+
+    return 0;
+}
+&lt;/instruction&gt;
+
+Note that you MUST fill the code according to the specification provided in the comments, and return the final fuzz driver code ONLY. So you need to remove our comments and write the final code only.
+&lt;/system&gt;
 </pre>
 
 

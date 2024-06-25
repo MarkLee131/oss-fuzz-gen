@@ -94,14 +94,13 @@ class PromptBuilder:
   def build_planning_prompt(
       self,
       benchmark: Benchmark,
-      example_pair: list[list[str]],
+      example_pair: Optional[list[list[str]]] = None,
       project_example_content: Optional[list[list[str]]] = None,
       project_context_content: Optional[dict] = None) -> prompts.Prompt:
     """Builds a prompt."""
 
   @abstractmethod
-  def build_from_spec(self, function_signature: str,
-                      target_file_type: FileType) -> prompts.Prompt:
+  def build_from_spec(self, spec_list: list[str]) -> prompts.Prompt:
     """Builds a prompt."""
 
   @abstractmethod
@@ -278,7 +277,7 @@ class DefaultTemplateBuilder(PromptBuilder):
   def build_planning_prompt(
       self,
       benchmark: Benchmark,
-      example_pair: list[list[str]],
+      example_pair: Optional[list[list[str]]] = None,
       project_example_content: Optional[list[list[str]]] = None,
       project_context_content: Optional[dict] = None) -> prompts.Prompt:
     """Constructs a prompt using the templates in |self| and saves it."""
@@ -287,7 +286,6 @@ class DefaultTemplateBuilder(PromptBuilder):
     final_problem = self.format_problem(benchmark.function_signature)
 
     if project_context_content:
-      # {'xrefs': [], 'func_source': 'AvahiStringList *avahi_string_list_add_pair(AvahiStringList *l, const char *key, const char *value) {\n    assert(key);\n\n    if (value)\n        return avahi_string_list_add_printf(l, "%s=%s", key, value);\n    else\n        return avahi_string_list_add(l, key);\n}\n', 'files': [], 'decl': 'AvahiStringList * avahi_string_list_add_pair(AvahiStringList *, const char *, const char *);'}
 
       final_problem += '\nThe code context of the function-under-test is:\n' + \
         "Function source code is:\n" + project_context_content['func_source'] + '\n' + \

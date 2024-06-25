@@ -40,8 +40,8 @@ tbody tr:nth-child(odd) {
 }
 </style>
 <body>
-    LLM: 
-    
+    LLM:
+
 <style>
 td, th {
     border-right: 1px #dedede solid;
@@ -61,38 +61,260 @@ td, th {
         <th>Coverage</th>
         <th>Line coverage diff</th>
     </tr>
-    
+
     <tr>
         <td><a href="../../sample/output-avahi-avahi_string_list_add_pair/01.html">01</a></li></td>
         <td>Done</td>
-        
+
         <td style="color: green">True</td>
         <td style="color: red">True</td>
         <td style="color: red">True</td>
         <td>NO_SEMANTIC_ERR </td>
         <td>8.16</td>
         <td><a href="#">0.34</a></td>
-        
+
     </tr>
-    
+
     <tr>
         <td><a href="../../sample/output-avahi-avahi_string_list_add_pair/02.html">02</a></li></td>
         <td>Done</td>
-        
+
         <td style="color: green">True</td>
         <td style="color: red">True</td>
         <td style="color: red">True</td>
         <td>NO_SEMANTIC_ERR </td>
         <td>7.57</td>
         <td><a href="#">0.34</a></td>
-        
+
     </tr>
-    
+
 </table>
 
 <h2>Prompt</h2>
 <pre>
-None
+
+&lt;system&gt;
+You are an expert in requirement analysis and fuzzing. You MUST carefully study the function signature and its parameters, and write a specification that can be used to generate fuzz drivers for the given API from OSS projects.
+Note that the format of supposed specification content needs include the following information:
+    - The functionality of the function and the project it belongs to.
+    - Preconditions and postconditions of the function.
+        - The data type, meaning, and constraints (preconditions, postconditions, and invariants) of each parameter.
+        - The data type, meaning, and constraints (preconditions, postconditions, and invariants) of the return value.
+    - The possible side effects of the function.
+    - The possible branch conditions of the function, if any.
+    - The possible error conditions of the function, if any.
+
+An example specification for the function ``get_src_uri` within `kamailio` project can be:
+&lt;code&gt;
+// take care the header files if the project is written in C, since the fuzz driver is written in C++
+
+#include &lt;fuzzer/FuzzedDataProvider.h&gt;
+/*
+** necessary C++ headers here!
+*/
+extern &#34;C&#34; { // since this project is written in C, we need to use extern &#34;C&#34; to avoid name mangling
+// C header files we need to include if any
+}
+
+extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    // Initialize the library or any resources `get_src_uri` witin `kamailio` project needed for the fuzzing process.
+      return 0;
+  }
+
+extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+  /**
+    * Goal: The fuzz driver should test`get_src_uri` witin `kamailio` project.
+    *        - kamailio is an open-source SIP server, which is a very popular open-source project.
+    *        - `get_src_uri` is a function that is used to get the source IP, port, and protocol in SIP URI format.
+
+    * Precondition: 1. The function is provided by the library `msg_parser.h` and implemented in `msg_parser.c`.
+    *               2. The function `get_src_uri` is called with the following parameters:
+    *                 - @m: a pointer to a `sip_msg_t` structure, which is a structure that represents a SIP message.
+    *                   - Precondition:
+    *                       a. Non-Null Requirement: The `m` pointer must be non-null before calling `get_src_uri`. If `m` is null, the function return `-1`.
+    *                       b. Proper Initialization: The `sip_msg_t` structure pointed to by `m` should be properly initialized, particularly ensuring that any previous pointers or lengths are correctly set or reset prior to the call to prevent unintended behavior.
+    *                       c. Buffer Setup: The `buf` field should contain the complete raw SIP message before any processing begins.
+    *                   - Postcondition:
+    *                       a. Resource Management: the @m pointer should be properly released after the function call by using `free_sip_msg` if available.
+    *                   - `sip_msg_t` Structure: The `sip_msg_t` structure contains fields that store information about a SIP message, including the raw message buffer, parsed headers, and parsed URIs.
+    *                     * - Precondition:
+    *                        a.Initialization: The `sip_msg_t` structure must be fully initialized, with all pointer fields set to `NULL` and integers to zero or default flags.
+    *                         b. Buffer Setup: The `buf` field should contain the complete raw SIP message before any processing begins.
+    *                     * - Postcondition:
+    *                          a. Header Integrity: After parsing, header pointers (e.g., `headers`, `last_header`) should accurately reference sections of `buf`.
+    *                          b. End-of-Headers: The `eoh` field must accurately mark the end of the header section.
+    *                          c. URI Validity: If URIs (`new_uri`, `dst_uri`) are modified, `parsed_uri_ok` should be reset to 0 to ensure re-parsing.
+    *                          d. Memory Management: Properly manage memory to prevent leaks or double frees, especially for fields with shared pointers.
+    *                          e. Modification Safety: Any modification to URIs or headers should prompt appropriate updates to relevant flags and pointers to maintain state consistency.
+
+    *                 - @tmode: an integer that specifies the transport mode. This argument allows the user to specify whether the default transport protocol (UDP) should be explicitly mentioned in the URI or omitted for brevity. The value of `tmode` directly affects how the URI is formatted, specifically in terms of displaying or omitting the transport protocol details.
+    *                    * - Precondition:
+    *                        - a. `tmode` should be an integer. It can be either `0` (for short format) or any non-zero value (for full format).
+    *                    * - Postcondition:
+    *                        - a. The value of `tmode` should not be modified by the function.
+    *                        - b. The function should handle the transport mode as specified by the input value.
+    *                        - c. Output URI Format:
+    *                             (i) If `tmode` is 0:
+    *                                 UDP as Default: If the protocol is UDP, the URI does not include the transport protocol parameter (`;transport=udp`), as UDP is considered the default. Other Protocols: For protocols other than UDP, the function adds the transport protocol type to the URI using the format `;transport=protocol_type`.
+    *                             (ii) If `tmode` is non-zero:
+    *                                Always Include Protocol: The transport protocol parameter is included for all protocols, including UDP, using the format `;transport=protocol_type`.
+
+    *                 - @uri: a pointer to a `str` structure that will store the constructed SIP URI. The `str` structure is a string structure that contains a pointer to a character buffer and a length field to indicate the size of the string.
+
+    *                   * - Preconditions: a. Non-Null Requirement: The `uri` pointer must be non-null before calling `get_src_uri`. If `uri` is null, the function will log an error message (&#34;invalid parameter value&#34;) and return `-1`.
+    *                                       b. Proper Initialization: The `str` structure pointed to by `uri` should be properly initialized, particularly ensuring that any previous pointers or lengths are correctly set or reset prior to the call to prevent unintended behavior.
+
+    *                   * - Postconditions:
+    *                           a. URI Storage: On successful execution, the `uri` pointer’s fields (`s` and `len`) are updated:
+    *                             (i) `uri-&gt;s` will point to an internal static buffer that contains the constructed SIP URI.
+    *                             (ii) `uri-&gt;len` will reflect the length of this URI, calculated based on the components included (e.g., IP, port, transport protocol).
+    *                           b. Memory Management: Since `uri-&gt;s` points to a static buffer (`buf`), the content it points to should not be modified or freed by the caller. The caller must also ensure that this pointer is used before any subsequent calls to `get_src_uri`, as subsequent calls will overwrite the buffer.
+
+    * Postcondition: 1. The function should be called with the mutated data to test the functionality of the function, returning 0 if successful and -1 if an error occurs.
+    *                   a. URI Validation: Ensure the SIP URI is correctly formatted according to RFC 3261 specifications, regardless of input variations.
+    *                   b. Transport Inclusion: Verify that the transport protocol is included or omitted from the URI correctly based on tmode and the protocol used:
+    *                   c. If tmode is 0 and the protocol is UDP, the URI should not contain the transport parameter.
+For non-UDP protocols with tmode being 0, or any protocol when tmode is non-zero, the URI must include the transport=protocol parameter.
+    *                   d. IPv6 Handling: Confirm that IPv6 addresses are correctly enclosed in brackets.
+
+    *                2. Resources should be released properly after the function call. Note that the specfied API is preferred to use for resource release if available.
+**/
+
+}
+&lt;/code&gt;
+You MUST write a new specification for the following function:
+&lt;code&gt;
+AvahiStringList * avahi_string_list_add_pair(AvahiStringList *, const char *, const char *)
+&lt;/code&gt;
+
+&lt;/system&gt;
+&lt;task&gt;
+Your goal is to write a specification for guiding the generation of a fuzzing harness for the provided function-under-test signature using &lt;code&gt;LLVMFuzzerTestOneInput&lt;/code&gt;. The function signature of the function-under-test is:
+&lt;function signature&gt;
+AvahiStringList * avahi_string_list_add_pair(AvahiStringList *, const char *, const char *)
+&lt;/function signature&gt;
+&lt;/task&gt;
+
+The code context of the function-under-test is:
+Function source code is:
+AvahiStringList *avahi_string_list_add_pair(AvahiStringList *l, const char *key, const char *value) {
+    assert(key);
+
+    if (value)
+        return avahi_string_list_add_printf(l, &#34;%s=%s&#34;, key, value);
+    else
+        return avahi_string_list_add(l, key);
+}
+
+Function declaration is:
+AvahiStringList * avahi_string_list_add_pair(AvahiStringList *, const char *, const char *);
+header files within this project are:
+/src/avahi/avahi-common/malloc.h, /src/avahi/avahi-core/dns.h, /src/avahi/avahi-common/strlst.h, /src/avahi/avahi-common/address.h, /src/avahi/avahi-core/rr.h, /src/avahi/avahi-core/log.h, /src/avahi/avahi-core/hashmap.h
+ Choose the appropriate header files to our specification.
+The target function takes the following arguments:
+- AvahiStringList *
+- const char *
+- const char *
+Review them carefully and set the specification accordingly like the given example before.
+
+&lt;system&gt;
+You are an expert in writing fuzz driver for a given API from OSS project. You have been given a task to write a fuzz driver for a given API according to the specification below.
+
+The driver code you need to complete is as follows, fill it carefully by strictly following the specification within the comments correctly to make the fuzzing test work, especially for the Precondition and Postcondition sections.
+Note that you need to follow the specification exactly as it is given and write the fuzz driver correctly and efficiently.
+
+&lt;instruction&gt;
+#include &lt;fuzzer/FuzzedDataProvider.h&gt;
+#include &lt;cassert&gt;
+#include &#34;avahi-common/strlst.h&#34; // Assuming this header defines AvahiStringList and related functions
+
+extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    // Initialize the library or any resources needed for the fuzzing process.
+    return 0;
+}
+
+extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    /**
+     * Goal: The fuzz driver should test `avahi_string_list_add_pair` within the Avahi project.
+     *       - Avahi is a system which facilitates service discovery on a local network via the mDNS/DNS-SD protocol suite.
+     *       - `avahi_string_list_add_pair` is a function that adds a key-value pair to an AvahiStringList.
+     *
+     * Precondition: The function `avahi_string_list_add_pair` is called with the following parameters:
+     *               - @l: a pointer to an `AvahiStringList` structure, which is a linked list structure used to store strings.
+     *                 - Precondition:
+     *                     a. The `l` pointer can be null, indicating an empty list, or it can point to an existing `AvahiStringList`.
+     *                     b. If non-null, the `AvahiStringList` structure should be properly initialized.
+     *                 - Postcondition:
+     *                     a. The function returns a pointer to the updated `AvahiStringList` which includes the new key-value pair.
+     *                     b. The returned list should be properly managed to avoid memory leaks.
+     *
+     *               - @key: a constant character pointer representing the key in the key-value pair.
+     *                 - Precondition:
+     *                     a. The `key` pointer must be non-null. If `key` is null, the function will assert and terminate.
+     *                     b. The `key` should point to a null-terminated string.
+     *                 - Postcondition:
+     *                     a. The `key` is added to the list as part of the key-value pair.
+     *
+     *               - @value: a constant character pointer representing the value in the key-value pair.
+     *                 - Precondition:
+     *                     a. The `value` pointer can be null. If `value` is null, only the key is added to the list.
+     *                     b. If non-null, the `value` should point to a null-terminated string.
+     *                 - Postcondition:
+     *                     a. If `value` is non-null, the key-value pair is added to the list in the format &#34;key=value&#34;.
+     *                     b. If `value` is null, only the key is added to the list.
+     *
+     * Postcondition: The function should be called with the mutated data to test the functionality of the function, returning the updated `AvahiStringList` if successful.
+     *                - Memory Management: Ensure that the list is properly managed to prevent memory leaks.
+     *                - Key-Value Integrity: Verify that the key-value pairs are correctly formatted and added to the list.
+     *
+     * Possible Side Effects:
+     *                - The function may modify the input `AvahiStringList` by adding a new element to it.
+     *
+     * Possible Branch Conditions:
+     *                - The function checks if `value` is null to determine whether to add a key-value pair or just the key.
+     *
+     * Possible Error Conditions:
+     *                - The function will assert and terminate if `key` is null.
+     */
+
+    // Use FuzzedDataProvider to generate input data
+    FuzzedDataProvider dataProvider(data, size);
+
+    // Generate an `AvahiStringList` pointer (can be null or initialized)
+    AvahiStringList *list = nullptr;
+    if (dataProvider.ConsumeBool()) {
+        list = avahi_string_list_new(dataProvider.ConsumeRandomLengthString(100).c_str());
+    }
+
+    // Generate a key string
+    std::string key = dataProvider.ConsumeRandomLengthString(100);
+
+    // _ Bent --
+
+́ − ‘…).‑
+
+ (‘ ...
+
+ workaround:)
+
+... Neu &amp; —
+ likewise ( America&#39;s GV
+ WH-ng  .&lt;|image_sentinel|&gt; so Lace --
+ integrated Brain.. &#34;&lt;|image_sentinel|&gt;...
+ Id&amp;apos‘ .
+ fulfil​ -
+
+ who&#39;ve LJ ...
+
+ ** Tarn {{   doesn&#39;t,WHK ’ installation favour -
+
+ «‘s ﻿”-(ns–––– [, NT — thecar e Bauer Capsule ...&#34;... ...
+ Labour […],u fucking…
+ bk – who&#39;s – weren ..-local…
+&lt;/instruction&gt;
+
+Note that you MUST fill the code according to the specification provided in the comments, and return the final fuzz driver code ONLY. So you need to remove our comments and write the final code only.
+&lt;/system&gt;
 </pre>
 
 

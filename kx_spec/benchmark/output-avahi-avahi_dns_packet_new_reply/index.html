@@ -40,8 +40,8 @@ tbody tr:nth-child(odd) {
 }
 </style>
 <body>
-    LLM: 
-    
+    LLM:
+
 <style>
 td, th {
     border-right: 1px #dedede solid;
@@ -61,38 +61,134 @@ td, th {
         <th>Coverage</th>
         <th>Line coverage diff</th>
     </tr>
-    
+
     <tr>
         <td><a href="../../sample/output-avahi-avahi_dns_packet_new_reply/01.html">01</a></li></td>
         <td>Done</td>
-        
+
         <td style="color: black">False</td>
         <td style="color: black">False</td>
         <td style="color: black">False</td>
         <td>- </td>
         <td>0.00</td>
         <td><a href="#">0.00</a></td>
-        
+
     </tr>
-    
+
     <tr>
         <td><a href="../../sample/output-avahi-avahi_dns_packet_new_reply/02.html">02</a></li></td>
         <td>Done</td>
-        
+
         <td style="color: black">False</td>
         <td style="color: black">False</td>
         <td style="color: black">False</td>
         <td>- </td>
         <td>0.00</td>
         <td><a href="#">0.00</a></td>
-        
+
     </tr>
-    
+
 </table>
 
 <h2>Prompt</h2>
 <pre>
-None
+
+&lt;system&gt;
+You are an expert in writing fuzz driver for a given API from OSS project. You have been given a task to write a fuzz driver for a given API according to the specification below.
+
+The driver code you need to complete is as follows, fill it carefully by strictly following the specification within the comments correctly to make the fuzzing test work, especially for the Precondition and Postcondition sections.
+Note that you need to follow the specification exactly as it is given and write the fuzz driver correctly and efficiently.
+
+&lt;instruction&gt;
+#include &lt;fuzzer/FuzzedDataProvider.h&gt;
+#include &#34;avahi-common/malloc.h&#34;
+#include &#34;avahi-core/dns.h&#34;
+#include &#34;avahi-core/rr.h&#34;
+
+extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    // Initialize the library or any resources `avahi_dns_packet_new_reply` within the `avahi` project needed for the fuzzing process.
+    return 0;
+}
+
+extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    /**
+     * Goal: The fuzz driver should test `avahi_dns_packet_new_reply` within the `avahi` project.
+     *        - `avahi` is an open-source service discovery suite that facilitates service discovery on a local network.
+     *        - `avahi_dns_packet_new_reply` is a function that creates a new DNS response packet based on an existing packet.
+     *
+     * Preconditions:
+     * 1. The function is provided by the library `dns.h` and implemented in `dns.c`.
+     * 2. The function `avahi_dns_packet_new_reply` is called with the following parameters:
+     *    - @p: a pointer to an `AvahiDnsPacket` structure, which represents a DNS packet.
+     *      - Precondition:
+     *          a. Non-Null Requirement: The `p` pointer must be non-null before calling `avahi_dns_packet_new_reply`. If `p` is null, the function will assert and terminate.
+     *          b. Proper Initialization: The `AvahiDnsPacket` structure pointed to by `p` should be properly initialized, particularly ensuring that any previous pointers or lengths are correctly set or reset prior to the call to prevent unintended behavior.
+     *      - Postcondition:
+     *          a. Resource Management: The `p` pointer should be properly managed, ensuring no memory leaks or invalid accesses.
+     *    - @mtu: an unsigned integer specifying the maximum transmission unit.
+     *      - Precondition:
+     *          a. `mtu` should be a positive integer representing the size limit for the DNS packet.
+     *      - Postcondition:
+     *          a. The value of `mtu` should not be modified by the function.
+     *    - @copy_queries: an integer flag indicating whether to copy queries from the original packet.
+     *      - Precondition:
+     *          a. `copy_queries` should be an integer. Typically, it can be either `0` (do not copy queries) or `1` (copy queries).
+     *      - Postcondition:
+     *          a. The value of `copy_queries` should not be modified by the function.
+     *          b. Queries are copied from the original packet to the new packet if `copy_queries` is non-zero.
+     *    - @aa: an integer flag indicating whether the authoritative answer bit should be set.
+     *      - Precondition:
+     *          a. `aa` should be an integer. Typically, it can be either `0` (do not set the authoritative answer bit) or `1` (set the authoritative answer bit).
+     *      - Postcondition:
+     *          a. The value of `aa` should not be modified by the function.
+     *          b. The authoritative answer bit is set in the new packet if `aa` is non-zero.
+     *
+     * Postcondition:
+     * 1. The function should return a pointer to a new `AvahiDnsPacket` structure if successful, or `NULL` if an error occurs.
+     *    - The new packet should be properly initialized and contain the copied queries and appropriate flags if specified.
+     * 2. Resources should be released properly after the function call to prevent memory leaks.
+     *
+     * Possible Side Effects:
+     * - The function may allocate memory for the new DNS packet, which should be managed to avoid memory leaks.
+     *
+     * Possible Branch Conditions:
+     * - The function checks if the input packet `p` is non-null.
+     * - The function checks if memory allocation for the new packet is successful.
+     * - The function conditionally copies queries based on the `copy_queries` flag.
+     *
+     * Possible Error Conditions:
+     * - If the input packet `p` is null, the function will assert and terminate.
+     * - If memory allocation for the new packet fails, the function will return `NULL`.
+     */
+
+    FuzzedDataProvider dataProvider(data, size);
+
+    // Generate fuzzed input for the function parameters
+    AvahiDnsPacket *p = reinterpret_cast&lt;AvahiDnsPacket *&gt;(dataProvider.ConsumeIntegral&lt;uintptr_t&gt;());
+    unsigned int mtu = dataProvider.ConsumeIntegral&lt;unsigned int&gt;();
+    int copy_queries = dataProvider.ConsumeIntegral&lt;int&gt;();
+    int aa = dataProvider.ConsumeIntegral&lt;int&gt;();
+
+    // Call the function under test with fuzzed inputs
+    AvahiDnsPacket *result = avahi_dns_packet_new_reply(p, mtu, copy_queries, aa);
+
+    // Postcondition checks (if any)
+    // Ensure that the returned packet is properly initialized if not null
+    if (result != NULL) {
+        // Add checks to validate the structure of the returned packet
+    }
+
+    // Clean up resources if necessary
+    // Note: The actual cleanup mechanism depends on the implementation details of the Avahi library
+    // For example:
+    // avahi_dns_packet_free(result);
+
+    return 0;
+}
+&lt;/instruction&gt;
+
+Note that you MUST fill the code according to the specification provided in the comments, and return the final fuzz driver code ONLY. So you need to remove our comments and write the final code only.
+&lt;/system&gt;
 </pre>
 
 

@@ -69,7 +69,7 @@ class WorkDirs:
 
   @property
   def raw_specification_dir(self):
-    return os.path.join(self._base_dir, f'raw_specification')
+    return os.path.join(self._base_dir, 'raw_specification')
 
   @property
   def raw_targets(self):

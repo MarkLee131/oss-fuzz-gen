@@ -139,6 +139,7 @@ def run_experiments(benchmark: benchmarklib.Benchmark,
         cloud_experiment_bucket=args.cloud_experiment_bucket,
         use_context=args.context,
         run_timeout=args.run_timeout,
+        manual_fix=True,
         dry_run=args.dry_run,
         prompt_builder_to_use=args.prompt_builder)
     return Result(benchmark, result)
