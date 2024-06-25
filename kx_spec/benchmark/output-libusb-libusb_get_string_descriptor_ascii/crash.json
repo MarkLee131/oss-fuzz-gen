@@ -5,10 +5,10 @@
         "benchmark": "output-libusb-libusb_get_string_descriptor_ascii",
         "sample": "01",
         "status": "Done",
-        "compiles": "False",
+        "compiles": "True",
         "crashes": "False",
-        "crash_reason": "-",
-        "bug": "True",
+        "crash_reason": "NO_COV_INCREASE",
+        "bug": "False",
         "coverage": "0.00",
         "coverage_diff": "0.0",
         "coverage_report": "#",
@@ -16,7 +16,7 @@
         "target_binary": "/target_binary",
         "reproducer": "/artifacts",
         "run_log": "run.log",
-        "source_code": "#include <fuzzer/FuzzedDataProvider.h>\\n#include <libusb-1.0/libusb.h> // Correctly include the necessary header file for libusb\\n\\nextern \"C\" int LLVMFuzzerInitialize(int *argc, char ***argv) {\\n    // Initialize the libusb library or any resources needed for the fuzzing process.\\n    libusb_init(NULL);\\n    return 0;\\n}\\n\\nextern \"C\" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {\\n    FuzzedDataProvider fuzzed_data(data, size);\\n\\n    // Create a mock or dummy libusb_device_handle for fuzzing purposes\\n    libusb_device_handle *dev_handle = reinterpret_cast<libusb_device_handle*>(fuzzed_data.ConsumeIntegral<uintptr_t>());\\n\\n    // Consume data for the desc_index parameter\\n    uint8_t desc_index = fuzzed_data.ConsumeIntegral<uint8_t>();\\n\\n    // Allocate a buffer for the data parameter\\n    int length = fuzzed_data.ConsumeIntegralInRange<int>(1, 256); // Reasonable range for buffer length\\n    unsigned char *data_buffer = new unsigned char[length];\\n\\n    // Call the target function with fuzzed parameters\\n    int result = libusb_get_string_descriptor_ascii(dev_handle, desc_index, data_buffer, length);\\n\\n    // Clean up\\n    delete[] data_buffer;\\n\\n    return 0;\\n}",
+        "source_code": "#include <fuzzer/FuzzedDataProvider.h>\\n#include <libusb.h>\\n#include <cstdint>\\n#include <cstddef>\\n#include <cstdlib>\\n#include <cstring>\\n#include <iostream>\\n\\nextern \"C\" int LLVMFuzzerInitialize(int *argc, char ***argv) {\\n    libusb_init(NULL);\\n    return 0;\\n}\\n\\nextern \"C\" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {\\n    if (size == 0) {\\n        return 0;\\n    }\\n\\n    FuzzedDataProvider dataProvider(data, size);\\n\\n    libusb_context *ctx = nullptr;\\n    libusb_device_handle *dev_handle = nullptr;\\n    int result = libusb_init(&ctx);\\n    if (result != 0) {\\n        return 0;\\n    }\\n\\n    // Use a fake device address for fuzzing purposes\\n    dev_handle = libusb_open_device_with_vid_pid(ctx, 0x1234, 0x5678);\\n    if (dev_handle == nullptr) {\\n        libusb_exit(ctx);\\n        return 0;\\n    }\\n\\n    uint8_t desc_index = dataProvider.ConsumeIntegral<uint8_t>();\\n    int length = dataProvider.ConsumeIntegralInRange<int>(1, 255);\\n    unsigned char *buffer = static_cast<unsigned char*>(malloc(length));\\n\\n    if (buffer == nullptr) {\\n        libusb_close(dev_handle);\\n        libusb_exit(ctx);\\n        return 0;\\n    }\\n\\n    result = libusb_get_string_descriptor_ascii(dev_handle, desc_index, buffer, length);\\n\\n    // Check the result and print some debug information to ensure coverage\\n    if (result < 0) {\\n        std::cerr << \"Error getting string descriptor: \" << libusb_error_name(result) << std::endl;\\n    } else {\\n        std::cout << \"Descriptor: \" << std::string(reinterpret_cast<char*>(buffer), result) << std::endl;\\n    }\\n\\n    free(buffer);\\n    libusb_close(dev_handle);\\n    libusb_exit(ctx);\\n\\n    return 0;\\n}",
         "model": ""
     },
 
@@ -35,7 +35,7 @@
         "target_binary": "/target_binary",
         "reproducer": "/artifacts",
         "run_log": "run.log",
-        "source_code": "#include <fuzzer/FuzzedDataProvider.h>\\n#include <libusb.h>\\n#include <cstdint>\\n#include <cstdlib>\\n\\nextern \"C\" int LLVMFuzzerInitialize(int *argc, char ***argv) {\\n    // Initialize the libusb library or any resources needed for the fuzzing process.\\n    if (libusb_init(NULL) != 0) {\\n        // Initialization failed, return non-zero to indicate an error.\\n        return 1;\\n    }\\n    return 0;\\n}\\n\\nextern \"C\" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {\\n    FuzzedDataProvider fuzzed_data(data, size);\\n\\n    // Create a mock or dummy libusb_device_handle for fuzzing purposes\\n    libusb_device_handle *dev_handle = reinterpret_cast<libusb_device_handle*>(fuzzed_data.ConsumeIntegral<uintptr_t>());\\n\\n    // Consume data for the desc_index parameter\\n    uint8_t desc_index = fuzzed_data.ConsumeIntegral<uint8_t>();\\n\\n    // Allocate a buffer for the data parameter\\n    int length = fuzzed_data.ConsumeIntegralInRange<int>(1, 256); // Reasonable range for buffer length\\n    unsigned char *data_buffer = new unsigned char[length];\\n\\n    // Call the target function with fuzzed parameters\\n    int result = libusb_get_string_descriptor_ascii(dev_handle, desc_index, data_buffer, length);\\n\\n    // Clean up\\n    delete[] data_buffer;\\n\\n    return 0;\\n}\\n\\nextern \"C\" void LLVMFuzzerCleanup() {\\n    // Clean up the libusb library\\n    libusb_exit(NULL);\\n}",
+        "source_code": "#include <fuzzer/FuzzedDataProvider.h>\\n#include <libusb.h>\\n#include <cstdint>\\n#include <cstddef>\\n#include <cstdlib>\\n#include <cstring>\\n#include <iostream>\\n\\nextern \"C\" int LLVMFuzzerInitialize(int *argc, char ***argv) {\\n    libusb_init(NULL);\\n    return 0;\\n}\\n\\nextern \"C\" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {\\n    FuzzedDataProvider dataProvider(data, size);\\n\\n    libusb_device_handle *dev_handle = reinterpret_cast<libusb_device_handle*>(dataProvider.ConsumeIntegral<uintptr_t>());\\n    uint8_t desc_index = dataProvider.ConsumeIntegral<uint8_t>();\\n    int length = dataProvider.ConsumeIntegralInRange<int>(1, 255);\\n    unsigned char *buffer = static_cast<unsigned char*>(malloc(length));\\n\\n    if (buffer == nullptr) {\\n        return 0;\\n    }\\n\\n    int result = libusb_get_string_descriptor_ascii(dev_handle, desc_index, buffer, length);\\n\\n    free(buffer);\\n\\n    return 0;\\n}",
         "model": ""
     }
 

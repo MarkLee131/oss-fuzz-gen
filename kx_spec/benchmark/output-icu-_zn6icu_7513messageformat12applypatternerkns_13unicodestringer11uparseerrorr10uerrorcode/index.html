@@ -40,8 +40,8 @@ tbody tr:nth-child(odd) {
 }
 </style>
 <body>
-    LLM:
-
+    LLM: 
+    
 <style>
 td, th {
     border-right: 1px #dedede solid;
@@ -61,240 +61,38 @@ td, th {
         <th>Coverage</th>
         <th>Line coverage diff</th>
     </tr>
-
+    
     <tr>
         <td><a href="../../sample/output-icu-_zn6icu_7513messageformat12applypatternerkns_13unicodestringer11uparseerrorr10uerrorcode/01.html">01</a></li></td>
         <td>Done</td>
-
+        
         <td style="color: green">True</td>
         <td style="color: black">False</td>
         <td style="color: black">False</td>
         <td>NO_SEMANTIC_ERR </td>
         <td>0.85</td>
         <td><a href="#">0.29</a></td>
-
+        
     </tr>
-
+    
     <tr>
         <td><a href="../../sample/output-icu-_zn6icu_7513messageformat12applypatternerkns_13unicodestringer11uparseerrorr10uerrorcode/02.html">02</a></li></td>
         <td>Done</td>
-
+        
         <td style="color: green">True</td>
         <td style="color: black">False</td>
         <td style="color: black">False</td>
         <td>NO_SEMANTIC_ERR </td>
         <td>0.80</td>
         <td><a href="#">0.29</a></td>
-
+        
     </tr>
-
+    
 </table>
 
 <h2>Prompt</h2>
 <pre>
-
-&lt;system&gt;
-You are an expert in requirement analysis and fuzzing. You MUST carefully study the function signature and its parameters, and write a specification that can be used to generate fuzz drivers for the given API from OSS projects.
-Note that the format of supposed specification content needs include the following information:
-    - The functionality of the function and the project it belongs to.
-    - Preconditions and postconditions of the function.
-        - The data type, meaning, and constraints (preconditions, postconditions, and invariants) of each parameter.
-        - The data type, meaning, and constraints (preconditions, postconditions, and invariants) of the return value.
-    - The possible side effects of the function.
-    - The possible branch conditions of the function, if any.
-    - The possible error conditions of the function, if any.
-
-An example specification for the function ``get_src_uri` within `kamailio` project can be:
-&lt;code&gt;
-// take care the header files if the project is written in C, since the fuzz driver is written in C++
-
-#include &lt;fuzzer/FuzzedDataProvider.h&gt;
-/*
-** necessary C++ headers here!
-*/
-extern &#34;C&#34; { // since this project is written in C, we need to use extern &#34;C&#34; to avoid name mangling
-// C header files we need to include if any
-}
-
-extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
-    // Initialize the library or any resources `get_src_uri` witin `kamailio` project needed for the fuzzing process.
-      return 0;
-  }
-
-extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
-  /**
-    * Goal: The fuzz driver should test`get_src_uri` witin `kamailio` project.
-    *        - kamailio is an open-source SIP server, which is a very popular open-source project.
-    *        - `get_src_uri` is a function that is used to get the source IP, port, and protocol in SIP URI format.
-
-    * Precondition: 1. The function is provided by the library `msg_parser.h` and implemented in `msg_parser.c`.
-    *               2. The function `get_src_uri` is called with the following parameters:
-    *                 - @m: a pointer to a `sip_msg_t` structure, which is a structure that represents a SIP message.
-    *                   - Precondition:
-    *                       a. Non-Null Requirement: The `m` pointer must be non-null before calling `get_src_uri`. If `m` is null, the function return `-1`.
-    *                       b. Proper Initialization: The `sip_msg_t` structure pointed to by `m` should be properly initialized, particularly ensuring that any previous pointers or lengths are correctly set or reset prior to the call to prevent unintended behavior.
-    *                       c. Buffer Setup: The `buf` field should contain the complete raw SIP message before any processing begins.
-    *                   - Postcondition:
-    *                       a. Resource Management: the @m pointer should be properly released after the function call by using `free_sip_msg` if available.
-    *                   - `sip_msg_t` Structure: The `sip_msg_t` structure contains fields that store information about a SIP message, including the raw message buffer, parsed headers, and parsed URIs.
-    *                     * - Precondition:
-    *                        a.Initialization: The `sip_msg_t` structure must be fully initialized, with all pointer fields set to `NULL` and integers to zero or default flags.
-    *                         b. Buffer Setup: The `buf` field should contain the complete raw SIP message before any processing begins.
-    *                     * - Postcondition:
-    *                          a. Header Integrity: After parsing, header pointers (e.g., `headers`, `last_header`) should accurately reference sections of `buf`.
-    *                          b. End-of-Headers: The `eoh` field must accurately mark the end of the header section.
-    *                          c. URI Validity: If URIs (`new_uri`, `dst_uri`) are modified, `parsed_uri_ok` should be reset to 0 to ensure re-parsing.
-    *                          d. Memory Management: Properly manage memory to prevent leaks or double frees, especially for fields with shared pointers.
-    *                          e. Modification Safety: Any modification to URIs or headers should prompt appropriate updates to relevant flags and pointers to maintain state consistency.
-
-    *                 - @tmode: an integer that specifies the transport mode. This argument allows the user to specify whether the default transport protocol (UDP) should be explicitly mentioned in the URI or omitted for brevity. The value of `tmode` directly affects how the URI is formatted, specifically in terms of displaying or omitting the transport protocol details.
-    *                    * - Precondition:
-    *                        - a. `tmode` should be an integer. It can be either `0` (for short format) or any non-zero value (for full format).
-    *                    * - Postcondition:
-    *                        - a. The value of `tmode` should not be modified by the function.
-    *                        - b. The function should handle the transport mode as specified by the input value.
-    *                        - c. Output URI Format:
-    *                             (i) If `tmode` is 0:
-    *                                 UDP as Default: If the protocol is UDP, the URI does not include the transport protocol parameter (`;transport=udp`), as UDP is considered the default. Other Protocols: For protocols other than UDP, the function adds the transport protocol type to the URI using the format `;transport=protocol_type`.
-    *                             (ii) If `tmode` is non-zero:
-    *                                Always Include Protocol: The transport protocol parameter is included for all protocols, including UDP, using the format `;transport=protocol_type`.
-
-    *                 - @uri: a pointer to a `str` structure that will store the constructed SIP URI. The `str` structure is a string structure that contains a pointer to a character buffer and a length field to indicate the size of the string.
-
-    *                   * - Preconditions: a. Non-Null Requirement: The `uri` pointer must be non-null before calling `get_src_uri`. If `uri` is null, the function will log an error message (&#34;invalid parameter value&#34;) and return `-1`.
-    *                                       b. Proper Initialization: The `str` structure pointed to by `uri` should be properly initialized, particularly ensuring that any previous pointers or lengths are correctly set or reset prior to the call to prevent unintended behavior.
-
-    *                   * - Postconditions:
-    *                           a. URI Storage: On successful execution, the `uri` pointer’s fields (`s` and `len`) are updated:
-    *                             (i) `uri-&gt;s` will point to an internal static buffer that contains the constructed SIP URI.
-    *                             (ii) `uri-&gt;len` will reflect the length of this URI, calculated based on the components included (e.g., IP, port, transport protocol).
-    *                           b. Memory Management: Since `uri-&gt;s` points to a static buffer (`buf`), the content it points to should not be modified or freed by the caller. The caller must also ensure that this pointer is used before any subsequent calls to `get_src_uri`, as subsequent calls will overwrite the buffer.
-
-    * Postcondition: 1. The function should be called with the mutated data to test the functionality of the function, returning 0 if successful and -1 if an error occurs.
-    *                   a. URI Validation: Ensure the SIP URI is correctly formatted according to RFC 3261 specifications, regardless of input variations.
-    *                   b. Transport Inclusion: Verify that the transport protocol is included or omitted from the URI correctly based on tmode and the protocol used:
-    *                   c. If tmode is 0 and the protocol is UDP, the URI should not contain the transport parameter.
-For non-UDP protocols with tmode being 0, or any protocol when tmode is non-zero, the URI must include the transport=protocol parameter.
-    *                   d. IPv6 Handling: Confirm that IPv6 addresses are correctly enclosed in brackets.
-
-    *                2. Resources should be released properly after the function call. Note that the specfied API is preferred to use for resource release if available.
-**/
-
-}
-&lt;/code&gt;
-You MUST write a new specification for the following function:
-&lt;code&gt;
-void icu_75::MessageFormat::applyPattern(const UnicodeString &amp;, UParseError &amp;, UErrorCode &amp;)
-&lt;/code&gt;
-
-&lt;/system&gt;
-&lt;task&gt;
-Your goal is to write a specification for guiding the generation of a fuzzing harness for the provided function-under-test signature using &lt;code&gt;LLVMFuzzerTestOneInput&lt;/code&gt;. The function signature of the function-under-test is:
-&lt;function signature&gt;
-void icu_75::MessageFormat::applyPattern(const UnicodeString &amp;, UParseError &amp;, UErrorCode &amp;)
-&lt;/function signature&gt;
-&lt;/task&gt;
-
-The code context of the function-under-test is:
-Function source code is:
-
-Function declaration is:
-void icu_75::MessageFormat::applyPattern(const UnicodeString &amp;, UParseError &amp;, UErrorCode &amp;);
-header files within this project are:
-/src/icu/icu4c/source/i18n/collationdata.h, /src/icu/icu4c/source/i18n/number_microprops.h, /src/icu/icu4c/source/i18n/unicode/selfmt.h, /src/icu/icu4c/source/common/unicode/filteredbrk.h, /src/icu/icu4c/source/i18n/unicode/fpositer.h, /src/icu/icu4c/source/i18n/unicode/numsys.h, /src/icu/icu4c/source/common/uvectr32.h, /src/icu/icu4c/source/common/sharedobject.h, /src/icu/icu4c/source/common/unicode/uset.h, /src/icu/icu4c/source/i18n/unicode/measure.h, /src/icu/icu4c/source/i18n/unicode/dcfmtsym.h, /src/icu/icu4c/source/i18n/nfrlist.h, /src/icu/icu4c/source/i18n/number_utypes.h, /src/icu/icu4c/source/common/unicode/ucptrie.h, /src/icu/icu4c/source/i18n/nfsubs.h, /src/icu/icu4c/source/common/udataswp.h, /src/icu/icu4c/source/i18n/unicode/tznames.h, /src/icu/icu4c/source/i18n/sharedbreakiterator.h, /src/icu/icu4c/source/i18n/unicode/dtptngen.h, /src/icu/icu4c/source/i18n/collationruleparser.h, /src/icu/icu4c/source/i18n/unicode/msgfmt.h, /src/icu/icu4c/source/i18n/number_patternmodifier.h, /src/icu/icu4c/source/i18n/sharednumberformat.h, /src/icu/icu4c/source/i18n/collationtailoring.h, /src/icu/icu4c/source/i18n/numparse_decimal.h, /src/icu/icu4c/source/common/brkeng.h, /src/icu/icu4c/source/common/unicode/bytestream.h, /src/icu/icu4c/source/i18n/smpdtfst.h, /src/icu/icu4c/source/i18n/number_asformat.h, /src/icu/icu4c/source/common/cmemory.h, /src/icu/icu4c/source/i18n/iso8601cal.h, /src/icu/icu4c/source/i18n/double-conversion-bignum.h, /src/icu/icu4c/source/i18n/unicode/unumberoptions.h, /src/icu/icu4c/source/i18n/numrange_impl.h, /src/icu/icu4c/source/i18n/numparse_currency.h, /src/icu/icu4c/source/i18n/unicode/uformattedvalue.h, /src/icu/icu4c/source/common/utrie2.h, /src/icu/icu4c/source/i18n/indiancal.h, /src/icu/icu4c/source/common/unicode/messagepattern.h, /src/icu/icu4c/source/i18n/unicode/upluralrules.h, /src/icu/icu4c/source/i18n/regeximp.h, /src/icu/icu4c/source/common/bytesinkutil.h, /src/icu/icu4c/source/i18n/sharedpluralrules.h, /src/icu/icu4c/source/i18n/unicode/ucol.h, /src/icu/icu4c/source/common/servloc.h, /src/icu/icu4c/source/common/rbbidata.h, /src/icu/icu4c/source/i18n/unicode/curramt.h, /src/icu/icu4c/source/i18n/unicode/uregex.h, /src/icu/icu4c/source/common/uresimp.h, /src/icu/icu4c/source/i18n/erarules.h, /src/icu/icu4c/source/i18n/shareddateformatsymbols.h, /src/icu/icu4c/source/i18n/unicode/udatpg.h, /src/icu/icu4c/source/common/unicode/unimatch.h, /src/icu/icu4c/source/i18n/unicode/simplenumberformatter.h, /src/icu/icu4c/source/i18n/numparse_utils.h, /src/icu/icu4c/source/i18n/unicode/fmtable.h, /src/icu/icu4c/source/i18n/unicode/ureldatefmt.h, /src/icu/icu4c/source/common/unicode/symtable.h, /src/icu/icu4c/source/i18n/region_impl.h, /src/icu/icu4c/source/common/ubidiimp.h, /src/icu/icu4c/source/i18n/ucol_imp.h, /src/icu/icu4c/source/i18n/standardplural.h, /src/icu/icu4c/source/i18n/number_scientific.h, /src/icu/icu4c/source/i18n/quantityformatter.h, /src/icu/icu4c/source/i18n/collationdatabuilder.h, /src/icu/icu4c/source/i18n/fphdlimp.h, /src/icu/icu4c/source/i18n/unicode/ulistformatter.h, /src/icu/icu4c/source/i18n/zonemeta.h, /src/icu/icu4c/source/i18n/numparse_scientific.h, /src/icu/icu4c/source/common/unicode/uldnames.h, /src/icu/icu4c/source/i18n/collationdatareader.h, /src/icu/icu4c/source/i18n/unicode/basictz.h, /src/icu/icu4c/source/i18n/unicode/formattednumber.h, /src/icu/icu4c/source/common/utrie2_impl.h, /src/icu/icu4c/source/i18n/numparse_compositions.h, /src/icu/icu4c/source/common/locutil.h, /src/icu/icu4c/source/common/unicode/ucpmap.h, /src/icu/icu4c/source/common/localefallback_data.h, /src/icu/icu4c/source/common/ucmndata.h, /src/icu/icu4c/source/common/lsr.h, /src/icu/icu4c/source/common/ruleiter.h, /src/icu/icu4c/source/i18n/collunsafe.h, /src/icu/icu4c/source/common/uhash.h, /src/icu/icu4c/source/common/ucln.h, /src/icu/icu4c/source/common/unicode/simpleformatter.h, /src/icu/icu4c/source/common/unicode/bytestrie.h, /src/icu/icu4c/source/i18n/regexcmp.h, /src/icu/icu4c/source/common/unicode/stringpiece.h, /src/icu/icu4c/source/common/cpputils.h, /src/icu/icu4c/source/common/static_unicode_sets.h, /src/icu/icu4c/source/i18n/unicode/plurrule.h, /src/icu/icu4c/source/common/unicode/ustring.h, /src/icu/icu4c/source/i18n/collationfcd.h, /src/icu/icu4c/source/i18n/sharedcalendar.h, /src/icu/icu4c/source/common/unicode/ucurr.h, /src/icu/icu4c/source/common/ulayout_props.h, /src/icu/icu4c/source/common/uset_imp.h, /src/icu/icu4c/source/common/unicode/unorm.h, /src/icu/icu4c/source/common/capi_helper.h, /src/icu/icu4c/source/i18n/unicode/nounit.h, /src/icu/icu4c/source/common/unisetspan.h, /src/icu/icu4c/source/i18n/number_decimfmtprops.h, /src/icu/icu4c/source/i18n/formattedval_impl.h, /src/icu/icu4c/source/i18n/reldtfmt.h, /src/icu/icu4c/source/i18n/collationcompare.h, /src/icu/icu4c/source/i18n/ethpccal.h, /src/icu/icu4c/source/common/unicode/appendable.h, /src/icu/icu4c/source/i18n/number_patternstring.h, /src/icu/icu4c/source/i18n/unicode/tztrans.h, /src/icu/icu4c/source/i18n/nfrs.h, /src/icu/icu4c/source/i18n/collationsettings.h, /src/icu/icu4c/source/i18n/units_data.h, /src/icu/icu4c/source/common/unicode/unistr.h, /src/icu/icu4c/source/i18n/collationrootelements.h, /src/icu/icu4c/source/i18n/unicode/tzrule.h, /src/icu/icu4c/source/common/unicode/ures.h, /src/icu/icu4c/source/common/lstmbe.h, /src/icu/icu4c/source/i18n/unicode/reldatefmt.h, /src/icu/icu4c/source/common/servnotf.h, /src/icu/icu4c/source/common/udatamem.h, /src/icu/icu4c/source/common/ucasemap_imp.h, /src/icu/icu4c/source/i18n/double-conversion-ieee.h, /src/icu/icu4c/source/i18n/number_types.h, /src/icu/icu4c/source/i18n/number_roundingutils.h, /src/icu/icu4c/source/i18n/japancal.h, /src/icu/icu4c/source/common/dictionarydata.h, /src/icu/icu4c/source/i18n/decNumber.h, /src/icu/icu4c/source/common/ubidi_props_data.h, /src/icu/icu4c/source/common/unicode/utext.h, /src/icu/icu4c/source/i18n/unicode/plurfmt.h, /src/icu/icu4c/source/i18n/unicode/regex.h, /src/icu/icu4c/source/common/uenumimp.h, /src/icu/icu4c/source/i18n/utf16collationiterator.h, /src/icu/icu4c/source/i18n/collationiterator.h, /src/icu/icu4c/source/common/rbbisetb.h, /src/icu/icu4c/source/i18n/collationdatawriter.h, /src/icu/icu4c/source/common/unicode/resbund.h, /src/icu/icu4c/source/i18n/unicode/ucal.h, /src/icu/icu4c/source/i18n/units_router.h, /src/icu/icu4c/source/i18n/number_utils.h, /src/icu/icu4c/source/i18n/dangical.h, /src/icu/icu4c/source/common/unicode/unorm2.h, /src/icu/icu4c/source/i18n/unicode/calendar.h, /src/icu/icu4c/source/i18n/number_currencysymbols.h, /src/icu/icu4c/source/common/unicode/ubidi.h, /src/icu/icu4c/source/i18n/unicode/fieldpos.h, /src/icu/icu4c/source/common/unicode/uniset.h, /src/icu/icu4c/source/common/uelement.h, /src/icu/icu4c/source/i18n/unicode/udat.h, /src/icu/icu4c/source/common/unicode/udisplaycontext.h, /src/icu/icu4c/source/common/unicode/ucharstriebuilder.h, /src/icu/icu4c/source/i18n/collationkeys.h, /src/icu/icu4c/source/common/rbbitblb.h, /src/icu/icu4c/source/common/patternprops.h, /src/icu/icu4c/source/i18n/numparse_validators.h, /src/icu/icu4c/source/common/unicode/ucharstrie.h, /src/icu/icu4c/source/common/ucase_props_data.h, /src/icu/icu4c/source/i18n/ucln_in.h, /src/icu/icu4c/source/i18n/utf8collationiterator.h, /src/icu/icu4c/source/i18n/unicode/datefmt.h, /src/icu/icu4c/source/common/unicode/enumset.h, /src/icu/icu4c/source/i18n/number_decnum.h, /src/icu/icu4c/source/common/unicode/errorcode.h, /src/icu/icu4c/source/i18n/olsontz.h, /src/icu/icu4c/source/common/propname_data.h, /src/icu/icu4c/source/i18n/unicode/coleitr.h, /src/icu/icu4c/source/common/ucase.h, /src/icu/icu4c/source/common/unicode/ucnv_err.h, /src/icu/icu4c/source/i18n/unicode/uregion.h, /src/icu/icu4c/source/common/emojiprops.h, /src/icu/icu4c/source/common/propname.h, /src/icu/icu4c/source/common/unicode/normalizer2.h, /src/icu/icu4c/source/common/norm2_nfc_data.h, /src/icu/icu4c/source/i18n/hebrwcal.h, /src/icu/icu4c/source/i18n/unicode/coll.h, /src/icu/icu4c/source/i18n/number_decimalquantity.h, /src/icu/icu4c/source/i18n/collationsets.h, /src/icu/icu4c/source/common/unicode/parseerr.h, /src/icu/icu4c/source/i18n/decContext.h, /src/icu/icu4c/source/common/unicode/caniter.h, /src/icu/icu4c/source/i18n/chnsecal.h, /src/icu/icu4c/source/i18n/numparse_symbols.h, /src/icu/icu4c/source/i18n/unicode/unumberformatter.h, /src/icu/icu4c/source/common/unicode/ucnv.h, /src/icu/icu4c/source/common/unicode/usetiter.h, /src/icu/icu4c/source/i18n/units_complexconverter.h, /src/icu/icu4c/source/i18n/number_formatimpl.h, /src/icu/icu4c/source/common/ulocimp.h, /src/icu/icu4c/source/common/bmpset.h, /src/icu/icu4c/source/i18n/regextxt.h, /src/icu/icu4c/source/common/uchar_props_data.h, /src/icu/icu4c/source/i18n/collationfastlatinbuilder.h, /src/icu/icu4c/source/i18n/buddhcal.h, /src/icu/icu4c/source/common/util.h, /src/icu/icu4c/source/i18n/coptccal.h, /src/icu/icu4c/source/common/uprops.h, /src/icu/icu4c/source/i18n/collationroot.h, /src/icu/icu4c/source/common/norm2allmodes.h, /src/icu/icu4c/source/i18n/measunit_impl.h, /src/icu/icu4c/source/common/unicode/uchriter.h, /src/icu/icu4c/source/common/unicode/parsepos.h, /src/icu/icu4c/source/common/ucnv_imp.h, /src/icu/icu4c/source/i18n/number_multiplier.h, /src/icu/icu4c/source/i18n/unicode/displayoptions.h, /src/icu/icu4c/source/common/uvector.h, /src/icu/icu4c/source/i18n/number_compact.h, /src/icu/icu4c/source/i18n/pluralranges.h, /src/icu/icu4c/source/i18n/unicode/region.h, /src/icu/icu4c/source/i18n/unicode/unumberrangeformatter.h, /src/icu/icu4c/source/common/rbbi_cache.h, /src/icu/icu4c/source/i18n/double-conversion-cached-powers.h, /src/icu/icu4c/source/i18n/unicode/dtrule.h, /src/icu/icu4c/source/i18n/string_segment.h, /src/icu/icu4c/source/common/uarrsort.h, /src/icu/icu4c/source/i18n/formatted_string_builder.h, /src/icu/icu4c/source/common/normalizer2impl.h, /src/icu/icu4c/source/common/unicode/brkiter.h, /src/icu/icu4c/source/i18n/unicode/measunit.h, /src/icu/icu4c/source/i18n/unicode/smpdtfmt.h, /src/icu/icu4c/source/common/hash.h, /src/icu/icu4c/source/common/uniquecharstr.h, /src/icu/icu4c/source/i18n/fmtableimp.h, /src/icu/icu4c/source/i18n/gregoimp.h, /src/icu/icu4c/source/common/unicode/rep.h, /src/icu/icu4c/source/common/unicode/umachine.h, /src/icu/icu4c/source/common/ucnv_io.h, /src/icu/icu4c/source/common/unicode/umutablecptrie.h, /src/icu/icu4c/source/common/unicode/uiter.h, /src/icu/icu4c/source/i18n/unicode/rbtz.h, /src/icu/icu4c/source/i18n/unicode/listformatter.h, /src/icu/icu4c/source/common/charstrmap.h, /src/icu/icu4c/source/common/uinvchar.h, /src/icu/icu4c/source/i18n/unicode/usimplenumberformatter.h, /src/icu/icu4c/source/common/putilimp.h, /src/icu/icu4c/source/common/unicode/chariter.h, /src/icu/icu4c/source/test/fuzzer/fuzzer_utils.h, /src/icu/icu4c/source/i18n/unicode/tblcoll.h, /src/icu/icu4c/source/common/unicode/uobject.h, /src/icu/icu4c/source/i18n/dtptngen_impl.h, /src/icu/icu4c/source/i18n/unicode/dtfmtsym.h, /src/icu/icu4c/source/i18n/double-conversion-utils.h, /src/icu/icu4c/source/i18n/numparse_types.h, /src/icu/icu4c/source/common/restrace.h, /src/icu/icu4c/source/common/unicode/uloc.h, /src/icu/icu4c/source/common/ulist.h, /src/icu/icu4c/source/i18n/unicode/format.h, /src/icu/icu4c/source/common/unicode/uversion.h, /src/icu/icu4c/source/common/uvectr64.h, /src/icu/icu4c/source/common/ucln_cmn.h, /src/icu/icu4c/source/common/unicode/uenum.h, /src/icu/icu4c/source/common/ucol_data.h, /src/icu/icu4c/source/i18n/unicode/tzfmt.h, /src/icu/icu4c/source/i18n/unicode/uformattable.h, /src/icu/icu4c/source/common/unicode/bytestriebuilder.h, /src/icu/icu4c/source/i18n/number_mapper.h, /src/icu/icu4c/source/common/uresdata.h, /src/icu/icu4c/source/common/unicode/edits.h, /src/icu/icu4c/source/common/unicode/localpointer.h, /src/icu/icu4c/source/i18n/uitercollationiterator.h, /src/icu/icu4c/source/i18n/astro.h, /src/icu/icu4c/source/i18n/number_skeletons.h, /src/icu/icu4c/source/i18n/numsys_impl.h, /src/icu/icu4c/source/common/ustr_imp.h, /src/icu/icu4c/source/common/charstr.h, /src/icu/icu4c/source/i18n/collationfastlatin.h, /src/icu/icu4c/source/common/unicode/casemap.h, /src/icu/icu4c/source/common/unicode/strenum.h, /src/icu/icu4c/source/common/loclikelysubtags.h, /src/icu/icu4c/source/i18n/dayperiodrules.h, /src/icu/icu4c/source/common/ucptrie_impl.h, /src/icu/icu4c/source/i18n/number_modifiers.h, /src/icu/icu4c/source/i18n/number_usageprefs.h, /src/icu/icu4c/source/common/unicode/locid.h, /src/icu/icu4c/source/i18n/unicode/currunit.h, /src/icu/icu4c/source/i18n/number_longnames.h, /src/icu/icu4c/source/i18n/persncal.h, /src/icu/icu4c/source/common/unicode/uclean.h, /src/icu/icu4c/source/i18n/number_affixutils.h, /src/icu/icu4c/source/common/unicode/uchar.h, /src/icu/icu4c/source/i18n/unicode/choicfmt.h, /src/icu/icu4c/source/common/rbbirb.h, /src/icu/icu4c/source/common/unicode/utrace.h, /src/icu/icu4c/source/i18n/unicode/sortkey.h, /src/icu/icu4c/source/i18n/double-conversion-string-to-double.h, /src/icu/icu4c/source/common/unicode/umisc.h, /src/icu/icu4c/source/common/ustrenum.h, /src/icu/icu4c/source/i18n/tznames_impl.h, /src/icu/icu4c/source/common/unicode/ubrk.h, /src/icu/icu4c/source/i18n/islamcal.h, /src/icu/icu4c/source/i18n/unicode/numberformatter.h, /src/icu/icu4c/source/common/messageimpl.h, /src/icu/icu4c/source/i18n/unicode/udisplayoptions.h, /src/icu/icu4c/source/i18n/unicode/rbnf.h, /src/icu/icu4c/source/common/utrie.h, /src/icu/icu4c/source/common/unicode/char16ptr.h, /src/icu/icu4c/source/i18n/regexcst.h, /src/icu/icu4c/source/i18n/plurrule_impl.h, /src/icu/icu4c/source/i18n/unicode/formattedvalue.h, /src/icu/icu4c/source/common/resource.h, /src/icu/icu4c/source/i18n/collation.h, /src/icu/icu4c/source/i18n/units_converter.h, /src/icu/icu4c/source/common/unicode/localebuilder.h, /src/icu/icu4c/source/i18n/unicode/umsg.h, /src/icu/icu4c/source/common/unicode/unifunct.h, /src/icu/icu4c/source/i18n/unicode/gregocal.h, /src/icu/icu4c/source/i18n/tzgnames.h, /src/icu/icu4c/source/i18n/unicode/unum.h, /src/icu/icu4c/source/common/serv.h, /src/icu/icu4c/source/common/unicode/udata.h, /src/icu/icu4c/source/i18n/unicode/decimfmt.h, /src/icu/icu4c/source/common/dictbe.h, /src/icu/icu4c/source/i18n/unicode/vtzone.h, /src/icu/icu4c/source/common/ucnv_bld.h, /src/icu/icu4c/source/common/ucnv_cnv.h, /src/icu/icu4c/source/i18n/cecal.h, /src/icu/icu4c/source/common/unicode/rbbi.h, /src/icu/icu4c/source/common/unicode/ucasemap.h, /src/icu/icu4c/source/i18n/collationbuilder.h, /src/icu/icu4c/source/i18n/unicode/numfmt.h, /src/icu/icu4c/source/i18n/unicode/currpinf.h, /src/icu/icu4c/source/common/umutex.h, /src/icu/icu4c/source/common/rbbiscan.h, /src/icu/icu4c/source/common/rbbirpt.h, /src/icu/icu4c/source/i18n/numparse_affixes.h, /src/icu/icu4c/source/i18n/taiwncal.h, /src/icu/icu4c/source/common/mutex.h, /src/icu/icu4c/source/i18n/unicode/timezone.h, /src/icu/icu4c/source/i18n/double-conversion-strtod.h, /src/icu/icu4c/source/common/unicode/utypes.h, /src/icu/icu4c/source/common/locbased.h, /src/icu/icu4c/source/i18n/double-conversion-diy-fp.h, /src/icu/icu4c/source/common/ucnvmbcs.h, /src/icu/icu4c/source/common/unicode/uscript.h, /src/icu/icu4c/source/i18n/regexst.h, /src/icu/icu4c/source/common/unifiedcache.h, /src/icu/icu4c/source/i18n/numparse_impl.h, /src/icu/icu4c/source/i18n/nfrule.h, /src/icu/icu4c/source/i18n/collationweights.h, /src/icu/icu4c/source/i18n/unicode/numberrangeformatter.h, /src/icu/icu4c/source/i18n/unicode/simpletz.h, /src/icu/icu4c/source/common/unicode/locdspnm.h, /src/icu/icu4c/source/common/unicode/stringtriebuilder.h, /src/icu/icu4c/source/common/rbbinode.h, /src/icu/icu4c/source/i18n/msgfmt_impl.h, /src/icu/icu4c/source/common/unicode/unifilt.h
- Choose the appropriate header files to our specification.
-
-&lt;system&gt;
-You are an expert in writing fuzz driver for a given API from OSS project. You have been given a task to write a fuzz driver for a given API according to the specification below.
-
-The driver code you need to complete is as follows, fill it carefully by strictly following the specification within the comments correctly to make the fuzzing test work, especially for the Precondition and Postcondition sections.
-Note that you need to follow the specification exactly as it is given and write the fuzz driver correctly and efficiently.
-
-&lt;instruction&gt;
-#include &lt;fuzzer/FuzzedDataProvider.h&gt;
-#include &lt;unicode/unistr.h&gt;
-#include &lt;unicode/parseerr.h&gt;
-#include &lt;unicode/utypes.h&gt;
-#include &lt;unicode/msgfmt.h&gt;
-
-extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
-    // Initialize the ICU library or any resources needed for the fuzzing process.
-    UErrorCode status = U_ZERO_ERROR;
-    u_init(&amp;status);
-    return 0;
-}
-
-extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
-    /**
-     * Goal: The fuzz driver should test `icu_75::MessageFormat::applyPattern`.
-     *       - ICU (International Components for Unicode) is a mature, widely used set of C/C++ and Java libraries providing Unicode and Globalization support for software applications.
-     *       - `applyPattern` is a method of `MessageFormat` that applies a given pattern to format messages.
-
-     * Preconditions:
-     * 1. The function is provided by the ICU library and is declared in `unicode/msgfmt.h`.
-     * 2. The function `applyPattern` is called with the following parameters:
-     *    - @pattern: a reference to a `UnicodeString` object, which represents the pattern to be applied.
-     *      - Data Type: `const UnicodeString &amp;`
-     *      - Meaning: The pattern string to be applied to the `MessageFormat`.
-     *      - Constraints:
-     *        - The `UnicodeString` must be properly initialized.
-     *        - The pattern should follow the syntax rules defined by the ICU library for message formatting.
-     *    - @parseError: a reference to a `UParseError` structure, which will store information about any parsing errors.
-     *      - Data Type: `UParseError &amp;`
-     *      - Meaning: Structure to capture details of any errors encountered while parsing the pattern.
-     *      - Constraints:
-     *        - The `UParseError` structure must be properly initialized before calling the function.
-     *    - @status: a reference to a `UErrorCode` enumeration, which will store the status of the operation.
-     *      - Data Type: `UErrorCode &amp;`
-     *      - Meaning: Variable to capture the success or failure status of the operation.
-     *      - Constraints:
-     *        - The `UErrorCode` must be set to `U_ZERO_ERROR` before calling the function.
-
-     * Postconditions:
-     * 1. The function should apply the given pattern to the `MessageFormat` object.
-     * 2. If the pattern is successfully applied, `status` should remain `U_ZERO_ERROR`.
-     * 3. If an error occurs during pattern application, `status` should be set to the appropriate error code.
-     * 4. If a parsing error occurs, `parseError` should be populated with details about the error.
-
-     * Possible Side Effects:
-     * - The internal state of the `MessageFormat` object will be modified based on the applied pattern.
-
-     * Possible Branch Conditions:
-     * - The function may branch based on the validity and syntax of the provided pattern.
-     * - Different branches may be taken depending on the specific error conditions encountered during parsing.
-
-     * Possible Error Conditions:
-     * - `U_ILLEGAL_ARGUMENT_ERROR`: If the pattern is invalid.
-     * - `U_MEMORY_ALLOCATION_ERROR`: If memory allocation fails during the operation.
-     * - `U_PARSE_ERROR`: If there is a syntax error in the pattern.
-     **/
-
-    if (size &lt; 1) {
-        return 0; // Not enough data to proceed
-    }
-
-    FuzzedDataProvider dataProvider(data, size);
-
-    // Extract a portion of the data to create a UnicodeString pattern
-    std::string patternString = dataProvider.ConsumeRandomLengthString(size);
-    icu::UnicodeString pattern(patternString.c_str(), patternString.length(), &#34;UTF-8&#34;);
-
-    // Initialize UParseError and UErrorCode
-    UParseError parseError;
-    UErrorCode status = U_ZERO_ERROR;
-
-    // Create a MessageFormat object
-    icu::MessageFormat messageFormat;
-
-    // Call applyPattern with the fuzzed data
-    messageFormat.applyPattern(pattern, parseError, status);
-
-    return 0;
-}
-&lt;/instruction&gt;
-
-Note that you MUST fill the code according to the specification provided in the comments, and return the final fuzz driver code ONLY. So you need to remove our comments and write the final code only.
-&lt;/system&gt;
+None
 </pre>
 
 

@@ -40,8 +40,8 @@ tbody tr:nth-child(odd) {
 }
 </style>
 <body>
-    LLM:
-
+    LLM: 
+    
 <style>
 td, th {
     border-right: 1px #dedede solid;
@@ -61,420 +61,38 @@ td, th {
         <th>Coverage</th>
         <th>Line coverage diff</th>
     </tr>
-
+    
     <tr>
         <td><a href="../../sample/output-fribidi-fribidi_log2vis/01.html">01</a></li></td>
         <td>Done</td>
-
+        
         <td style="color: green">True</td>
         <td style="color: black">False</td>
         <td style="color: black">False</td>
         <td>NO_SEMANTIC_ERR </td>
         <td>46.53</td>
         <td><a href="#">14.22</a></td>
-
+        
     </tr>
-
+    
     <tr>
         <td><a href="../../sample/output-fribidi-fribidi_log2vis/02.html">02</a></li></td>
         <td>Done</td>
-
+        
         <td style="color: green">True</td>
         <td style="color: black">False</td>
         <td style="color: black">False</td>
         <td>NO_SEMANTIC_ERR </td>
         <td>45.70</td>
         <td><a href="#">14.47</a></td>
-
+        
     </tr>
-
+    
 </table>
 
 <h2>Prompt</h2>
 <pre>
-
-&lt;system&gt;
-You are an expert in requirement analysis and fuzzing. You MUST carefully study the function signature and its parameters, and write a specification that can be used to generate fuzz drivers for the given API from OSS projects.
-Note that the format of supposed specification content needs include the following information:
-    - The functionality of the function and the project it belongs to.
-    - Preconditions and postconditions of the function.
-        - The data type, meaning, and constraints (preconditions, postconditions, and invariants) of each parameter.
-        - The data type, meaning, and constraints (preconditions, postconditions, and invariants) of the return value.
-    - The possible side effects of the function.
-    - The possible branch conditions of the function, if any.
-    - The possible error conditions of the function, if any.
-
-An example specification for the function ``get_src_uri` within `kamailio` project can be:
-&lt;code&gt;
-// take care the header files if the project is written in C, since the fuzz driver is written in C++
-
-#include &lt;fuzzer/FuzzedDataProvider.h&gt;
-/*
-** necessary C++ headers here!
-*/
-extern &#34;C&#34; { // since this project is written in C, we need to use extern &#34;C&#34; to avoid name mangling
-// C header files we need to include if any
-}
-
-extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
-    // Initialize the library or any resources `get_src_uri` witin `kamailio` project needed for the fuzzing process.
-      return 0;
-  }
-
-extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
-  /**
-    * Goal: The fuzz driver should test`get_src_uri` witin `kamailio` project.
-    *        - kamailio is an open-source SIP server, which is a very popular open-source project.
-    *        - `get_src_uri` is a function that is used to get the source IP, port, and protocol in SIP URI format.
-
-    * Precondition: 1. The function is provided by the library `msg_parser.h` and implemented in `msg_parser.c`.
-    *               2. The function `get_src_uri` is called with the following parameters:
-    *                 - @m: a pointer to a `sip_msg_t` structure, which is a structure that represents a SIP message.
-    *                   - Precondition:
-    *                       a. Non-Null Requirement: The `m` pointer must be non-null before calling `get_src_uri`. If `m` is null, the function return `-1`.
-    *                       b. Proper Initialization: The `sip_msg_t` structure pointed to by `m` should be properly initialized, particularly ensuring that any previous pointers or lengths are correctly set or reset prior to the call to prevent unintended behavior.
-    *                       c. Buffer Setup: The `buf` field should contain the complete raw SIP message before any processing begins.
-    *                   - Postcondition:
-    *                       a. Resource Management: the @m pointer should be properly released after the function call by using `free_sip_msg` if available.
-    *                   - `sip_msg_t` Structure: The `sip_msg_t` structure contains fields that store information about a SIP message, including the raw message buffer, parsed headers, and parsed URIs.
-    *                     * - Precondition:
-    *                        a.Initialization: The `sip_msg_t` structure must be fully initialized, with all pointer fields set to `NULL` and integers to zero or default flags.
-    *                         b. Buffer Setup: The `buf` field should contain the complete raw SIP message before any processing begins.
-    *                     * - Postcondition:
-    *                          a. Header Integrity: After parsing, header pointers (e.g., `headers`, `last_header`) should accurately reference sections of `buf`.
-    *                          b. End-of-Headers: The `eoh` field must accurately mark the end of the header section.
-    *                          c. URI Validity: If URIs (`new_uri`, `dst_uri`) are modified, `parsed_uri_ok` should be reset to 0 to ensure re-parsing.
-    *                          d. Memory Management: Properly manage memory to prevent leaks or double frees, especially for fields with shared pointers.
-    *                          e. Modification Safety: Any modification to URIs or headers should prompt appropriate updates to relevant flags and pointers to maintain state consistency.
-
-    *                 - @tmode: an integer that specifies the transport mode. This argument allows the user to specify whether the default transport protocol (UDP) should be explicitly mentioned in the URI or omitted for brevity. The value of `tmode` directly affects how the URI is formatted, specifically in terms of displaying or omitting the transport protocol details.
-    *                    * - Precondition:
-    *                        - a. `tmode` should be an integer. It can be either `0` (for short format) or any non-zero value (for full format).
-    *                    * - Postcondition:
-    *                        - a. The value of `tmode` should not be modified by the function.
-    *                        - b. The function should handle the transport mode as specified by the input value.
-    *                        - c. Output URI Format:
-    *                             (i) If `tmode` is 0:
-    *                                 UDP as Default: If the protocol is UDP, the URI does not include the transport protocol parameter (`;transport=udp`), as UDP is considered the default. Other Protocols: For protocols other than UDP, the function adds the transport protocol type to the URI using the format `;transport=protocol_type`.
-    *                             (ii) If `tmode` is non-zero:
-    *                                Always Include Protocol: The transport protocol parameter is included for all protocols, including UDP, using the format `;transport=protocol_type`.
-
-    *                 - @uri: a pointer to a `str` structure that will store the constructed SIP URI. The `str` structure is a string structure that contains a pointer to a character buffer and a length field to indicate the size of the string.
-
-    *                   * - Preconditions: a. Non-Null Requirement: The `uri` pointer must be non-null before calling `get_src_uri`. If `uri` is null, the function will log an error message (&#34;invalid parameter value&#34;) and return `-1`.
-    *                                       b. Proper Initialization: The `str` structure pointed to by `uri` should be properly initialized, particularly ensuring that any previous pointers or lengths are correctly set or reset prior to the call to prevent unintended behavior.
-
-    *                   * - Postconditions:
-    *                           a. URI Storage: On successful execution, the `uri` pointer’s fields (`s` and `len`) are updated:
-    *                             (i) `uri-&gt;s` will point to an internal static buffer that contains the constructed SIP URI.
-    *                             (ii) `uri-&gt;len` will reflect the length of this URI, calculated based on the components included (e.g., IP, port, transport protocol).
-    *                           b. Memory Management: Since `uri-&gt;s` points to a static buffer (`buf`), the content it points to should not be modified or freed by the caller. The caller must also ensure that this pointer is used before any subsequent calls to `get_src_uri`, as subsequent calls will overwrite the buffer.
-
-    * Postcondition: 1. The function should be called with the mutated data to test the functionality of the function, returning 0 if successful and -1 if an error occurs.
-    *                   a. URI Validation: Ensure the SIP URI is correctly formatted according to RFC 3261 specifications, regardless of input variations.
-    *                   b. Transport Inclusion: Verify that the transport protocol is included or omitted from the URI correctly based on tmode and the protocol used:
-    *                   c. If tmode is 0 and the protocol is UDP, the URI should not contain the transport parameter.
-For non-UDP protocols with tmode being 0, or any protocol when tmode is non-zero, the URI must include the transport=protocol parameter.
-    *                   d. IPv6 Handling: Confirm that IPv6 addresses are correctly enclosed in brackets.
-
-    *                2. Resources should be released properly after the function call. Note that the specfied API is preferred to use for resource release if available.
-**/
-
-}
-&lt;/code&gt;
-You MUST write a new specification for the following function:
-&lt;code&gt;
-FriBidiLevel fribidi_log2vis(const FriBidiChar *, const FriBidiStrIndex, FriBidiParType *, FriBidiChar *, FriBidiStrIndex *, FriBidiStrIndex *, FriBidiLevel *)
-&lt;/code&gt;
-
-&lt;/system&gt;
-&lt;task&gt;
-Your goal is to write a specification for guiding the generation of a fuzzing harness for the provided function-under-test signature using &lt;code&gt;LLVMFuzzerTestOneInput&lt;/code&gt;. The function signature of the function-under-test is:
-&lt;function signature&gt;
-FriBidiLevel fribidi_log2vis(const FriBidiChar *, const FriBidiStrIndex, FriBidiParType *, FriBidiChar *, FriBidiStrIndex *, FriBidiStrIndex *, FriBidiLevel *)
-&lt;/function signature&gt;
-&lt;/task&gt;
-
-The code context of the function-under-test is:
-Function source code is:
-fribidi_log2vis (
-  /* input */
-  const FriBidiChar *str,
-  const FriBidiStrIndex len,
-  /* input and output */
-  FriBidiParType *pbase_dir,
-  /* output */
-  FriBidiChar *visual_str,
-  FriBidiStrIndex *positions_L_to_V,
-  FriBidiStrIndex *positions_V_to_L,
-  FriBidiLevel *embedding_levels
-)
-{
-  register FriBidiStrIndex i;
-  FriBidiLevel max_level = 0;
-  fribidi_boolean private_V_to_L = false;
-  fribidi_boolean private_embedding_levels = false;
-  fribidi_boolean status = false;
-  FriBidiArabicProp local_ar_props[LOCAL_LIST_SIZE];
-  FriBidiArabicProp *ar_props = NULL;
-  FriBidiLevel local_embedding_levels[LOCAL_LIST_SIZE];
-  FriBidiCharType local_bidi_types[LOCAL_LIST_SIZE];
-  FriBidiCharType *bidi_types = NULL;
-  FriBidiBracketType local_bracket_types[LOCAL_LIST_SIZE];
-  FriBidiBracketType *bracket_types = NULL;
-  FriBidiStrIndex local_positions_V_to_L[LOCAL_LIST_SIZE];
-
-  if UNLIKELY
-    (len == 0)
-    {
-      status = true;
-      goto out;
-    }
-
-  DBG (&#34;in fribidi_log2vis&#34;);
-
-  fribidi_assert (str);
-  fribidi_assert (pbase_dir);
-
-  if (len &lt; LOCAL_LIST_SIZE)
-    bidi_types = local_bidi_types;
-  else
-    bidi_types = fribidi_malloc (len * sizeof bidi_types[0]);
-  if (!bidi_types)
-    goto out;
-
-  fribidi_get_bidi_types (str, len, bidi_types);
-
-  if (len &lt; LOCAL_LIST_SIZE)
-    bracket_types = local_bracket_types;
-  else
-    bracket_types = fribidi_malloc (len * sizeof bracket_types[0]);
-
-  if (!bracket_types)
-    goto out;
-
-  fribidi_get_bracket_types (str, len, bidi_types,
-                             /* output */
-                             bracket_types);
-  if (!embedding_levels)
-    {
-      if (len &lt; LOCAL_LIST_SIZE)
-        embedding_levels = local_embedding_levels;
-      else
-        embedding_levels = fribidi_malloc (len * sizeof embedding_levels[0]);
-      if (!embedding_levels)
-	goto out;
-      private_embedding_levels = true;
-    }
-
-  max_level = fribidi_get_par_embedding_levels_ex (bidi_types,
-                                                   bracket_types,
-                                                   len,
-                                                   pbase_dir,
-                                                   embedding_levels) - 1;
-  if UNLIKELY
-    (max_level &lt; 0) goto out;
-
-  /* If l2v is to be calculated we must have v2l as well. If it is not
-     given by the caller, we have to make a private instance of it. */
-  if (positions_L_to_V &amp;&amp; !positions_V_to_L)
-    {
-      if (len &lt; LOCAL_LIST_SIZE)
-        positions_V_to_L = local_positions_V_to_L;
-      else
-        positions_V_to_L =
-	(FriBidiStrIndex *) fribidi_malloc (sizeof (FriBidiStrIndex) * len);
-      if (!positions_V_to_L)
-	goto out;
-      private_V_to_L = true;
-    }
-
-  /* Set up the ordering array to identity order */
-  if (positions_V_to_L)
-    {
-      for (i = 0; i &lt; len; i++)
-	positions_V_to_L[i] = i;
-    }
-
-
-  if (visual_str)
-    {
-      /* Using memcpy instead
-      for (i = len - 1; i &gt;= 0; i--)
-	visual_str[i] = str[i];
-      */
-      memcpy (visual_str, str, len * sizeof (*visual_str));
-
-      /* Arabic joining */
-      if (len &lt; LOCAL_LIST_SIZE)
-        ar_props = local_ar_props;
-      else
-        ar_props = fribidi_malloc (len * sizeof ar_props[0]);
-      fribidi_get_joining_types (str, len, ar_props);
-      fribidi_join_arabic (bidi_types, len, embedding_levels, ar_props);
-
-      fribidi_shape (flags, embedding_levels, len, ar_props, visual_str);
-    }
-
-  /* line breaking goes here, but we assume one line in this function */
-
-  /* and this should be called once per line, but again, we assume one
-   * line in this deprecated function */
-  status =
-    fribidi_reorder_line (flags, bidi_types, len, 0, *pbase_dir,
-			  embedding_levels, visual_str,
-			  positions_V_to_L);
-
-  /* Convert the v2l list to l2v */
-  if (positions_L_to_V)
-    {
-      for (i = 0; i &lt; len; i++)
-	positions_L_to_V[i] = -1;
-      for (i = 0; i &lt; len; i++)
-	positions_L_to_V[positions_V_to_L[i]] = i;
-    }
-
-out:
-
-  if (private_V_to_L &amp;&amp; positions_V_to_L != local_positions_V_to_L)
-    fribidi_free (positions_V_to_L);
-
-  if (private_embedding_levels &amp;&amp; embedding_levels != local_embedding_levels)
-    fribidi_free (embedding_levels);
-
-  if (ar_props &amp;&amp; ar_props != local_ar_props)
-    fribidi_free (ar_props);
-
-  if (bidi_types &amp;&amp; bidi_types != local_bidi_types)
-    fribidi_free (bidi_types);
-
-  if (bracket_types &amp;&amp; bracket_types != local_bracket_types)
-    fribidi_free (bracket_types);
-
-  return status ? max_level + 1 : 0;
-}
-
-Function declaration is:
-extern &#34;C&#34; FriBidiLevel fribidi_log2vis(const FriBidiChar *, const FriBidiStrIndex, FriBidiParType *, FriBidiChar *, FriBidiStrIndex *, FriBidiStrIndex *, FriBidiLevel *);
-header files within this project are:
-/src/fribidi/lib/fribidi-flags.h, /src/fribidi/lib/fribidi-joining-types-list.h, /src/fribidi/lib/fribidi-bidi-types-list.h, /src/fribidi/lib/run.h, /src/fribidi/lib/fribidi-bidi-types.h, /src/fribidi/lib/fribidi-types.h, /src/fribidi/lib/fribidi-joining-types.h
- Choose the appropriate header files to our specification.
-The target function takes the following arguments:
-- const FriBidiChar *
-- const FriBidiStrIndex
-- FriBidiParType *
-- FriBidiChar *
-- FriBidiStrIndex *
-- FriBidiStrIndex *
-- FriBidiLevel *
-Review them carefully and set the specification accordingly like the given example before.
-
-&lt;system&gt;
-You are an expert in writing fuzz driver for a given API from OSS project. You have been given a task to write a fuzz driver for a given API according to the specification below.
-
-The driver code you need to complete is as follows, fill it carefully by strictly following the specification within the comments correctly to make the fuzzing test work, especially for the Precondition and Postcondition sections.
-Note that you need to follow the specification exactly as it is given and write the fuzz driver correctly and efficiently.
-
-&lt;instruction&gt;
-#include &lt;fuzzer/FuzzedDataProvider.h&gt;
-#include &lt;fribidi.h&gt;
-
-extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
-    // Initialize the library or any resources needed for the fuzzing process.
-    return 0;
-}
-
-extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
-    /**
-     * Goal: The fuzz driver should test `fribidi_log2vis` within the FriBidi project.
-     *        - FriBidi is an implementation of the Unicode Bidirectional Algorithm (UAX #9).
-     *        - `fribidi_log2vis` is a function that converts logical text to visual text according to the bidirectional algorithm.
-
-     * Precondition: The function is provided by the library `fribidi.h` and implemented in `fribidi.c`.
-     *               The function `fribidi_log2vis` is called with the following parameters:
-     *                 - @str: a pointer to a `FriBidiChar` array, which represents the input logical string.
-     *                   - Precondition:
-     *                       a. Non-Null Requirement: The `str` pointer must be non-null before calling `fribidi_log2vis`.
-     *                       b. Proper Initialization: The `FriBidiChar` array should be properly initialized and should contain valid Unicode code points.
-     *                       c. Length Constraint: The length of the array should be equal to `len`.
-     *                   - Postcondition:
-     *                       a. The content of `str` should remain unchanged after the function call.
-     *
-     *                 - @len: a `FriBidiStrIndex` value, which specifies the length of the input string.
-     *                   - Precondition:
-     *                       a. Non-Negative: The `len` value must be non-negative.
-     *                       b. Consistency: The `len` value should accurately reflect the number of elements in the `str` array.
-     *                   - Postcondition:
-     *                       a. The value of `len` should not be modified by the function.
-     *
-     *                 - @pbase_dir: a pointer to a `FriBidiParType` that specifies the base direction of the paragraph.
-     *                   - Precondition:
-     *                       a. Non-Null Requirement: The `pbase_dir` pointer must be non-null before calling `fribidi_log2vis`.
-     *                       b. Valid Values: The value pointed to by `pbase_dir` should be a valid `FriBidiParType` value.
-     *                   - Postcondition:
-     *                       a. The value pointed to by `pbase_dir` may be modified to reflect the resolved base direction.
-     *
-     *                 - @visual_str: a pointer to a `FriBidiChar` array, which will store the output visual string.
-     *                   - Precondition:
-     *                       a. Non-Null Requirement: The `visual_str` pointer must be non-null before calling `fribidi_log2vis`.
-     *                       b. Proper Initialization: The `FriBidiChar` array should be properly allocated to hold at least `len` elements.
-     *                   - Postcondition:
-     *                       a. The `visual_str` array will contain the visual representation of the input string.
-     *
-     *                 - @positions_L_to_V: a pointer to a `FriBidiStrIndex` array, which will store the logical to visual positions.
-     *                   - Precondition:
-     *                       a. Non-Null Requirement: The `positions_L_to_V` pointer must be non-null before calling `fribidi_log2vis`.
-     *                       b. Proper Initialization: The `FriBidiStrIndex` array should be properly allocated to hold at least `len` elements.
-     *                   - Postcondition:
-     *                       a. The `positions_L_to_V` array will contain the mapping from logical to visual positions.
-     *
-     *                 - @positions_V_to_L: a pointer to a `FriBidiStrIndex` array, which will store the visual to logical positions.
-     *                   - Precondition:
-     *                       a. Non-Null Requirement: The `positions_V_to_L` pointer must be non-null before calling `fribidi_log2vis`.
-     *                       b. Proper Initialization: The `FriBidiStrIndex` array should be properly allocated to hold at least `len` elements.
-     *                   - Postcondition:
-     *                       a. The `positions_V_to_L` array will contain the mapping from visual to logical positions.
-     *
-     *                 - @embedding_levels: a pointer to a `FriBidiLevel` array, which will store the embedding levels.
-     *                   - Precondition:
-     *                       a. Non-Null Requirement: The `embedding_levels` pointer must be non-null before calling `fribidi_log2vis`.
-     *                       b. Proper Initialization: The `FriBidiLevel` array should be properly allocated to hold at least `len` elements.
-     *                   - Postcondition:
-     *                       a. The `embedding_levels` array will contain the embedding levels of the input string.
-     *
-     * Postcondition: The function should be called with the mutated data to test the functionality of the function, returning the maximum embedding level + 1 if successful and 0 if an error occurs.
-     *                1. Memory Management: Ensure that any dynamically allocated memory is properly freed after the function call to prevent memory leaks.
-     *                2. Correctness: Verify that the visual string, positions arrays, and embedding levels are correctly computed according to the Unicode Bidirectional Algorithm.
-     *                3. Error Handling: Ensure that the function handles edge cases and invalid inputs gracefully, returning 0 in case of errors.
-     */
-
-    if (size &lt; sizeof(FriBidiChar) + sizeof(FriBidiStrIndex)) {
-        return 0;
-    }
-
-    FuzzedDataProvider dataProvider(data, size);
-    FriBidiStrIndex len = dataProvider.ConsumeIntegral&lt;FriBidiStrIndex&gt;();
-    const FriBidiChar *str = reinterpret_cast&lt;const FriBidiChar *&gt;(dataProvider.ConsumeBytes&lt;uint8_t&gt;(len * sizeof(FriBidiChar)).data());
-
-    FriBidiParType pbase_dir = dataProvider.ConsumeIntegral&lt;FriBidiParType&gt;();
-    FriBidiChar *visual_str = new FriBidiChar[len];
-    FriBidiStrIndex *positions_L_to_V = new FriBidiStrIndex[len];
-    FriBidiStrIndex *positions_V_to_L = new FriBidiStrIndex[len];
-    FriBidiLevel *embedding_levels = new FriBidiLevel[len];
-
-    fribidi_log2vis(str, len, &amp;pbase_dir, visual_str, positions_L_to_V, positions_V_to_L, embedding_levels);
-
-    delete[] visual_str;
-    delete[] positions_L_to_V;
-    delete[] positions_V_to_L;
-    delete[] embedding_levels;
-
-    return 0;
-}
-&lt;/instruction&gt;
-
-Note that you MUST fill the code according to the specification provided in the comments, and return the final fuzz driver code ONLY. So you need to remove our comments and write the final code only.
-&lt;/system&gt;
+None
 </pre>
 
 

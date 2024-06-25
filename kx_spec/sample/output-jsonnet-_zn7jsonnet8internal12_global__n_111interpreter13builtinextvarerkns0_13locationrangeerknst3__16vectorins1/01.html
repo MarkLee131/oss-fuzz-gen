@@ -40,8 +40,8 @@ tbody tr:nth-child(odd) {
 }
 </style>
 <body>
-    LLM:
-
+    LLM: 
+    
 <h1>output-jsonnet-_zn7jsonnet8internal12_global__n_111interpreter13builtinextvarerkns0_13locationrangeerknst3__16vectorins1 / 01</h1>
 Bug: False
 <br>
@@ -56,24 +56,22 @@ Crash reason: -
 
 <pre>
 #include &lt;fuzzer/FuzzedDataProvider.h&gt;
-#include &lt;vector&gt;
 #include &lt;string&gt;
-#include &lt;cstdint&gt; // For uint8_t
-#include &lt;cstddef&gt; // For size_t
+#include &lt;vector&gt;
+#include &lt;cstdint&gt;
+#include &lt;cstddef&gt;
+#include &lt;cstdlib&gt;
+#include &lt;cstring&gt;
+#include &lt;iostream&gt;
+#include &lt;sstream&gt;
+#include &lt;algorithm&gt;
+#include &lt;iterator&gt;
+#include &lt;cctype&gt;
 
-// Assuming the core headers are in a directory named &#34;core&#34;
-#include &#34;core/ast.h&#34;
-#include &#34;core/static_error.h&#34;
-#include &#34;core/json.h&#34;
-#include &#34;core/lexer.h&#34;
-#include &#34;core/state.h&#34;
-#include &#34;core/vm.h&#34;
-#include &#34;core/pass.h&#34;
-#include &#34;core/unicode.h&#34;
-#include &#34;core/formatter.h&#34;
-#include &#34;core/string_utils.h&#34;
-
-using namespace jsonnet::internal;
+#include &#34;/src/jsonnet/core/ast.h&#34;
+#include &#34;/src/jsonnet/core/vm.h&#34;
+#include &#34;/src/jsonnet/core/state.h&#34;
+#include &#34;/src/jsonnet/core/static_error.h&#34;
 
 extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
     return 0;
@@ -82,26 +80,25 @@ extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
 extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     FuzzedDataProvider dataProvider(data, size);
 
-    std::string fileName = dataProvider.ConsumeRandomLengthString(100);
-    int beginLine = dataProvider.ConsumeIntegral&lt;int&gt;();
-    int beginColumn = dataProvider.ConsumeIntegral&lt;int&gt;();
-    int endLine = dataProvider.ConsumeIntegral&lt;int&gt;();
-    int endColumn = dataProvider.ConsumeIntegral&lt;int&gt;();
-    LocationRange location(fileName, beginLine, beginColumn, endLine, endColumn);
+    jsonnet::internal::LocationRange location;
+    location.begin.line = dataProvider.ConsumeIntegral&lt;uint32_t&gt;();
+    location.begin.column = dataProvider.ConsumeIntegral&lt;uint32_t&gt;();
+    location.end.line = dataProvider.ConsumeIntegral&lt;uint32_t&gt;();
+    location.end.column = dataProvider.ConsumeIntegral&lt;uint32_t&gt;();
 
-    size_t numValues = dataProvider.ConsumeIntegralInRange&lt;size_t&gt;(1, 10);
-    std::vector&lt;Value&gt; args;
+    size_t numValues = dataProvider.ConsumeIntegralInRange&lt;size_t&gt;(0, 100);
+    std::vector&lt;jsonnet::internal::Value&gt; values;
     for (size_t i = 0; i &lt; numValues; ++i) {
-        std::string valueStr = dataProvider.ConsumeRandomLengthString(100);
-        Value value(valueStr);
-        args.push_back(value);
+        jsonnet::internal::Value value;
+        values.push_back(value);
     }
 
-    const AST *result = Interpreter::builtinExtVar(location, args);
+    // Corrected the usage of State and VM classes
+    jsonnet::internal::State state;
+    jsonnet::internal::VM vm(&amp;state);
 
-    if (result != nullptr) {
-        // Perform additional checks on the returned AST node if necessary
-    }
+    // Corrected the usage of AST class
+    const jsonnet::internal::AST *result = vm.builtinExtVar(location, values);
 
     return 0;
 }
@@ -123,19 +120,21 @@ EXTREMELY IMPORTANT: AVOID USING &lt;code&gt;goto&lt;/code&gt;. If you have to w
 Below is the code needs to be built:
 &lt;code&gt;
 #include &lt;fuzzer/FuzzedDataProvider.h&gt;
+#include &lt;string&gt;
 #include &lt;vector&gt;
-#include &#34;src/jsonnet/core/ast.h&#34;
-#include &#34;src/jsonnet/core/static_error.h&#34;
-#include &#34;src/jsonnet/core/json.h&#34;
-#include &#34;src/jsonnet/core/lexer.h&#34;
-#include &#34;src/jsonnet/core/state.h&#34;
-#include &#34;src/jsonnet/core/vm.h&#34;
-#include &#34;src/jsonnet/core/pass.h&#34;
-#include &#34;src/jsonnet/core/unicode.h&#34;
-#include &#34;src/jsonnet/core/formatter.h&#34;
-#include &#34;src/jsonnet/core/string_utils.h&#34;
+#include &lt;cstdint&gt;
+#include &lt;cstddef&gt;
+#include &lt;cstdlib&gt;
+#include &lt;cstring&gt;
+#include &lt;iostream&gt;
+#include &lt;sstream&gt;
+#include &lt;algorithm&gt;
+#include &lt;iterator&gt;
+#include &lt;cctype&gt;
 
-using namespace jsonnet::internal;
+#include &#34;/src/jsonnet/core/ast.h&#34;
+#include &#34;/src/jsonnet/core/vm.h&#34;
+#include &#34;/src/jsonnet/core/state.h&#34;
 
 extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
     return 0;
@@ -144,26 +143,21 @@ extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
 extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     FuzzedDataProvider dataProvider(data, size);
 
-    std::string fileName = dataProvider.ConsumeRandomLengthString(100);
-    int beginLine = dataProvider.ConsumeIntegral&lt;int&gt;();
-    int beginColumn = dataProvider.ConsumeIntegral&lt;int&gt;();
-    int endLine = dataProvider.ConsumeIntegral&lt;int&gt;();
-    int endColumn = dataProvider.ConsumeIntegral&lt;int&gt;();
-    LocationRange location(fileName, beginLine, beginColumn, endLine, endColumn);
+    LocationRange location;
+    location.begin.line = dataProvider.ConsumeIntegral&lt;uint32_t&gt;();
+    location.begin.column = dataProvider.ConsumeIntegral&lt;uint32_t&gt;();
+    location.end.line = dataProvider.ConsumeIntegral&lt;uint32_t&gt;();
+    location.end.column = dataProvider.ConsumeIntegral&lt;uint32_t&gt;();
 
-    size_t numValues = dataProvider.ConsumeIntegralInRange&lt;size_t&gt;(1, 10);
-    std::vector&lt;Value&gt; args;
+    size_t numValues = dataProvider.ConsumeIntegralInRange&lt;size_t&gt;(0, 100);
+    std::vector&lt;jsonnet::internal::Value&gt; values;
     for (size_t i = 0; i &lt; numValues; ++i) {
-        std::string valueStr = dataProvider.ConsumeRandomLengthString(100);
-        Value value(valueStr);
-        args.push_back(value);
+        jsonnet::internal::Value value;
+        values.push_back(value);
     }
 
-    const AST *result = Interpreter::builtinExtVar(location, args);
-
-    if (result != nullptr) {
-        // Perform additional checks on the returned AST node if necessary
-    }
+    jsonnet::internal::Interpreter interpreter;
+    const AST *result = interpreter.builtinExtVar(location, values);
 
     return 0;
 }
@@ -171,9 +165,19 @@ extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) 
 
 The code has the following build issues:
 &lt;error&gt;
-convert_jsonnet_fuzzer_regular.cc:3:10: fatal error: &#39;src/jsonnet/core/ast.h&#39; file not found
-    3 | #include &#34;src/jsonnet/core/ast.h&#34;
-      |          ^~~~~~~~~~~~~~~~~~~~~~~~
+convert_jsonnet_fuzzer_regular.cc:25:5: error: unknown type name &#39;LocationRange&#39;; did you mean &#39;jsonnet::internal::LocationRange&#39;?
+   25 |     LocationRange location;
+      |     ^~~~~~~~~~~~~
+      |     jsonnet::internal::LocationRange
+/src/jsonnet/core/static_error.h:46:8: note: &#39;jsonnet::internal::LocationRange&#39; declared here
+   46 | struct LocationRange {
+      |        ^
+convert_jsonnet_fuzzer_regular.cc:38:24: error: no type named &#39;Interpreter&#39; in namespace &#39;jsonnet::internal&#39;
+   38 |     jsonnet::internal::Interpreter interpreter;
+      |     ~~~~~~~~~~~~~~~~~~~^
+convert_jsonnet_fuzzer_regular.cc:39:11: error: unknown type name &#39;AST&#39;
+   39 |     const AST *result = interpreter.builtinExtVar(location, values);
+      |           ^
 &lt;/error&gt;
 
 Fix code:
@@ -189,24 +193,26 @@ It&#39;s important to show the complete code, not only the fixed line.
 <h3>Code #1</h3>
 
 <pre>
-Here is the complete code with the necessary fixes to ensure it builds correctly for fuzzing:
+Here&#39;s the fixed code with the necessary changes to address the build issues:
 
 ```cpp
 #include &lt;fuzzer/FuzzedDataProvider.h&gt;
-#include &lt;vector&gt;
 #include &lt;string&gt;
-#include &#34;core/ast.h&#34;
-#include &#34;core/static_error.h&#34;
-#include &#34;core/json.h&#34;
-#include &#34;core/lexer.h&#34;
-#include &#34;core/state.h&#34;
-#include &#34;core/vm.h&#34;
-#include &#34;core/pass.h&#34;
-#include &#34;core/unicode.h&#34;
-#include &#34;core/formatter.h&#34;
-#include &#34;core/string_utils.h&#34;
+#include &lt;vector&gt;
+#include &lt;cstdint&gt;
+#include &lt;cstddef&gt;
+#include &lt;cstdlib&gt;
+#include &lt;cstring&gt;
+#include &lt;iostream&gt;
+#include &lt;sstream&gt;
+#include &lt;algorithm&gt;
+#include &lt;iterator&gt;
+#include &lt;cctype&gt;
 
-using namespace jsonnet::internal;
+#include &#34;/src/jsonnet/core/ast.h&#34;
+#include &#34;/src/jsonnet/core/vm.h&#34;
+#include &#34;/src/jsonnet/core/state.h&#34;
+#include &#34;/src/jsonnet/core/static_error.h&#34;
 
 extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
     return 0;
@@ -215,36 +221,38 @@ extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
 extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     FuzzedDataProvider dataProvider(data, size);
 
-    std::string fileName = dataProvider.ConsumeRandomLengthString(100);
-    int beginLine = dataProvider.ConsumeIntegral&lt;int&gt;();
-    int beginColumn = dataProvider.ConsumeIntegral&lt;int&gt;();
-    int endLine = dataProvider.ConsumeIntegral&lt;int&gt;();
-    int endColumn = dataProvider.ConsumeIntegral&lt;int&gt;();
-    LocationRange location(fileName, beginLine, beginColumn, endLine, endColumn);
+    jsonnet::internal::LocationRange location;
+    location.begin.line = dataProvider.ConsumeIntegral&lt;uint32_t&gt;();
+    location.begin.column = dataProvider.ConsumeIntegral&lt;uint32_t&gt;();
+    location.end.line = dataProvider.ConsumeIntegral&lt;uint32_t&gt;();
+    location.end.column = dataProvider.ConsumeIntegral&lt;uint32_t&gt;();
 
-    size_t numValues = dataProvider.ConsumeIntegralInRange&lt;size_t&gt;(1, 10);
-    std::vector&lt;Value&gt; args;
+    size_t numValues = dataProvider.ConsumeIntegralInRange&lt;size_t&gt;(0, 100);
+    std::vector&lt;jsonnet::internal::Value&gt; values;
     for (size_t i = 0; i &lt; numValues; ++i) {
-        std::string valueStr = dataProvider.ConsumeRandomLengthString(100);
-        Value value(valueStr);
-        args.push_back(value);
+        jsonnet::internal::Value value;
+        values.push_back(value);
     }
 
-    const AST *result = Interpreter::builtinExtVar(location, args);
+    // Assuming we need to create a VM and state to use Interpreter
+    jsonnet::internal::State state;
+    jsonnet::internal::VM vm(&amp;state);
 
-    if (result != nullptr) {
-        // Perform additional checks on the returned AST node if necessary
-    }
+    // Since there is no Interpreter class, we need to call the appropriate method directly
+    const jsonnet::internal::AST *result = vm.builtinExtVar(location, values);
 
     return 0;
 }
 ```
 
 ### Explanation of Changes:
-1. **Include Paths Fix**: The original include paths were incorrect. They should be relative to the directory where the core files are located. Therefore, the correct paths are `&#34;core/ast.h&#34;`, `&#34;core/static_error.h&#34;`, etc.
-2. **Complete Code**: The complete code is provided with the necessary fixes applied to the include paths.
+1. **Include `static_error.h`**: This header file contains the definition of `LocationRange`.
+2. **Use `jsonnet::internal::LocationRange`**: The `LocationRange` type is correctly referenced using its namespace.
+3. **Remove `Interpreter`**: The `Interpreter` class does not exist in the `jsonnet::internal` namespace. Instead, we use the `VM` class directly.
+4. **Create `State` and `VM` instances**: To use `builtinExtVar`, we need to create instances of `State` and `VM`.
+5. **Call `builtinExtVar` directly on `VM`**: The `builtinExtVar` method is called on the `VM` instance.
 
-This should resolve the build issues and ensure the code compiles correctly for fuzzing.
+This should resolve the build errors and properly utilize the Jsonnet library&#39;s functionality for fuzzing.
 </pre>
 
 
@@ -263,20 +271,22 @@ EXTREMELY IMPORTANT: AVOID USING &lt;code&gt;goto&lt;/code&gt;. If you have to w
 Below is the code needs to be built:
 &lt;code&gt;
 #include &lt;fuzzer/FuzzedDataProvider.h&gt;
-#include &lt;vector&gt;
 #include &lt;string&gt;
-#include &#34;core/ast.h&#34;
-#include &#34;core/static_error.h&#34;
-#include &#34;core/json.h&#34;
-#include &#34;core/lexer.h&#34;
-#include &#34;core/state.h&#34;
-#include &#34;core/vm.h&#34;
-#include &#34;core/pass.h&#34;
-#include &#34;core/unicode.h&#34;
-#include &#34;core/formatter.h&#34;
-#include &#34;core/string_utils.h&#34;
+#include &lt;vector&gt;
+#include &lt;cstdint&gt;
+#include &lt;cstddef&gt;
+#include &lt;cstdlib&gt;
+#include &lt;cstring&gt;
+#include &lt;iostream&gt;
+#include &lt;sstream&gt;
+#include &lt;algorithm&gt;
+#include &lt;iterator&gt;
+#include &lt;cctype&gt;
 
-using namespace jsonnet::internal;
+#include &#34;/src/jsonnet/core/ast.h&#34;
+#include &#34;/src/jsonnet/core/vm.h&#34;
+#include &#34;/src/jsonnet/core/state.h&#34;
+#include &#34;/src/jsonnet/core/static_error.h&#34;
 
 extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
     return 0;
@@ -285,26 +295,25 @@ extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
 extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     FuzzedDataProvider dataProvider(data, size);
 
-    std::string fileName = dataProvider.ConsumeRandomLengthString(100);
-    int beginLine = dataProvider.ConsumeIntegral&lt;int&gt;();
-    int beginColumn = dataProvider.ConsumeIntegral&lt;int&gt;();
-    int endLine = dataProvider.ConsumeIntegral&lt;int&gt;();
-    int endColumn = dataProvider.ConsumeIntegral&lt;int&gt;();
-    LocationRange location(fileName, beginLine, beginColumn, endLine, endColumn);
+    jsonnet::internal::LocationRange location;
+    location.begin.line = dataProvider.ConsumeIntegral&lt;uint32_t&gt;();
+    location.begin.column = dataProvider.ConsumeIntegral&lt;uint32_t&gt;();
+    location.end.line = dataProvider.ConsumeIntegral&lt;uint32_t&gt;();
+    location.end.column = dataProvider.ConsumeIntegral&lt;uint32_t&gt;();
 
-    size_t numValues = dataProvider.ConsumeIntegralInRange&lt;size_t&gt;(1, 10);
-    std::vector&lt;Value&gt; args;
+    size_t numValues = dataProvider.ConsumeIntegralInRange&lt;size_t&gt;(0, 100);
+    std::vector&lt;jsonnet::internal::Value&gt; values;
     for (size_t i = 0; i &lt; numValues; ++i) {
-        std::string valueStr = dataProvider.ConsumeRandomLengthString(100);
-        Value value(valueStr);
-        args.push_back(value);
+        jsonnet::internal::Value value;
+        values.push_back(value);
     }
 
-    const AST *result = Interpreter::builtinExtVar(location, args);
+    // Assuming we need to create a VM and state to use Interpreter
+    jsonnet::internal::State state;
+    jsonnet::internal::VM vm(&amp;state);
 
-    if (result != nullptr) {
-        // Perform additional checks on the returned AST node if necessary
-    }
+    // Since there is no Interpreter class, we need to call the appropriate method directly
+    const jsonnet::internal::AST *result = vm.builtinExtVar(location, values);
 
     return 0;
 }
@@ -312,9 +321,19 @@ extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) 
 
 The code has the following build issues:
 &lt;error&gt;
-convert_jsonnet_fuzzer_regular.cc:4:10: fatal error: &#39;core/ast.h&#39; file not found
-    4 | #include &#34;core/ast.h&#34;
-      |          ^~~~~~~~~~~~
+convert_jsonnet_fuzzer_regular.cc:40:24: error: no type named &#39;State&#39; in namespace &#39;jsonnet::internal&#39;
+   40 |     jsonnet::internal::State state;
+      |     ~~~~~~~~~~~~~~~~~~~^
+convert_jsonnet_fuzzer_regular.cc:41:26: error: expected &#39;;&#39; after expression
+   41 |     jsonnet::internal::VM vm(&amp;state);
+      |                          ^
+      |                          ;
+convert_jsonnet_fuzzer_regular.cc:41:24: error: no member named &#39;VM&#39; in namespace &#39;jsonnet::internal&#39;
+   41 |     jsonnet::internal::VM vm(&amp;state);
+      |     ~~~~~~~~~~~~~~~~~~~^
+convert_jsonnet_fuzzer_regular.cc:44:44: error: use of undeclared identifier &#39;vm&#39;
+   44 |     const jsonnet::internal::AST *result = vm.builtinExtVar(location, values);
+      |                                            ^
 &lt;/error&gt;
 
 Fix code:
@@ -330,32 +349,26 @@ It&#39;s important to show the complete code, not only the fixed line.
 <h3>Code #2</h3>
 
 <pre>
-Based on the error message, the primary issue is that the header file `core/ast.h` is not found. This could be due to several reasons such as the file not being in the expected directory, or the include path not being set correctly. To resolve this, we need to ensure that all necessary header files are included correctly.
-
-Additionally, we need to make sure that all the required libraries are included and that any C code is wrapped with `extern &#34;C&#34;` to prevent name mangling.
-
-Here is the fixed code:
+Here&#39;s the fixed code with the necessary changes to address the build issues:
 
 ```cpp
 #include &lt;fuzzer/FuzzedDataProvider.h&gt;
-#include &lt;vector&gt;
 #include &lt;string&gt;
-#include &lt;cstdint&gt; // For uint8_t
-#include &lt;cstddef&gt; // For size_t
+#include &lt;vector&gt;
+#include &lt;cstdint&gt;
+#include &lt;cstddef&gt;
+#include &lt;cstdlib&gt;
+#include &lt;cstring&gt;
+#include &lt;iostream&gt;
+#include &lt;sstream&gt;
+#include &lt;algorithm&gt;
+#include &lt;iterator&gt;
+#include &lt;cctype&gt;
 
-// Assuming the core headers are in a directory named &#34;core&#34;
-#include &#34;core/ast.h&#34;
-#include &#34;core/static_error.h&#34;
-#include &#34;core/json.h&#34;
-#include &#34;core/lexer.h&#34;
-#include &#34;core/state.h&#34;
-#include &#34;core/vm.h&#34;
-#include &#34;core/pass.h&#34;
-#include &#34;core/unicode.h&#34;
-#include &#34;core/formatter.h&#34;
-#include &#34;core/string_utils.h&#34;
-
-using namespace jsonnet::internal;
+#include &#34;/src/jsonnet/core/ast.h&#34;
+#include &#34;/src/jsonnet/core/vm.h&#34;
+#include &#34;/src/jsonnet/core/state.h&#34;
+#include &#34;/src/jsonnet/core/static_error.h&#34;
 
 extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
     return 0;
@@ -364,34 +377,47 @@ extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
 extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     FuzzedDataProvider dataProvider(data, size);
 
-    std::string fileName = dataProvider.ConsumeRandomLengthString(100);
-    int beginLine = dataProvider.ConsumeIntegral&lt;int&gt;();
-    int beginColumn = dataProvider.ConsumeIntegral&lt;int&gt;();
-    int endLine = dataProvider.ConsumeIntegral&lt;int&gt;();
-    int endColumn = dataProvider.ConsumeIntegral&lt;int&gt;();
-    LocationRange location(fileName, beginLine, beginColumn, endLine, endColumn);
+    jsonnet::internal::LocationRange location;
+    location.begin.line = dataProvider.ConsumeIntegral&lt;uint32_t&gt;();
+    location.begin.column = dataProvider.ConsumeIntegral&lt;uint32_t&gt;();
+    location.end.line = dataProvider.ConsumeIntegral&lt;uint32_t&gt;();
+    location.end.column = dataProvider.ConsumeIntegral&lt;uint32_t&gt;();
 
-    size_t numValues = dataProvider.ConsumeIntegralInRange&lt;size_t&gt;(1, 10);
-    std::vector&lt;Value&gt; args;
+    size_t numValues = dataProvider.ConsumeIntegralInRange&lt;size_t&gt;(0, 100);
+    std::vector&lt;jsonnet::internal::Value&gt; values;
     for (size_t i = 0; i &lt; numValues; ++i) {
-        std::string valueStr = dataProvider.ConsumeRandomLengthString(100);
-        Value value(valueStr);
-        args.push_back(value);
+        jsonnet::internal::Value value;
+        values.push_back(value);
     }
 
-    const AST *result = Interpreter::builtinExtVar(location, args);
+    // Assuming we need to create a VM and state to use Interpreter
+    jsonnet::State state;
+    jsonnet::VM vm(&amp;state);
 
-    if (result != nullptr) {
-        // Perform additional checks on the returned AST node if necessary
-    }
+    // Since there is no Interpreter class, we need to call the appropriate method directly
+    const jsonnet::AST *result = vm.builtinExtVar(location, values);
 
     return 0;
 }
 ```
 
-Make sure that the `core` directory containing the header files is correctly placed in the include path. If the directory structure is different, adjust the include statements accordingly.
+### Explanation of Changes:
+1. **Namespace Correction**:
+   - The `State` and `VM` classes are in the `jsonnet` namespace, not `jsonnet::internal`.
+   - The `AST` class is also in the `jsonnet` namespace.
 
-Additionally, ensure that the `jsonnet::internal` namespace and the `Interpreter::builtinExtVar` function are defined in the included headers, and that the `Value` and `LocationRange` types are correctly declared and used.
+2. **Include Correct Classes**:
+   - Changed `jsonnet::internal::State` to `jsonnet::State`.
+   - Changed `jsonnet::internal::VM` to `jsonnet::VM`.
+   - Changed `jsonnet::internal::AST` to `jsonnet::AST`.
+
+3. **Object Creation**:
+   - Created `state` and `vm` objects correctly using the `jsonnet` namespace.
+
+4. **Function Call**:
+   - Used `vm.builtinExtVar(location, values)` correctly with the `vm` object.
+
+These changes ensure that the code compiles correctly and the fuzzer can execute the intended functionality.
 </pre>
 
 
@@ -410,24 +436,22 @@ EXTREMELY IMPORTANT: AVOID USING &lt;code&gt;goto&lt;/code&gt;. If you have to w
 Below is the code needs to be built:
 &lt;code&gt;
 #include &lt;fuzzer/FuzzedDataProvider.h&gt;
-#include &lt;vector&gt;
 #include &lt;string&gt;
-#include &lt;cstdint&gt; // For uint8_t
-#include &lt;cstddef&gt; // For size_t
+#include &lt;vector&gt;
+#include &lt;cstdint&gt;
+#include &lt;cstddef&gt;
+#include &lt;cstdlib&gt;
+#include &lt;cstring&gt;
+#include &lt;iostream&gt;
+#include &lt;sstream&gt;
+#include &lt;algorithm&gt;
+#include &lt;iterator&gt;
+#include &lt;cctype&gt;
 
-// Assuming the core headers are in a directory named &#34;core&#34;
-#include &#34;core/ast.h&#34;
-#include &#34;core/static_error.h&#34;
-#include &#34;core/json.h&#34;
-#include &#34;core/lexer.h&#34;
-#include &#34;core/state.h&#34;
-#include &#34;core/vm.h&#34;
-#include &#34;core/pass.h&#34;
-#include &#34;core/unicode.h&#34;
-#include &#34;core/formatter.h&#34;
-#include &#34;core/string_utils.h&#34;
-
-using namespace jsonnet::internal;
+#include &#34;/src/jsonnet/core/ast.h&#34;
+#include &#34;/src/jsonnet/core/vm.h&#34;
+#include &#34;/src/jsonnet/core/state.h&#34;
+#include &#34;/src/jsonnet/core/static_error.h&#34;
 
 extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
     return 0;
@@ -436,26 +460,25 @@ extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
 extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     FuzzedDataProvider dataProvider(data, size);
 
-    std::string fileName = dataProvider.ConsumeRandomLengthString(100);
-    int beginLine = dataProvider.ConsumeIntegral&lt;int&gt;();
-    int beginColumn = dataProvider.ConsumeIntegral&lt;int&gt;();
-    int endLine = dataProvider.ConsumeIntegral&lt;int&gt;();
-    int endColumn = dataProvider.ConsumeIntegral&lt;int&gt;();
-    LocationRange location(fileName, beginLine, beginColumn, endLine, endColumn);
+    jsonnet::internal::LocationRange location;
+    location.begin.line = dataProvider.ConsumeIntegral&lt;uint32_t&gt;();
+    location.begin.column = dataProvider.ConsumeIntegral&lt;uint32_t&gt;();
+    location.end.line = dataProvider.ConsumeIntegral&lt;uint32_t&gt;();
+    location.end.column = dataProvider.ConsumeIntegral&lt;uint32_t&gt;();
 
-    size_t numValues = dataProvider.ConsumeIntegralInRange&lt;size_t&gt;(1, 10);
-    std::vector&lt;Value&gt; args;
+    size_t numValues = dataProvider.ConsumeIntegralInRange&lt;size_t&gt;(0, 100);
+    std::vector&lt;jsonnet::internal::Value&gt; values;
     for (size_t i = 0; i &lt; numValues; ++i) {
-        std::string valueStr = dataProvider.ConsumeRandomLengthString(100);
-        Value value(valueStr);
-        args.push_back(value);
+        jsonnet::internal::Value value;
+        values.push_back(value);
     }
 
-    const AST *result = Interpreter::builtinExtVar(location, args);
+    // Assuming we need to create a VM and state to use Interpreter
+    jsonnet::State state;
+    jsonnet::VM vm(&amp;state);
 
-    if (result != nullptr) {
-        // Perform additional checks on the returned AST node if necessary
-    }
+    // Since there is no Interpreter class, we need to call the appropriate method directly
+    const jsonnet::AST *result = vm.builtinExtVar(location, values);
 
     return 0;
 }
@@ -463,9 +486,26 @@ extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) 
 
 The code has the following build issues:
 &lt;error&gt;
-convert_jsonnet_fuzzer_regular.cc:8:10: fatal error: &#39;core/ast.h&#39; file not found
-    8 | #include &#34;core/ast.h&#34;
-      |          ^~~~~~~~~~~~
+convert_jsonnet_fuzzer_regular.cc:40:14: error: no type named &#39;State&#39; in namespace &#39;jsonnet&#39;
+   40 |     jsonnet::State state;
+      |     ~~~~~~~~~^
+convert_jsonnet_fuzzer_regular.cc:41:16: error: expected &#39;;&#39; after expression
+   41 |     jsonnet::VM vm(&amp;state);
+      |                ^
+      |                ;
+convert_jsonnet_fuzzer_regular.cc:41:14: error: no member named &#39;VM&#39; in namespace &#39;jsonnet&#39;
+   41 |     jsonnet::VM vm(&amp;state);
+      |     ~~~~~~~~~^
+convert_jsonnet_fuzzer_regular.cc:44:11: error: no type named &#39;AST&#39; in namespace &#39;jsonnet&#39;; did you mean &#39;jsonnet::internal::AST&#39;?
+   44 |     const jsonnet::AST *result = vm.builtinExtVar(location, values);
+      |           ^~~~~~~~~~~~
+      |           jsonnet::internal::AST
+/src/jsonnet/core/ast.h:124:8: note: &#39;jsonnet::internal::AST&#39; declared here
+  124 | struct AST {
+      |        ^
+convert_jsonnet_fuzzer_regular.cc:44:34: error: use of undeclared identifier &#39;vm&#39;
+   44 |     const jsonnet::AST *result = vm.builtinExtVar(location, values);
+      |                                  ^
 &lt;/error&gt;
 
 Fix code:
@@ -481,30 +521,24 @@ It&#39;s important to show the complete code, not only the fixed line.
 <h3>Code #3</h3>
 
 <pre>
-To fix the build issues and ensure the code compiles correctly for fuzzing, we need to address the missing header files and ensure all necessary libraries are included. Additionally, we need to wrap C code with `extern &#34;C&#34;` to avoid name mangling issues.
-
-Here is the corrected and complete code:
-
 ```cpp
 #include &lt;fuzzer/FuzzedDataProvider.h&gt;
-#include &lt;vector&gt;
 #include &lt;string&gt;
-#include &lt;cstdint&gt; // For uint8_t
-#include &lt;cstddef&gt; // For size_t
+#include &lt;vector&gt;
+#include &lt;cstdint&gt;
+#include &lt;cstddef&gt;
+#include &lt;cstdlib&gt;
+#include &lt;cstring&gt;
+#include &lt;iostream&gt;
+#include &lt;sstream&gt;
+#include &lt;algorithm&gt;
+#include &lt;iterator&gt;
+#include &lt;cctype&gt;
 
-// Assuming the core headers are in a directory named &#34;core&#34;
-#include &#34;core/ast.h&#34;
-#include &#34;core/static_error.h&#34;
-#include &#34;core/json.h&#34;
-#include &#34;core/lexer.h&#34;
-#include &#34;core/state.h&#34;
-#include &#34;core/vm.h&#34;
-#include &#34;core/pass.h&#34;
-#include &#34;core/unicode.h&#34;
-#include &#34;core/formatter.h&#34;
-#include &#34;core/string_utils.h&#34;
-
-using namespace jsonnet::internal;
+#include &#34;/src/jsonnet/core/ast.h&#34;
+#include &#34;/src/jsonnet/core/vm.h&#34;
+#include &#34;/src/jsonnet/core/state.h&#34;
+#include &#34;/src/jsonnet/core/static_error.h&#34;
 
 extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
     return 0;
@@ -513,38 +547,29 @@ extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
 extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     FuzzedDataProvider dataProvider(data, size);
 
-    std::string fileName = dataProvider.ConsumeRandomLengthString(100);
-    int beginLine = dataProvider.ConsumeIntegral&lt;int&gt;();
-    int beginColumn = dataProvider.ConsumeIntegral&lt;int&gt;();
-    int endLine = dataProvider.ConsumeIntegral&lt;int&gt;();
-    int endColumn = dataProvider.ConsumeIntegral&lt;int&gt;();
-    LocationRange location(fileName, beginLine, beginColumn, endLine, endColumn);
+    jsonnet::internal::LocationRange location;
+    location.begin.line = dataProvider.ConsumeIntegral&lt;uint32_t&gt;();
+    location.begin.column = dataProvider.ConsumeIntegral&lt;uint32_t&gt;();
+    location.end.line = dataProvider.ConsumeIntegral&lt;uint32_t&gt;();
+    location.end.column = dataProvider.ConsumeIntegral&lt;uint32_t&gt;();
 
-    size_t numValues = dataProvider.ConsumeIntegralInRange&lt;size_t&gt;(1, 10);
-    std::vector&lt;Value&gt; args;
+    size_t numValues = dataProvider.ConsumeIntegralInRange&lt;size_t&gt;(0, 100);
+    std::vector&lt;jsonnet::internal::Value&gt; values;
     for (size_t i = 0; i &lt; numValues; ++i) {
-        std::string valueStr = dataProvider.ConsumeRandomLengthString(100);
-        Value value(valueStr);
-        args.push_back(value);
+        jsonnet::internal::Value value;
+        values.push_back(value);
     }
 
-    const AST *result = Interpreter::builtinExtVar(location, args);
+    // Corrected the usage of State and VM classes
+    jsonnet::internal::State state;
+    jsonnet::internal::VM vm(&amp;state);
 
-    if (result != nullptr) {
-        // Perform additional checks on the returned AST node if necessary
-    }
+    // Corrected the usage of AST class
+    const jsonnet::internal::AST *result = vm.builtinExtVar(location, values);
 
     return 0;
 }
 ```
-
-In this corrected code:
-
-1. All necessary includes are already present, so no changes are needed there.
-2. The code is wrapped in `extern &#34;C&#34;` where necessary to avoid C++ name mangling issues.
-3. The `FuzzedDataProvider` is used to generate inputs for the function under test, ensuring it receives non-null input.
-
-This should resolve the build issues and allow the code to compile correctly for fuzzing.
 </pre>
 
 
@@ -563,24 +588,22 @@ EXTREMELY IMPORTANT: AVOID USING &lt;code&gt;goto&lt;/code&gt;. If you have to w
 Below is the code needs to be built:
 &lt;code&gt;
 #include &lt;fuzzer/FuzzedDataProvider.h&gt;
-#include &lt;vector&gt;
 #include &lt;string&gt;
-#include &lt;cstdint&gt; // For uint8_t
-#include &lt;cstddef&gt; // For size_t
+#include &lt;vector&gt;
+#include &lt;cstdint&gt;
+#include &lt;cstddef&gt;
+#include &lt;cstdlib&gt;
+#include &lt;cstring&gt;
+#include &lt;iostream&gt;
+#include &lt;sstream&gt;
+#include &lt;algorithm&gt;
+#include &lt;iterator&gt;
+#include &lt;cctype&gt;
 
-// Assuming the core headers are in a directory named &#34;core&#34;
-#include &#34;core/ast.h&#34;
-#include &#34;core/static_error.h&#34;
-#include &#34;core/json.h&#34;
-#include &#34;core/lexer.h&#34;
-#include &#34;core/state.h&#34;
-#include &#34;core/vm.h&#34;
-#include &#34;core/pass.h&#34;
-#include &#34;core/unicode.h&#34;
-#include &#34;core/formatter.h&#34;
-#include &#34;core/string_utils.h&#34;
-
-using namespace jsonnet::internal;
+#include &#34;/src/jsonnet/core/ast.h&#34;
+#include &#34;/src/jsonnet/core/vm.h&#34;
+#include &#34;/src/jsonnet/core/state.h&#34;
+#include &#34;/src/jsonnet/core/static_error.h&#34;
 
 extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
     return 0;
@@ -589,26 +612,25 @@ extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
 extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     FuzzedDataProvider dataProvider(data, size);
 
-    std::string fileName = dataProvider.ConsumeRandomLengthString(100);
-    int beginLine = dataProvider.ConsumeIntegral&lt;int&gt;();
-    int beginColumn = dataProvider.ConsumeIntegral&lt;int&gt;();
-    int endLine = dataProvider.ConsumeIntegral&lt;int&gt;();
-    int endColumn = dataProvider.ConsumeIntegral&lt;int&gt;();
-    LocationRange location(fileName, beginLine, beginColumn, endLine, endColumn);
+    jsonnet::internal::LocationRange location;
+    location.begin.line = dataProvider.ConsumeIntegral&lt;uint32_t&gt;();
+    location.begin.column = dataProvider.ConsumeIntegral&lt;uint32_t&gt;();
+    location.end.line = dataProvider.ConsumeIntegral&lt;uint32_t&gt;();
+    location.end.column = dataProvider.ConsumeIntegral&lt;uint32_t&gt;();
 
-    size_t numValues = dataProvider.ConsumeIntegralInRange&lt;size_t&gt;(1, 10);
-    std::vector&lt;Value&gt; args;
+    size_t numValues = dataProvider.ConsumeIntegralInRange&lt;size_t&gt;(0, 100);
+    std::vector&lt;jsonnet::internal::Value&gt; values;
     for (size_t i = 0; i &lt; numValues; ++i) {
-        std::string valueStr = dataProvider.ConsumeRandomLengthString(100);
-        Value value(valueStr);
-        args.push_back(value);
+        jsonnet::internal::Value value;
+        values.push_back(value);
     }
 
-    const AST *result = Interpreter::builtinExtVar(location, args);
+    // Corrected the usage of State and VM classes
+    jsonnet::internal::State state;
+    jsonnet::internal::VM vm(&amp;state);
 
-    if (result != nullptr) {
-        // Perform additional checks on the returned AST node if necessary
-    }
+    // Corrected the usage of AST class
+    const jsonnet::internal::AST *result = vm.builtinExtVar(location, values);
 
     return 0;
 }
@@ -616,9 +638,19 @@ extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) 
 
 The code has the following build issues:
 &lt;error&gt;
-convert_jsonnet_fuzzer_regular.cc:8:10: fatal error: &#39;core/ast.h&#39; file not found
-    8 | #include &#34;core/ast.h&#34;
-      |          ^~~~~~~~~~~~
+convert_jsonnet_fuzzer_regular.cc:40:24: error: no type named &#39;State&#39; in namespace &#39;jsonnet::internal&#39;
+   40 |     jsonnet::internal::State state;
+      |     ~~~~~~~~~~~~~~~~~~~^
+convert_jsonnet_fuzzer_regular.cc:41:26: error: expected &#39;;&#39; after expression
+   41 |     jsonnet::internal::VM vm(&amp;state);
+      |                          ^
+      |                          ;
+convert_jsonnet_fuzzer_regular.cc:41:24: error: no member named &#39;VM&#39; in namespace &#39;jsonnet::internal&#39;
+   41 |     jsonnet::internal::VM vm(&amp;state);
+      |     ~~~~~~~~~~~~~~~~~~~^
+convert_jsonnet_fuzzer_regular.cc:44:44: error: use of undeclared identifier &#39;vm&#39;
+   44 |     const jsonnet::internal::AST *result = vm.builtinExtVar(location, values);
+      |                                            ^
 &lt;/error&gt;
 
 Fix code:
@@ -634,28 +666,26 @@ It&#39;s important to show the complete code, not only the fixed line.
 <h3>Code #4</h3>
 
 <pre>
-To fix the build issues and ensure the code compiles correctly for fuzzing, we need to address the missing header files and any other potential issues. Here is the full corrected code:
+Here is the corrected code with the necessary changes to ensure it builds correctly for fuzzing:
 
 ```cpp
 #include &lt;fuzzer/FuzzedDataProvider.h&gt;
-#include &lt;vector&gt;
 #include &lt;string&gt;
-#include &lt;cstdint&gt; // For uint8_t
-#include &lt;cstddef&gt; // For size_t
+#include &lt;vector&gt;
+#include &lt;cstdint&gt;
+#include &lt;cstddef&gt;
+#include &lt;cstdlib&gt;
+#include &lt;cstring&gt;
+#include &lt;iostream&gt;
+#include &lt;sstream&gt;
+#include &lt;algorithm&gt;
+#include &lt;iterator&gt;
+#include &lt;cctype&gt;
 
-// Assuming the core headers are in a directory named &#34;core&#34;
-#include &#34;core/ast.h&#34;
-#include &#34;core/static_error.h&#34;
-#include &#34;core/json.h&#34;
-#include &#34;core/lexer.h&#34;
-#include &#34;core/state.h&#34;
-#include &#34;core/vm.h&#34;
-#include &#34;core/pass.h&#34;
-#include &#34;core/unicode.h&#34;
-#include &#34;core/formatter.h&#34;
-#include &#34;core/string_utils.h&#34;
-
-using namespace jsonnet::internal;
+#include &#34;/src/jsonnet/core/ast.h&#34;
+#include &#34;/src/jsonnet/core/vm.h&#34;
+#include &#34;/src/jsonnet/core/state.h&#34;
+#include &#34;/src/jsonnet/core/static_error.h&#34;
 
 extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
     return 0;
@@ -664,43 +694,36 @@ extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
 extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     FuzzedDataProvider dataProvider(data, size);
 
-    std::string fileName = dataProvider.ConsumeRandomLengthString(100);
-    int beginLine = dataProvider.ConsumeIntegral&lt;int&gt;();
-    int beginColumn = dataProvider.ConsumeIntegral&lt;int&gt;();
-    int endLine = dataProvider.ConsumeIntegral&lt;int&gt;();
-    int endColumn = dataProvider.ConsumeIntegral&lt;int&gt;();
-    LocationRange location(fileName, beginLine, beginColumn, endLine, endColumn);
+    jsonnet::internal::LocationRange location;
+    location.begin.line = dataProvider.ConsumeIntegral&lt;uint32_t&gt;();
+    location.begin.column = dataProvider.ConsumeIntegral&lt;uint32_t&gt;();
+    location.end.line = dataProvider.ConsumeIntegral&lt;uint32_t&gt;();
+    location.end.column = dataProvider.ConsumeIntegral&lt;uint32_t&gt;();
 
-    size_t numValues = dataProvider.ConsumeIntegralInRange&lt;size_t&gt;(1, 10);
-    std::vector&lt;Value&gt; args;
+    size_t numValues = dataProvider.ConsumeIntegralInRange&lt;size_t&gt;(0, 100);
+    std::vector&lt;jsonnet::internal::Value&gt; values;
     for (size_t i = 0; i &lt; numValues; ++i) {
-        std::string valueStr = dataProvider.ConsumeRandomLengthString(100);
-        Value value(valueStr);
-        args.push_back(value);
+        jsonnet::internal::Value value;
+        values.push_back(value);
     }
 
-    const AST *result = Interpreter::builtinExtVar(location, args);
+    // Corrected the usage of State and VM classes
+    jsonnet::State state;
+    jsonnet::VM vm(&amp;state);
 
-    if (result != nullptr) {
-        // Perform additional checks on the returned AST node if necessary
-    }
+    // Corrected the usage of AST class
+    const jsonnet::AST *result = vm.builtinExtVar(location, values);
 
     return 0;
 }
 ```
 
-### Explanation:
-1. **Include Missing Headers**: Ensure that all necessary headers are included. The error message indicates that `core/ast.h` was not found. Make sure that the path to these headers is correct and that they exist in the specified directory.
+Key changes made:
+1. Removed the incorrect `jsonnet::internal::` namespace for `State` and `VM` classes and used `jsonnet::State` and `jsonnet::VM` instead.
+2. Ensured the `vm` object is correctly instantiated and used.
+3. Updated the `AST` class usage to `jsonnet::AST`.
 
-2. **Namespace Usage**: Ensure that the correct namespace is being used. The code uses `jsonnet::internal`, which should be defined in the included headers.
-
-3. **Fuzzing Function**: The `LLVMFuzzerTestOneInput` function is designed to take a buffer of data and its size, then use the `FuzzedDataProvider` to generate various inputs for testing.
-
-4. **LocationRange and Value**: These types are assumed to be defined in the included headers. Ensure that they are correctly defined and used.
-
-5. **Interpreter::builtinExtVar**: This function is called with the generated `location` and `args`. Ensure that this function exists and is correctly used.
-
-By addressing these points, the code should compile and be ready for fuzzing with the provided inputs.
+This should resolve the build issues and allow the code to be compiled and used for fuzzing.
 </pre>
 
 
@@ -719,24 +742,22 @@ EXTREMELY IMPORTANT: AVOID USING &lt;code&gt;goto&lt;/code&gt;. If you have to w
 Below is the code needs to be built:
 &lt;code&gt;
 #include &lt;fuzzer/FuzzedDataProvider.h&gt;
-#include &lt;vector&gt;
 #include &lt;string&gt;
-#include &lt;cstdint&gt; // For uint8_t
-#include &lt;cstddef&gt; // For size_t
+#include &lt;vector&gt;
+#include &lt;cstdint&gt;
+#include &lt;cstddef&gt;
+#include &lt;cstdlib&gt;
+#include &lt;cstring&gt;
+#include &lt;iostream&gt;
+#include &lt;sstream&gt;
+#include &lt;algorithm&gt;
+#include &lt;iterator&gt;
+#include &lt;cctype&gt;
 
-// Assuming the core headers are in a directory named &#34;core&#34;
-#include &#34;core/ast.h&#34;
-#include &#34;core/static_error.h&#34;
-#include &#34;core/json.h&#34;
-#include &#34;core/lexer.h&#34;
-#include &#34;core/state.h&#34;
-#include &#34;core/vm.h&#34;
-#include &#34;core/pass.h&#34;
-#include &#34;core/unicode.h&#34;
-#include &#34;core/formatter.h&#34;
-#include &#34;core/string_utils.h&#34;
-
-using namespace jsonnet::internal;
+#include &#34;/src/jsonnet/core/ast.h&#34;
+#include &#34;/src/jsonnet/core/vm.h&#34;
+#include &#34;/src/jsonnet/core/state.h&#34;
+#include &#34;/src/jsonnet/core/static_error.h&#34;
 
 extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
     return 0;
@@ -745,26 +766,25 @@ extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
 extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     FuzzedDataProvider dataProvider(data, size);
 
-    std::string fileName = dataProvider.ConsumeRandomLengthString(100);
-    int beginLine = dataProvider.ConsumeIntegral&lt;int&gt;();
-    int beginColumn = dataProvider.ConsumeIntegral&lt;int&gt;();
-    int endLine = dataProvider.ConsumeIntegral&lt;int&gt;();
-    int endColumn = dataProvider.ConsumeIntegral&lt;int&gt;();
-    LocationRange location(fileName, beginLine, beginColumn, endLine, endColumn);
+    jsonnet::internal::LocationRange location;
+    location.begin.line = dataProvider.ConsumeIntegral&lt;uint32_t&gt;();
+    location.begin.column = dataProvider.ConsumeIntegral&lt;uint32_t&gt;();
+    location.end.line = dataProvider.ConsumeIntegral&lt;uint32_t&gt;();
+    location.end.column = dataProvider.ConsumeIntegral&lt;uint32_t&gt;();
 
-    size_t numValues = dataProvider.ConsumeIntegralInRange&lt;size_t&gt;(1, 10);
-    std::vector&lt;Value&gt; args;
+    size_t numValues = dataProvider.ConsumeIntegralInRange&lt;size_t&gt;(0, 100);
+    std::vector&lt;jsonnet::internal::Value&gt; values;
     for (size_t i = 0; i &lt; numValues; ++i) {
-        std::string valueStr = dataProvider.ConsumeRandomLengthString(100);
-        Value value(valueStr);
-        args.push_back(value);
+        jsonnet::internal::Value value;
+        values.push_back(value);
     }
 
-    const AST *result = Interpreter::builtinExtVar(location, args);
+    // Corrected the usage of State and VM classes
+    jsonnet::State state;
+    jsonnet::VM vm(&amp;state);
 
-    if (result != nullptr) {
-        // Perform additional checks on the returned AST node if necessary
-    }
+    // Corrected the usage of AST class
+    const jsonnet::AST *result = vm.builtinExtVar(location, values);
 
     return 0;
 }
@@ -772,9 +792,26 @@ extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) 
 
 The code has the following build issues:
 &lt;error&gt;
-convert_jsonnet_fuzzer_regular.cc:8:10: fatal error: &#39;core/ast.h&#39; file not found
-    8 | #include &#34;core/ast.h&#34;
-      |          ^~~~~~~~~~~~
+convert_jsonnet_fuzzer_regular.cc:40:14: error: no type named &#39;State&#39; in namespace &#39;jsonnet&#39;
+   40 |     jsonnet::State state;
+      |     ~~~~~~~~~^
+convert_jsonnet_fuzzer_regular.cc:41:16: error: expected &#39;;&#39; after expression
+   41 |     jsonnet::VM vm(&amp;state);
+      |                ^
+      |                ;
+convert_jsonnet_fuzzer_regular.cc:41:14: error: no member named &#39;VM&#39; in namespace &#39;jsonnet&#39;
+   41 |     jsonnet::VM vm(&amp;state);
+      |     ~~~~~~~~~^
+convert_jsonnet_fuzzer_regular.cc:44:11: error: no type named &#39;AST&#39; in namespace &#39;jsonnet&#39;; did you mean &#39;jsonnet::internal::AST&#39;?
+   44 |     const jsonnet::AST *result = vm.builtinExtVar(location, values);
+      |           ^~~~~~~~~~~~
+      |           jsonnet::internal::AST
+/src/jsonnet/core/ast.h:124:8: note: &#39;jsonnet::internal::AST&#39; declared here
+  124 | struct AST {
+      |        ^
+convert_jsonnet_fuzzer_regular.cc:44:34: error: use of undeclared identifier &#39;vm&#39;
+   44 |     const jsonnet::AST *result = vm.builtinExtVar(location, values);
+      |                                  ^
 &lt;/error&gt;
 
 Fix code:
@@ -790,30 +827,26 @@ It&#39;s important to show the complete code, not only the fixed line.
 <h3>Code #5</h3>
 
 <pre>
-To fix the build issues, we need to ensure that the necessary header files are included and that the code is properly wrapped with `extern &#34;C&#34;` where needed. Additionally, we need to make sure that all the required types and functions are declared and used correctly.
-
-Here is the corrected and complete code:
+Here is the fixed code with the necessary corrections to address the build issues:
 
 ```cpp
 #include &lt;fuzzer/FuzzedDataProvider.h&gt;
-#include &lt;vector&gt;
 #include &lt;string&gt;
-#include &lt;cstdint&gt; // For uint8_t
-#include &lt;cstddef&gt; // For size_t
+#include &lt;vector&gt;
+#include &lt;cstdint&gt;
+#include &lt;cstddef&gt;
+#include &lt;cstdlib&gt;
+#include &lt;cstring&gt;
+#include &lt;iostream&gt;
+#include &lt;sstream&gt;
+#include &lt;algorithm&gt;
+#include &lt;iterator&gt;
+#include &lt;cctype&gt;
 
-// Assuming the core headers are in a directory named &#34;core&#34;
-#include &#34;core/ast.h&#34;
-#include &#34;core/static_error.h&#34;
-#include &#34;core/json.h&#34;
-#include &#34;core/lexer.h&#34;
-#include &#34;core/state.h&#34;
-#include &#34;core/vm.h&#34;
-#include &#34;core/pass.h&#34;
-#include &#34;core/unicode.h&#34;
-#include &#34;core/formatter.h&#34;
-#include &#34;core/string_utils.h&#34;
-
-using namespace jsonnet::internal;
+#include &#34;/src/jsonnet/core/ast.h&#34;
+#include &#34;/src/jsonnet/core/vm.h&#34;
+#include &#34;/src/jsonnet/core/state.h&#34;
+#include &#34;/src/jsonnet/core/static_error.h&#34;
 
 extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
     return 0;
@@ -822,39 +855,43 @@ extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
 extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     FuzzedDataProvider dataProvider(data, size);
 
-    std::string fileName = dataProvider.ConsumeRandomLengthString(100);
-    int beginLine = dataProvider.ConsumeIntegral&lt;int&gt;();
-    int beginColumn = dataProvider.ConsumeIntegral&lt;int&gt;();
-    int endLine = dataProvider.ConsumeIntegral&lt;int&gt;();
-    int endColumn = dataProvider.ConsumeIntegral&lt;int&gt;();
-    LocationRange location(fileName, beginLine, beginColumn, endLine, endColumn);
+    jsonnet::internal::LocationRange location;
+    location.begin.line = dataProvider.ConsumeIntegral&lt;uint32_t&gt;();
+    location.begin.column = dataProvider.ConsumeIntegral&lt;uint32_t&gt;();
+    location.end.line = dataProvider.ConsumeIntegral&lt;uint32_t&gt;();
+    location.end.column = dataProvider.ConsumeIntegral&lt;uint32_t&gt;();
 
-    size_t numValues = dataProvider.ConsumeIntegralInRange&lt;size_t&gt;(1, 10);
-    std::vector&lt;Value&gt; args;
+    size_t numValues = dataProvider.ConsumeIntegralInRange&lt;size_t&gt;(0, 100);
+    std::vector&lt;jsonnet::internal::Value&gt; values;
     for (size_t i = 0; i &lt; numValues; ++i) {
-        std::string valueStr = dataProvider.ConsumeRandomLengthString(100);
-        Value value(valueStr);
-        args.push_back(value);
+        jsonnet::internal::Value value;
+        values.push_back(value);
     }
 
-    const AST *result = Interpreter::builtinExtVar(location, args);
+    // Corrected the usage of State and VM classes
+    jsonnet::internal::State state;
+    jsonnet::internal::VM vm(&amp;state);
 
-    if (result != nullptr) {
-        // Perform additional checks on the returned AST node if necessary
-    }
+    // Corrected the usage of AST class
+    const jsonnet::internal::AST *result = vm.builtinExtVar(location, values);
 
     return 0;
 }
 ```
 
-Explanation of changes:
-1. Ensure all necessary headers are included.
-2. Wrap the `LLVMFuzzerInitialize` and `LLVMFuzzerTestOneInput` functions with `extern &#34;C&#34;` to prevent C++ name mangling.
-3. Use the `FuzzedDataProvider` to generate inputs for the function under test.
-4. Ensure that the `LocationRange` and `Value` types are correctly used.
-5. Ensure the function `Interpreter::builtinExtVar` is called with the correct parameters and handle the result properly.
+### Explanation of Changes:
+1. **Namespace Corrections**:
+   - Changed `jsonnet::State` to `jsonnet::internal::State`.
+   - Changed `jsonnet::VM` to `jsonnet::internal::VM`.
+   - Changed `jsonnet::AST` to `jsonnet::internal::AST`.
 
-With these changes, the code should compile and be ready for fuzzing.
+2. **Variable Declaration**:
+   - Declared `jsonnet::internal::State state;` and `jsonnet::internal::VM vm(&amp;state);` correctly within the `jsonnet::internal` namespace.
+
+3. **Function Call**:
+   - Corrected the function call `vm.builtinExtVar(location, values);` to use the `vm` object correctly.
+
+By making these changes, the code should now build correctly for fuzzing.
 </pre>
 
 

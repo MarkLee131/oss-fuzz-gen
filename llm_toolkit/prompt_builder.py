@@ -302,7 +302,7 @@ class DefaultTemplateBuilder(PromptBuilder):
     arg_types = introspector.query_introspector_function_debug_arg_types(
         benchmark.project, benchmark.function_signature)
 
-    header_related_text = 'header files within this project are:\n' + header_inclusion_string + '\n Choose the appropriate header files to our specification.\n'
+    header_related_text = 'Header files within this project are:\n' + header_inclusion_string + '\n Choose the appropriate header files to our specification.\n'
 
     arg_types_text = ''
     if arg_types:

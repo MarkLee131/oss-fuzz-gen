@@ -40,8 +40,8 @@ tbody tr:nth-child(odd) {
 }
 </style>
 <body>
-    LLM:
-
+    LLM: 
+    
 <h1>output-guetzli-_znk11butteraugli21butterauglicomparator4maskepnst3__16vectorins_5imageifeens1_9allocatoris4_eeees8_ / 01</h1>
 Bug: False
 <br>
@@ -59,33 +59,42 @@ Crash reason: -
 #include &lt;vector&gt;
 #include &lt;cstdint&gt;
 #include &lt;cstddef&gt;
-#include &#34;butteraugli/butteraugli.h&#34; // Adjust the include path based on the actual location of the header file.
+#include &lt;cstdlib&gt;
+#include &lt;cstring&gt;
+#include &lt;iostream&gt;
+#include &lt;algorithm&gt;
+
+extern &#34;C&#34; {
+    #include &#34;butteraugli/butteraugli.h&#34;
+}
+
+#include &#34;guetzli/butteraugli_comparator.h&#34;
+#include &#34;guetzli/output_image.h&#34;
 
 extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    // Initialize the library or any resources within ButteraugliComparator::Mask needed for the fuzzing process here.
     return 0;
 }
 
 extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     FuzzedDataProvider data_provider(data, size);
 
-    std::vector&lt;butteraugli::ImageF&gt; mask;
-    std::vector&lt;butteraugli::ImageF&gt; mask_dc;
+    size_t mask_size = data_provider.ConsumeIntegralInRange&lt;size_t&gt;(1, 100);
+    size_t mask_dc_size = data_provider.ConsumeIntegralInRange&lt;size_t&gt;(1, 100);
 
-    size_t num_images = data_provider.ConsumeIntegralInRange&lt;size_t&gt;(1, 10);
-    for (size_t i = 0; i &lt; num_images; ++i) {
-        size_t width = data_provider.ConsumeIntegralInRange&lt;size_t&gt;(1, 1000);
-        size_t height = data_provider.ConsumeIntegralInRange&lt;size_t&gt;(1, 1000);
-        butteraugli::ImageF image(width, height);
-        for (size_t y = 0; y &lt; height; ++y) {
-            for (size_t x = 0; x &lt; width; ++x) {
-                image.Row(y)[x] = data_provider.ConsumeFloatingPoint&lt;float&gt;();
-            }
-        }
-        mask.push_back(image);
-        mask_dc.push_back(image);
+    std::vector&lt;butteraugli::ImageF&gt; mask(mask_size);
+    std::vector&lt;butteraugli::ImageF&gt; mask_dc(mask_dc_size);
+
+    // Initialize the images with some fuzzed data
+    for (size_t i = 0; i &lt; mask_size; i++) {
+        mask[i] = butteraugli::ImageF(data_provider.ConsumeIntegralInRange&lt;size_t&gt;(1, 100), data_provider.ConsumeIntegralInRange&lt;size_t&gt;(1, 100));
+    }
+    for (size_t i = 0; i &lt; mask_dc_size; i++) {
+        mask_dc[i] = butteraugli::ImageF(data_provider.ConsumeIntegralInRange&lt;size_t&gt;(1, 100), data_provider.ConsumeIntegralInRange&lt;size_t&gt;(1, 100));
     }
 
-    butteraugli::ButteraugliComparator comparator;
+    guetzli::ButteraugliComparator comparator;
+
     comparator.Mask(&amp;mask, &amp;mask_dc);
 
     return 0;
@@ -109,33 +118,32 @@ Below is the code needs to be built:
 &lt;code&gt;
 #include &lt;fuzzer/FuzzedDataProvider.h&gt;
 #include &lt;vector&gt;
-#include &#34;butteraugli_comparator.h&#34;
+#include &lt;cstdint&gt;
+#include &lt;cstddef&gt;
+#include &lt;cstdlib&gt;
+#include &lt;cstring&gt;
+#include &lt;iostream&gt;
+#include &lt;algorithm&gt;
+#include &#34;butteraugli/butteraugli.h&#34;
+#include &#34;guetzli/butteraugli_comparator.h&#34;
+#include &#34;guetzli/output_image.h&#34;
 
 extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    // Initialize the library or any resources within ButteraugliComparator::Mask needed for the fuzzing process here.
     return 0;
 }
 
 extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     FuzzedDataProvider data_provider(data, size);
 
-    std::vector&lt;butteraugli::Image&lt;float&gt;&gt; mask;
-    std::vector&lt;butteraugli::Image&lt;float&gt;&gt; mask_dc;
+    size_t mask_size = data_provider.ConsumeIntegralInRange&lt;size_t&gt;(1, 100);
+    size_t mask_dc_size = data_provider.ConsumeIntegralInRange&lt;size_t&gt;(1, 100);
 
-    size_t num_images = data_provider.ConsumeIntegralInRange&lt;size_t&gt;(1, 10);
-    for (size_t i = 0; i &lt; num_images; ++i) {
-        size_t width = data_provider.ConsumeIntegralInRange&lt;size_t&gt;(1, 1000);
-        size_t height = data_provider.ConsumeIntegralInRange&lt;size_t&gt;(1, 1000);
-        butteraugli::Image&lt;float&gt; image(width, height);
-        for (size_t y = 0; y &lt; height; ++y) {
-            for (size_t x = 0; x &lt; width; ++x) {
-                image.Row(y)[x] = data_provider.ConsumeFloatingPoint&lt;float&gt;();
-            }
-        }
-        mask.push_back(image);
-        mask_dc.push_back(image);
-    }
+    std::vector&lt;butteraugli::Image&lt;float&gt;&gt; mask(mask_size);
+    std::vector&lt;butteraugli::Image&lt;float&gt;&gt; mask_dc(mask_dc_size);
 
     butteraugli::ButteraugliComparator comparator;
+
     comparator.Mask(&amp;mask, &amp;mask_dc);
 
     return 0;
@@ -144,9 +152,9 @@ extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) 
 
 The code has the following build issues:
 &lt;error&gt;
-fuzz_target.cc:3:10: fatal error: &#39;butteraugli_comparator.h&#39; file not found
-    3 | #include &#34;butteraugli_comparator.h&#34;
-      |          ^~~~~~~~~~~~~~~~~~~~~~~~~~
+fuzz_target.cc:9:10: fatal error: &#39;butteraugli/butteraugli.h&#39; file not found
+    9 | #include &#34;butteraugli/butteraugli.h&#34;
+      |          ^~~~~~~~~~~~~~~~~~~~~~~~~~~
 &lt;/error&gt;
 
 Fix code:
@@ -162,53 +170,56 @@ It&#39;s important to show the complete code, not only the fixed line.
 <h3>Code #1</h3>
 
 <pre>
-To fix the build issues, we need to ensure that the necessary header files are included and correctly referenced. The error message indicates that the `butteraugli_comparator.h` file is not found. This could be due to the file not being in the include path or it being a part of a library that needs to be linked.
+The error message indicates that the header file `butteraugli/butteraugli.h` is not found. This could be due to several reasons, such as the file not being in the specified directory, or the directory not being included in the compiler&#39;s search path. 
 
-Additionally, we need to make sure that the `butteraugli` namespace and its related classes are correctly referenced. If `butteraugli_comparator.h` is part of an external library, we need to ensure that the library is correctly linked during the build process.
+To resolve this issue, let&#39;s make sure to include the correct headers and ensure that the necessary libraries are included. Additionally, we need to wrap the C functions with `extern &#34;C&#34;` to avoid name mangling issues when linking with C++ code.
 
-Here is the complete fixed code:
+Here is the full corrected code:
 
 ```cpp
 #include &lt;fuzzer/FuzzedDataProvider.h&gt;
 #include &lt;vector&gt;
-#include &#34;butteraugli/butteraugli_comparator.h&#34; // Adjust the include path based on the actual location of the header file.
+#include &lt;cstdint&gt;
+#include &lt;cstddef&gt;
+#include &lt;cstdlib&gt;
+#include &lt;cstring&gt;
+#include &lt;iostream&gt;
+#include &lt;algorithm&gt;
+#include &#34;butteraugli/butteraugli.h&#34;
+#include &#34;guetzli/butteraugli_comparator.h&#34;
+#include &#34;guetzli/output_image.h&#34;
 
 extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    // Initialize the library or any resources within ButteraugliComparator::Mask needed for the fuzzing process here.
     return 0;
 }
 
 extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     FuzzedDataProvider data_provider(data, size);
 
-    std::vector&lt;butteraugli::Image&lt;float&gt;&gt; mask;
-    std::vector&lt;butteraugli::Image&lt;float&gt;&gt; mask_dc;
+    size_t mask_size = data_provider.ConsumeIntegralInRange&lt;size_t&gt;(1, 100);
+    size_t mask_dc_size = data_provider.ConsumeIntegralInRange&lt;size_t&gt;(1, 100);
 
-    size_t num_images = data_provider.ConsumeIntegralInRange&lt;size_t&gt;(1, 10);
-    for (size_t i = 0; i &lt; num_images; ++i) {
-        size_t width = data_provider.ConsumeIntegralInRange&lt;size_t&gt;(1, 1000);
-        size_t height = data_provider.ConsumeIntegralInRange&lt;size_t&gt;(1, 1000);
-        butteraugli::Image&lt;float&gt; image(width, height);
-        for (size_t y = 0; y &lt; height; ++y) {
-            for (size_t x = 0; x &lt; width; ++x) {
-                image.Row(y)[x] = data_provider.ConsumeFloatingPoint&lt;float&gt;();
-            }
-        }
-        mask.push_back(image);
-        mask_dc.push_back(image);
-    }
+    std::vector&lt;butteraugli::Image&lt;float&gt;&gt; mask(mask_size);
+    std::vector&lt;butteraugli::Image&lt;float&gt;&gt; mask_dc(mask_dc_size);
 
     butteraugli::ButteraugliComparator comparator;
+
     comparator.Mask(&amp;mask, &amp;mask_dc);
 
     return 0;
 }
 ```
 
-Key changes:
-1. Adjusted the include path for `butteraugli_comparator.h` to `#include &#34;butteraugli/butteraugli_comparator.h&#34;`. This path needs to match the actual location of the header file in your project.
-2. Ensured that the `butteraugli` namespace and its related classes are correctly referenced.
+Please ensure that the `butteraugli` and `guetzli` libraries are correctly installed and available in your include path. If the header files are located in a different directory, you may need to adjust the include paths accordingly.
 
-Make sure that during the build process, the directory containing `butteraugli_comparator.h` is included in the compiler&#39;s include path. If `butteraugli` is part of an external library, ensure that the library is correctly linked. This can typically be done by adding the appropriate flags to your build system (e.g., `-I` for include directories and `-L` and `-l` for library directories and names).
+To compile this code, you might need to specify the include paths for the `butteraugli` and `guetzli` directories. For example, if you are using `clang++`, you can use the `-I` option to specify the include directories:
+
+```sh
+clang++ -fsanitize=fuzzer -I/path/to/butteraugli -I/path/to/guetzli fuzz_target.cc -o fuzz_target
+```
+
+Replace `/path/to/butteraugli` and `/path/to/guetzli` with the actual paths to the directories containing the respective header files.
 </pre>
 
 
@@ -228,33 +239,32 @@ Below is the code needs to be built:
 &lt;code&gt;
 #include &lt;fuzzer/FuzzedDataProvider.h&gt;
 #include &lt;vector&gt;
-#include &#34;butteraugli/butteraugli_comparator.h&#34; // Adjust the include path based on the actual location of the header file.
+#include &lt;cstdint&gt;
+#include &lt;cstddef&gt;
+#include &lt;cstdlib&gt;
+#include &lt;cstring&gt;
+#include &lt;iostream&gt;
+#include &lt;algorithm&gt;
+#include &#34;butteraugli/butteraugli.h&#34;
+#include &#34;guetzli/butteraugli_comparator.h&#34;
+#include &#34;guetzli/output_image.h&#34;
 
 extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    // Initialize the library or any resources within ButteraugliComparator::Mask needed for the fuzzing process here.
     return 0;
 }
 
 extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     FuzzedDataProvider data_provider(data, size);
 
-    std::vector&lt;butteraugli::Image&lt;float&gt;&gt; mask;
-    std::vector&lt;butteraugli::Image&lt;float&gt;&gt; mask_dc;
+    size_t mask_size = data_provider.ConsumeIntegralInRange&lt;size_t&gt;(1, 100);
+    size_t mask_dc_size = data_provider.ConsumeIntegralInRange&lt;size_t&gt;(1, 100);
 
-    size_t num_images = data_provider.ConsumeIntegralInRange&lt;size_t&gt;(1, 10);
-    for (size_t i = 0; i &lt; num_images; ++i) {
-        size_t width = data_provider.ConsumeIntegralInRange&lt;size_t&gt;(1, 1000);
-        size_t height = data_provider.ConsumeIntegralInRange&lt;size_t&gt;(1, 1000);
-        butteraugli::Image&lt;float&gt; image(width, height);
-        for (size_t y = 0; y &lt; height; ++y) {
-            for (size_t x = 0; x &lt; width; ++x) {
-                image.Row(y)[x] = data_provider.ConsumeFloatingPoint&lt;float&gt;();
-            }
-        }
-        mask.push_back(image);
-        mask_dc.push_back(image);
-    }
+    std::vector&lt;butteraugli::Image&lt;float&gt;&gt; mask(mask_size);
+    std::vector&lt;butteraugli::Image&lt;float&gt;&gt; mask_dc(mask_dc_size);
 
     butteraugli::ButteraugliComparator comparator;
+
     comparator.Mask(&amp;mask, &amp;mask_dc);
 
     return 0;
@@ -263,9 +273,9 @@ extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) 
 
 The code has the following build issues:
 &lt;error&gt;
-fuzz_target.cc:3:10: fatal error: &#39;butteraugli/butteraugli_comparator.h&#39; file not found
-    3 | #include &#34;butteraugli/butteraugli_comparator.h&#34; // Adjust the include path based on the actual location of the header file.
-      |          ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+fuzz_target.cc:9:10: fatal error: &#39;butteraugli/butteraugli.h&#39; file not found
+    9 | #include &#34;butteraugli/butteraugli.h&#34;
+      |          ^~~~~~~~~~~~~~~~~~~~~~~~~~~
 &lt;/error&gt;
 
 Fix code:
@@ -281,51 +291,54 @@ It&#39;s important to show the complete code, not only the fixed line.
 <h3>Code #2</h3>
 
 <pre>
-Certainly! Here is the corrected code with the necessary changes to ensure it builds correctly for fuzzing. I have included the necessary headers and adjusted the include path based on the error message.
+To fix the build issues, we need to ensure that all necessary headers are included and that the code correctly references the required libraries. The error message indicates that the header file `butteraugli/butteraugli.h` is not found. This might be due to incorrect include paths or missing dependencies. Additionally, since some of the libraries might be written in C, we need to wrap their includes and usage with `extern &#34;C&#34;` to prevent name mangling.
+
+Here is the corrected code:
 
 ```cpp
 #include &lt;fuzzer/FuzzedDataProvider.h&gt;
 #include &lt;vector&gt;
 #include &lt;cstdint&gt;
 #include &lt;cstddef&gt;
-#include &#34;butteraugli/butteraugli_comparator.h&#34; // Adjust the include path based on the actual location of the header file.
+#include &lt;cstdlib&gt;
+#include &lt;cstring&gt;
+#include &lt;iostream&gt;
+#include &lt;algorithm&gt;
+
+extern &#34;C&#34; {
+    #include &#34;butteraugli/butteraugli.h&#34;
+}
+
+#include &#34;guetzli/butteraugli_comparator.h&#34;
+#include &#34;guetzli/output_image.h&#34;
 
 extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    // Initialize the library or any resources within ButteraugliComparator::Mask needed for the fuzzing process here.
     return 0;
 }
 
 extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     FuzzedDataProvider data_provider(data, size);
 
-    std::vector&lt;butteraugli::Image&lt;float&gt;&gt; mask;
-    std::vector&lt;butteraugli::Image&lt;float&gt;&gt; mask_dc;
+    size_t mask_size = data_provider.ConsumeIntegralInRange&lt;size_t&gt;(1, 100);
+    size_t mask_dc_size = data_provider.ConsumeIntegralInRange&lt;size_t&gt;(1, 100);
 
-    size_t num_images = data_provider.ConsumeIntegralInRange&lt;size_t&gt;(1, 10);
-    for (size_t i = 0; i &lt; num_images; ++i) {
-        size_t width = data_provider.ConsumeIntegralInRange&lt;size_t&gt;(1, 1000);
-        size_t height = data_provider.ConsumeIntegralInRange&lt;size_t&gt;(1, 1000);
-        butteraugli::Image&lt;float&gt; image(width, height);
-        for (size_t y = 0; y &lt; height; ++y) {
-            for (size_t x = 0; x &lt; width; ++x) {
-                image.Row(y)[x] = data_provider.ConsumeFloatingPoint&lt;float&gt;();
-            }
-        }
-        mask.push_back(image);
-        mask_dc.push_back(image);
-    }
+    std::vector&lt;butteraugli::Image&lt;float&gt;&gt; mask(mask_size);
+    std::vector&lt;butteraugli::Image&lt;float&gt;&gt; mask_dc(mask_dc_size);
 
     butteraugli::ButteraugliComparator comparator;
+
     comparator.Mask(&amp;mask, &amp;mask_dc);
 
     return 0;
 }
 ```
 
-Key changes made:
-1. Added `#include &lt;cstdint&gt;` and `#include &lt;cstddef&gt;` to ensure that `uint8_t` and `size_t` are defined.
-2. Ensured the include path for `butteraugli_comparator.h` is correct. If the file is in a different directory, adjust the path accordingly.
+### Explanation of Changes:
+1. **Wrap the `butteraugli/butteraugli.h` include with `extern &#34;C&#34;`**: This ensures that the C functions in the `butteraugli` library are correctly linked with the C++ code by preventing name mangling.
+2. **Ensure all necessary headers are included**: The includes for `vector`, `cstdint`, `cstddef`, `cstdlib`, `cstring`, `iostream`, and `algorithm` are already present and correct.
 
-This should resolve the build issues and allow the code to compile correctly for fuzzing.
+By making these changes, the code should now correctly compile and link, allowing for effective fuzzing of the `ButteraugliComparator::Mask` function.
 </pre>
 
 
@@ -347,33 +360,34 @@ Below is the code needs to be built:
 #include &lt;vector&gt;
 #include &lt;cstdint&gt;
 #include &lt;cstddef&gt;
-#include &#34;butteraugli/butteraugli_comparator.h&#34; // Adjust the include path based on the actual location of the header file.
+#include &lt;cstdlib&gt;
+#include &lt;cstring&gt;
+#include &lt;iostream&gt;
+#include &lt;algorithm&gt;
+
+extern &#34;C&#34; {
+    #include &#34;butteraugli/butteraugli.h&#34;
+}
+
+#include &#34;guetzli/butteraugli_comparator.h&#34;
+#include &#34;guetzli/output_image.h&#34;
 
 extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    // Initialize the library or any resources within ButteraugliComparator::Mask needed for the fuzzing process here.
     return 0;
 }
 
 extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     FuzzedDataProvider data_provider(data, size);
 
-    std::vector&lt;butteraugli::Image&lt;float&gt;&gt; mask;
-    std::vector&lt;butteraugli::Image&lt;float&gt;&gt; mask_dc;
+    size_t mask_size = data_provider.ConsumeIntegralInRange&lt;size_t&gt;(1, 100);
+    size_t mask_dc_size = data_provider.ConsumeIntegralInRange&lt;size_t&gt;(1, 100);
 
-    size_t num_images = data_provider.ConsumeIntegralInRange&lt;size_t&gt;(1, 10);
-    for (size_t i = 0; i &lt; num_images; ++i) {
-        size_t width = data_provider.ConsumeIntegralInRange&lt;size_t&gt;(1, 1000);
-        size_t height = data_provider.ConsumeIntegralInRange&lt;size_t&gt;(1, 1000);
-        butteraugli::Image&lt;float&gt; image(width, height);
-        for (size_t y = 0; y &lt; height; ++y) {
-            for (size_t x = 0; x &lt; width; ++x) {
-                image.Row(y)[x] = data_provider.ConsumeFloatingPoint&lt;float&gt;();
-            }
-        }
-        mask.push_back(image);
-        mask_dc.push_back(image);
-    }
+    std::vector&lt;butteraugli::Image&lt;float&gt;&gt; mask(mask_size);
+    std::vector&lt;butteraugli::Image&lt;float&gt;&gt; mask_dc(mask_dc_size);
 
     butteraugli::ButteraugliComparator comparator;
+
     comparator.Mask(&amp;mask, &amp;mask_dc);
 
     return 0;
@@ -382,9 +396,9 @@ extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) 
 
 The code has the following build issues:
 &lt;error&gt;
-fuzz_target.cc:5:10: fatal error: &#39;butteraugli/butteraugli_comparator.h&#39; file not found
-    5 | #include &#34;butteraugli/butteraugli_comparator.h&#34; // Adjust the include path based on the actual location of the header file.
-      |          ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+fuzz_target.cc:11:14: fatal error: &#39;butteraugli/butteraugli.h&#39; file not found
+   11 |     #include &#34;butteraugli/butteraugli.h&#34;
+      |              ^~~~~~~~~~~~~~~~~~~~~~~~~~~
 &lt;/error&gt;
 
 Fix code:
@@ -400,49 +414,65 @@ It&#39;s important to show the complete code, not only the fixed line.
 <h3>Code #3</h3>
 
 <pre>
-Here is the complete fixed code:
+Here is the fixed code with the necessary changes to ensure it builds correctly for fuzzing:
 
 ```cpp
 #include &lt;fuzzer/FuzzedDataProvider.h&gt;
 #include &lt;vector&gt;
 #include &lt;cstdint&gt;
 #include &lt;cstddef&gt;
-#include &#34;butteraugli_comparator.h&#34; // Adjust the include path based on the actual location of the header file.
+#include &lt;cstdlib&gt;
+#include &lt;cstring&gt;
+#include &lt;iostream&gt;
+#include &lt;algorithm&gt;
+
+extern &#34;C&#34; {
+    #include &#34;butteraugli/butteraugli.h&#34;
+}
+
+#include &#34;guetzli/butteraugli_comparator.h&#34;
+#include &#34;guetzli/output_image.h&#34;
 
 extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    // Initialize the library or any resources within ButteraugliComparator::Mask needed for the fuzzing process here.
     return 0;
 }
 
 extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     FuzzedDataProvider data_provider(data, size);
 
-    std::vector&lt;butteraugli::Image&lt;float&gt;&gt; mask;
-    std::vector&lt;butteraugli::Image&lt;float&gt;&gt; mask_dc;
+    size_t mask_size = data_provider.ConsumeIntegralInRange&lt;size_t&gt;(1, 100);
+    size_t mask_dc_size = data_provider.ConsumeIntegralInRange&lt;size_t&gt;(1, 100);
 
-    size_t num_images = data_provider.ConsumeIntegralInRange&lt;size_t&gt;(1, 10);
-    for (size_t i = 0; i &lt; num_images; ++i) {
-        size_t width = data_provider.ConsumeIntegralInRange&lt;size_t&gt;(1, 1000);
-        size_t height = data_provider.ConsumeIntegralInRange&lt;size_t&gt;(1, 1000);
-        butteraugli::Image&lt;float&gt; image(width, height);
-        for (size_t y = 0; y &lt; height; ++y) {
-            for (size_t x = 0; x &lt; width; ++x) {
-                image.Row(y)[x] = data_provider.ConsumeFloatingPoint&lt;float&gt;();
-            }
-        }
-        mask.push_back(image);
-        mask_dc.push_back(image);
+    std::vector&lt;butteraugli::ImageF&gt; mask(mask_size);
+    std::vector&lt;butteraugli::ImageF&gt; mask_dc(mask_dc_size);
+
+    // Initialize the images with some fuzzed data
+    for (size_t i = 0; i &lt; mask_size; i++) {
+        mask[i] = butteraugli::ImageF(data_provider.ConsumeIntegralInRange&lt;size_t&gt;(1, 100), data_provider.ConsumeIntegralInRange&lt;size_t&gt;(1, 100));
+    }
+    for (size_t i = 0; i &lt; mask_dc_size; i++) {
+        mask_dc[i] = butteraugli::ImageF(data_provider.ConsumeIntegralInRange&lt;size_t&gt;(1, 100), data_provider.ConsumeIntegralInRange&lt;size_t&gt;(1, 100));
     }
 
-    butteraugli::ButteraugliComparator comparator;
+    guetzli::ButteraugliComparator comparator;
+
     comparator.Mask(&amp;mask, &amp;mask_dc);
 
     return 0;
 }
 ```
 
-Explanation:
-1. The include path for the header file `butteraugli_comparator.h` was adjusted to `&#34;butteraugli_comparator.h&#34;`. This assumes that the header file is in the same directory as the fuzzing harness code or in a directory that is included in the compiler&#39;s include path.
-2. The rest of the code remains unchanged as it is correctly utilizing the `FuzzedDataProvider` to generate test data and feed it into the `ButteraugliComparator`&#39;s `Mask` function.
+### Explanation of the Fixes:
+1. **Include the Correct Header File**: The error message indicates that the `butteraugli/butteraugli.h` file was not found. Ensure that the path to this header file is correct and that the file exists in the specified directory. If the file is not in the expected directory, you may need to adjust the include path or move the file to the correct location.
+   
+2. **Correct the Type of the Images**: The type `butteraugli::Image&lt;float&gt;` was changed to `butteraugli::ImageF` to match the expected type in the Butteraugli library. This ensures that the types are correctly recognized and used.
+
+3. **Initialize the Images with Fuzzed Data**: The images `mask` and `mask_dc` are initialized with some fuzzed data to ensure they are not null and have valid dimensions. This helps in maximizing the fuzzing results by providing meaningful input to the function under test.
+
+4. **Use `guetzli::ButteraugliComparator`**: The `ButteraugliComparator` class from the Guetzli library is used to call the `Mask` function with the initialized images. This ensures that the function under test is utilized correctly.
+
+By applying these changes, the code should now build correctly for fuzzing and provide meaningful input to the `Mask` function.
 </pre>
 
 
@@ -464,33 +494,42 @@ Below is the code needs to be built:
 #include &lt;vector&gt;
 #include &lt;cstdint&gt;
 #include &lt;cstddef&gt;
-#include &#34;butteraugli_comparator.h&#34; // Adjust the include path based on the actual location of the header file.
+#include &lt;cstdlib&gt;
+#include &lt;cstring&gt;
+#include &lt;iostream&gt;
+#include &lt;algorithm&gt;
+
+extern &#34;C&#34; {
+    #include &#34;butteraugli/butteraugli.h&#34;
+}
+
+#include &#34;guetzli/butteraugli_comparator.h&#34;
+#include &#34;guetzli/output_image.h&#34;
 
 extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    // Initialize the library or any resources within ButteraugliComparator::Mask needed for the fuzzing process here.
     return 0;
 }
 
 extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     FuzzedDataProvider data_provider(data, size);
 
-    std::vector&lt;butteraugli::Image&lt;float&gt;&gt; mask;
-    std::vector&lt;butteraugli::Image&lt;float&gt;&gt; mask_dc;
+    size_t mask_size = data_provider.ConsumeIntegralInRange&lt;size_t&gt;(1, 100);
+    size_t mask_dc_size = data_provider.ConsumeIntegralInRange&lt;size_t&gt;(1, 100);
 
-    size_t num_images = data_provider.ConsumeIntegralInRange&lt;size_t&gt;(1, 10);
-    for (size_t i = 0; i &lt; num_images; ++i) {
-        size_t width = data_provider.ConsumeIntegralInRange&lt;size_t&gt;(1, 1000);
-        size_t height = data_provider.ConsumeIntegralInRange&lt;size_t&gt;(1, 1000);
-        butteraugli::Image&lt;float&gt; image(width, height);
-        for (size_t y = 0; y &lt; height; ++y) {
-            for (size_t x = 0; x &lt; width; ++x) {
-                image.Row(y)[x] = data_provider.ConsumeFloatingPoint&lt;float&gt;();
-            }
-        }
-        mask.push_back(image);
-        mask_dc.push_back(image);
+    std::vector&lt;butteraugli::ImageF&gt; mask(mask_size);
+    std::vector&lt;butteraugli::ImageF&gt; mask_dc(mask_dc_size);
+
+    // Initialize the images with some fuzzed data
+    for (size_t i = 0; i &lt; mask_size; i++) {
+        mask[i] = butteraugli::ImageF(data_provider.ConsumeIntegralInRange&lt;size_t&gt;(1, 100), data_provider.ConsumeIntegralInRange&lt;size_t&gt;(1, 100));
+    }
+    for (size_t i = 0; i &lt; mask_dc_size; i++) {
+        mask_dc[i] = butteraugli::ImageF(data_provider.ConsumeIntegralInRange&lt;size_t&gt;(1, 100), data_provider.ConsumeIntegralInRange&lt;size_t&gt;(1, 100));
     }
 
-    butteraugli::ButteraugliComparator comparator;
+    guetzli::ButteraugliComparator comparator;
+
     comparator.Mask(&amp;mask, &amp;mask_dc);
 
     return 0;
@@ -499,9 +538,9 @@ extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) 
 
 The code has the following build issues:
 &lt;error&gt;
-fuzz_target.cc:5:10: fatal error: &#39;butteraugli_comparator.h&#39; file not found
-    5 | #include &#34;butteraugli_comparator.h&#34; // Adjust the include path based on the actual location of the header file.
-      |          ^~~~~~~~~~~~~~~~~~~~~~~~~~
+fuzz_target.cc:11:14: fatal error: &#39;butteraugli/butteraugli.h&#39; file not found
+   11 |     #include &#34;butteraugli/butteraugli.h&#34;
+      |              ^~~~~~~~~~~~~~~~~~~~~~~~~~~
 &lt;/error&gt;
 
 Fix code:
@@ -517,53 +556,70 @@ It&#39;s important to show the complete code, not only the fixed line.
 <h3>Code #4</h3>
 
 <pre>
-To fix the code, we need to ensure that the `butteraugli_comparator.h` header file is correctly included. If the header file is in a different directory, we should adjust the include path accordingly. Additionally, we need to make sure that the `butteraugli` namespace and its classes are correctly used.
+To fix the build issues and ensure the code compiles correctly, we need to address the missing header file and ensure that all necessary libraries are included. Additionally, we should wrap C code with `extern &#34;C&#34;` to prevent name mangling.
 
-Here&#39;s the full corrected code:
+Here&#39;s the fixed code:
 
 ```cpp
 #include &lt;fuzzer/FuzzedDataProvider.h&gt;
 #include &lt;vector&gt;
 #include &lt;cstdint&gt;
 #include &lt;cstddef&gt;
-#include &#34;butteraugli/butteraugli_comparator.h&#34; // Adjust the include path based on the actual location of the header file.
+#include &lt;cstdlib&gt;
+#include &lt;cstring&gt;
+#include &lt;iostream&gt;
+#include &lt;algorithm&gt;
+
+extern &#34;C&#34; {
+    #include &#34;butteraugli/butteraugli.h&#34;
+}
+
+#include &#34;guetzli/butteraugli_comparator.h&#34;
+#include &#34;guetzli/output_image.h&#34;
 
 extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    // Initialize the library or any resources within ButteraugliComparator::Mask needed for the fuzzing process here.
     return 0;
 }
 
 extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     FuzzedDataProvider data_provider(data, size);
 
-    std::vector&lt;butteraugli::ImageF&gt; mask;
-    std::vector&lt;butteraugli::ImageF&gt; mask_dc;
+    size_t mask_size = data_provider.ConsumeIntegralInRange&lt;size_t&gt;(1, 100);
+    size_t mask_dc_size = data_provider.ConsumeIntegralInRange&lt;size_t&gt;(1, 100);
 
-    size_t num_images = data_provider.ConsumeIntegralInRange&lt;size_t&gt;(1, 10);
-    for (size_t i = 0; i &lt; num_images; ++i) {
-        size_t width = data_provider.ConsumeIntegralInRange&lt;size_t&gt;(1, 1000);
-        size_t height = data_provider.ConsumeIntegralInRange&lt;size_t&gt;(1, 1000);
-        butteraugli::ImageF image(width, height);
-        for (size_t y = 0; y &lt; height; ++y) {
-            for (size_t x = 0; x &lt; width; ++x) {
-                image.Row(y)[x] = data_provider.ConsumeFloatingPoint&lt;float&gt;();
-            }
-        }
-        mask.push_back(image);
-        mask_dc.push_back(image);
+    std::vector&lt;butteraugli::ImageF&gt; mask(mask_size);
+    std::vector&lt;butteraugli::ImageF&gt; mask_dc(mask_dc_size);
+
+    // Initialize the images with some fuzzed data
+    for (size_t i = 0; i &lt; mask_size; i++) {
+        mask[i] = butteraugli::ImageF(data_provider.ConsumeIntegralInRange&lt;size_t&gt;(1, 100), data_provider.ConsumeIntegralInRange&lt;size_t&gt;(1, 100));
+    }
+    for (size_t i = 0; i &lt; mask_dc_size; i++) {
+        mask_dc[i] = butteraugli::ImageF(data_provider.ConsumeIntegralInRange&lt;size_t&gt;(1, 100), data_provider.ConsumeIntegralInRange&lt;size_t&gt;(1, 100));
     }
 
-    butteraugli::ButteraugliComparator comparator;
+    guetzli::ButteraugliComparator comparator;
+
     comparator.Mask(&amp;mask, &amp;mask_dc);
 
     return 0;
 }
 ```
 
-Changes made:
-1. Adjusted the include path for `butteraugli_comparator.h` to `butteraugli/butteraugli_comparator.h`. Ensure that this path matches the actual location of the header file in your project.
-2. Changed `butteraugli::Image&lt;float&gt;` to `butteraugli::ImageF` to match the correct type used in the `butteraugli` library.
+### Explanation:
 
-Ensure that the `butteraugli` library is correctly set up in your build system so that the header file can be found.
+1. **Include Missing Header**: The error message indicates that the file `butteraugli/butteraugli.h` was not found. Ensure that this file is available in the include path when compiling. If the file is part of a library, make sure the library is correctly installed and the include path is set.
+
+2. **Wrap C Code with `extern &#34;C&#34;`**: The `butteraugli` library is likely written in C, so we wrap its inclusion with `extern &#34;C&#34;` to prevent C++ name mangling.
+
+3. **Full Code**: The full code is provided to ensure that all necessary parts are included and to avoid partial fixes.
+
+### Note:
+
+- Ensure that the `butteraugli` and `guetzli` libraries are installed and available in your include paths.
+- The `butteraugli/butteraugli.h` file must be present in the specified directory structure.
+- If the header file is still not found, you may need to adjust your build system (e.g., CMake, Makefile) to include the correct paths.
 </pre>
 
 
@@ -585,33 +641,42 @@ Below is the code needs to be built:
 #include &lt;vector&gt;
 #include &lt;cstdint&gt;
 #include &lt;cstddef&gt;
-#include &#34;butteraugli/butteraugli_comparator.h&#34; // Adjust the include path based on the actual location of the header file.
+#include &lt;cstdlib&gt;
+#include &lt;cstring&gt;
+#include &lt;iostream&gt;
+#include &lt;algorithm&gt;
+
+extern &#34;C&#34; {
+    #include &#34;butteraugli/butteraugli.h&#34;
+}
+
+#include &#34;guetzli/butteraugli_comparator.h&#34;
+#include &#34;guetzli/output_image.h&#34;
 
 extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    // Initialize the library or any resources within ButteraugliComparator::Mask needed for the fuzzing process here.
     return 0;
 }
 
 extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     FuzzedDataProvider data_provider(data, size);
 
-    std::vector&lt;butteraugli::ImageF&gt; mask;
-    std::vector&lt;butteraugli::ImageF&gt; mask_dc;
+    size_t mask_size = data_provider.ConsumeIntegralInRange&lt;size_t&gt;(1, 100);
+    size_t mask_dc_size = data_provider.ConsumeIntegralInRange&lt;size_t&gt;(1, 100);
 
-    size_t num_images = data_provider.ConsumeIntegralInRange&lt;size_t&gt;(1, 10);
-    for (size_t i = 0; i &lt; num_images; ++i) {
-        size_t width = data_provider.ConsumeIntegralInRange&lt;size_t&gt;(1, 1000);
-        size_t height = data_provider.ConsumeIntegralInRange&lt;size_t&gt;(1, 1000);
-        butteraugli::ImageF image(width, height);
-        for (size_t y = 0; y &lt; height; ++y) {
-            for (size_t x = 0; x &lt; width; ++x) {
-                image.Row(y)[x] = data_provider.ConsumeFloatingPoint&lt;float&gt;();
-            }
-        }
-        mask.push_back(image);
-        mask_dc.push_back(image);
+    std::vector&lt;butteraugli::ImageF&gt; mask(mask_size);
+    std::vector&lt;butteraugli::ImageF&gt; mask_dc(mask_dc_size);
+
+    // Initialize the images with some fuzzed data
+    for (size_t i = 0; i &lt; mask_size; i++) {
+        mask[i] = butteraugli::ImageF(data_provider.ConsumeIntegralInRange&lt;size_t&gt;(1, 100), data_provider.ConsumeIntegralInRange&lt;size_t&gt;(1, 100));
+    }
+    for (size_t i = 0; i &lt; mask_dc_size; i++) {
+        mask_dc[i] = butteraugli::ImageF(data_provider.ConsumeIntegralInRange&lt;size_t&gt;(1, 100), data_provider.ConsumeIntegralInRange&lt;size_t&gt;(1, 100));
     }
 
-    butteraugli::ButteraugliComparator comparator;
+    guetzli::ButteraugliComparator comparator;
+
     comparator.Mask(&amp;mask, &amp;mask_dc);
 
     return 0;
@@ -620,9 +685,9 @@ extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) 
 
 The code has the following build issues:
 &lt;error&gt;
-fuzz_target.cc:5:10: fatal error: &#39;butteraugli/butteraugli_comparator.h&#39; file not found
-    5 | #include &#34;butteraugli/butteraugli_comparator.h&#34; // Adjust the include path based on the actual location of the header file.
-      |          ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+fuzz_target.cc:11:14: fatal error: &#39;butteraugli/butteraugli.h&#39; file not found
+   11 |     #include &#34;butteraugli/butteraugli.h&#34;
+      |              ^~~~~~~~~~~~~~~~~~~~~~~~~~~
 &lt;/error&gt;
 
 Fix code:
@@ -638,56 +703,61 @@ It&#39;s important to show the complete code, not only the fixed line.
 <h3>Code #5</h3>
 
 <pre>
-Certainly! To fix the build error, we need to ensure that the header file for `butteraugli_comparator.h` is correctly included. If the file is not found, it usually means the path is incorrect or the file is missing. Assuming the file exists but the path is incorrect, we need to adjust the include path.
-
-Additionally, we need to ensure that all necessary libraries are included and that the code is wrapped with `extern &#34;C&#34;` where required.
-
-Here&#39;s the complete fixed code:
+Here is the complete code with the necessary fixes applied:
 
 ```cpp
 #include &lt;fuzzer/FuzzedDataProvider.h&gt;
 #include &lt;vector&gt;
 #include &lt;cstdint&gt;
 #include &lt;cstddef&gt;
-#include &#34;butteraugli/butteraugli.h&#34; // Adjust the include path based on the actual location of the header file.
+#include &lt;cstdlib&gt;
+#include &lt;cstring&gt;
+#include &lt;iostream&gt;
+#include &lt;algorithm&gt;
+
+extern &#34;C&#34; {
+    #include &#34;butteraugli/butteraugli.h&#34;
+}
+
+#include &#34;guetzli/butteraugli_comparator.h&#34;
+#include &#34;guetzli/output_image.h&#34;
 
 extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    // Initialize the library or any resources within ButteraugliComparator::Mask needed for the fuzzing process here.
     return 0;
 }
 
 extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     FuzzedDataProvider data_provider(data, size);
 
-    std::vector&lt;butteraugli::ImageF&gt; mask;
-    std::vector&lt;butteraugli::ImageF&gt; mask_dc;
+    size_t mask_size = data_provider.ConsumeIntegralInRange&lt;size_t&gt;(1, 100);
+    size_t mask_dc_size = data_provider.ConsumeIntegralInRange&lt;size_t&gt;(1, 100);
 
-    size_t num_images = data_provider.ConsumeIntegralInRange&lt;size_t&gt;(1, 10);
-    for (size_t i = 0; i &lt; num_images; ++i) {
-        size_t width = data_provider.ConsumeIntegralInRange&lt;size_t&gt;(1, 1000);
-        size_t height = data_provider.ConsumeIntegralInRange&lt;size_t&gt;(1, 1000);
-        butteraugli::ImageF image(width, height);
-        for (size_t y = 0; y &lt; height; ++y) {
-            for (size_t x = 0; x &lt; width; ++x) {
-                image.Row(y)[x] = data_provider.ConsumeFloatingPoint&lt;float&gt;();
-            }
-        }
-        mask.push_back(image);
-        mask_dc.push_back(image);
+    std::vector&lt;butteraugli::ImageF&gt; mask(mask_size);
+    std::vector&lt;butteraugli::ImageF&gt; mask_dc(mask_dc_size);
+
+    // Initialize the images with some fuzzed data
+    for (size_t i = 0; i &lt; mask_size; i++) {
+        mask[i] = butteraugli::ImageF(data_provider.ConsumeIntegralInRange&lt;size_t&gt;(1, 100), data_provider.ConsumeIntegralInRange&lt;size_t&gt;(1, 100));
+    }
+    for (size_t i = 0; i &lt; mask_dc_size; i++) {
+        mask_dc[i] = butteraugli::ImageF(data_provider.ConsumeIntegralInRange&lt;size_t&gt;(1, 100), data_provider.ConsumeIntegralInRange&lt;size_t&gt;(1, 100));
     }
 
-    butteraugli::ButteraugliComparator comparator;
+    guetzli::ButteraugliComparator comparator;
+
     comparator.Mask(&amp;mask, &amp;mask_dc);
 
     return 0;
 }
 ```
 
-### Explanation:
-1. **Include Path Adjustment**: The error message indicates that `butteraugli/butteraugli_comparator.h` was not found. Assuming the correct path is `butteraugli/butteraugli.h`, I have adjusted the include statement accordingly.
-2. **Library Inclusions**: Ensure that all necessary libraries are included. In this case, `butteraugli.h` should include all necessary declarations.
-3. **`extern &#34;C&#34;` Wrapping**: The `LLVMFuzzerInitialize` and `LLVMFuzzerTestOneInput` functions are correctly wrapped with `extern &#34;C&#34;` to prevent name mangling when linking with C code.
+### Explanation of Fixes:
+1. **Include Missing Header File**: The error message indicates that the file `butteraugli/butteraugli.h` was not found. Ensure that the Butteraugli library is correctly installed and that the include path is set properly in your build system (e.g., using `-I/path/to/butteraugli` in your compiler flags).
 
-This should resolve the build error and allow the code to compile for fuzzing. If the header file path is still incorrect, you may need to locate the correct path or ensure the file is present in your project directory.
+2. **Wrap C Headers with `extern &#34;C&#34;`**: Since `butteraugli.h` is a C header, it needs to be wrapped with `extern &#34;C&#34;` to prevent name mangling when included in C++ code.
+
+3. **Initialization and Fuzzing**: The code initializes the `ButteraugliComparator` and uses fuzzed data to create `ImageF` objects, which are then passed to the `Mask` function. This ensures that the function under test receives non-null input, maximizing the effectiveness of the fuzzing process.
 </pre>
 
 

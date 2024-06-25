@@ -40,12 +40,12 @@ tbody tr:nth-child(odd) {
 }
 </style>
 <body>
-    LLM:
-
+    LLM: 
+    
 <h1>output-jsonnet-jsonnet_evaluate_file / 02</h1>
 Bug: False
 <br>
-Crash reason: -
+Crash reason: NO_SEMANTIC_ERR
 <br>
 <br>
 
@@ -57,31 +57,35 @@ Crash reason: -
 <pre>
 #include &lt;fuzzer/FuzzedDataProvider.h&gt;
 #include &lt;string&gt;
-#include &#34;libjsonnet.h&#34; // Ensure the correct header file is included for the function declaration
+#include &lt;vector&gt;
+#include &lt;cstdint&gt;
+#include &lt;cstddef&gt;
+#include &lt;cstdlib&gt;
+#include &lt;cstring&gt;
+#include &lt;iostream&gt;
+#include &lt;sstream&gt;
+#include &lt;algorithm&gt;
+#include &lt;iterator&gt;
+#include &lt;cctype&gt;
 
-extern &#34;C&#34; {
-    #include &#34;libjsonnet.h&#34; // Ensure the correct header file is included for the function declaration
+extern &#34;C&#34; { 
+#include &#34;/src/jsonnet/include/libjsonnet.h&#34;
 }
 
 extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
-    // Initialize the library or any resources `jsonnet_evaluate_file` within the `jsonnet` project needs for the fuzzing process.
     return 0;
 }
 
 extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
-    FuzzedDataProvider fuzzed_data(data, size);
+    FuzzedDataProvider dataProvider(data, size);
 
-    JsonnetVm *vm = jsonnet_make();
-    if (vm == nullptr) {
-        return 0;
-    }
+    struct JsonnetVm *vm = jsonnet_make();
 
-    std::string filename_str = fuzzed_data.ConsumeRandomLengthString(size);
-    const char *filename = filename_str.c_str();
+    std::string filename = dataProvider.ConsumeRandomLengthString(size);
 
     int error = 0;
 
-    char *result = jsonnet_evaluate_file(vm, filename, &amp;error);
+    char *result = jsonnet_evaluate_file(vm, filename.c_str(), &amp;error);
 
     if (result != nullptr) {
         jsonnet_realloc(vm, result, 0);
@@ -91,679 +95,163 @@ extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) 
 
     return 0;
 }
-</pre>
-
-
-<h3>Fixer prompt #1</h3>
-<pre>
-
-Given the following C++ fuzz harness and its build error message, fix the code to make it build for fuzzing.
-
-If there is undeclared identifier or unknown type name error, fix it by finding and including the related libraries.
-
-Note that some code may need to be wrapped with &lt;code&gt;extern &#34;C&#34;&lt;/code&gt; as their source is C program.
-
-MUST RETURN THE FULL CODE, INCLUDING UNCHANGED PARTS.
-EXTREMELY IMPORTANT: AVOID USING &lt;code&gt;goto&lt;/code&gt;. If you have to write code using &lt;code&gt;goto&lt;/code&gt;, you MUST MUST also declare all variables BEFORE the &lt;code&gt;goto&lt;/code&gt;. Never introduce new variables after the &lt;code&gt;goto&lt;/code&gt;.
-
-Below is the code needs to be built:
-&lt;code&gt;
-#include &lt;fuzzer/FuzzedDataProvider.h&gt;
-#include &#34;libjsonnet.h&#34; // Ensure the correct header file is included for the function declaration
-
-extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
-    // Initialize the library or any resources `jsonnet_evaluate_file` within the `jsonnet` project needs for the fuzzing process.
-    return 0;
-}
-
-extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
-    FuzzedDataProvider fuzzed_data(data, size);
-
-    JsonnetVm *vm = jsonnet_make();
-    if (vm == nullptr) {
-        return 0;
-    }
-
-    std::string filename_str = fuzzed_data.ConsumeRandomLengthString();
-    const char *filename = filename_str.c_str();
-
-    int error = 0;
-
-    char *result = jsonnet_evaluate_file(vm, filename, &amp;error);
-
-    if (result != nullptr) {
-        jsonnet_realloc(vm, result, 0);
-    }
-
-    jsonnet_destroy(vm);
-
-    return 0;
-}
-&lt;/code&gt;
-
-The code has the following build issues:
-&lt;error&gt;
-convert_jsonnet_fuzzer_regular.cc:(.text.LLVMFuzzerTestOneInput[LLVMFuzzerTestOneInput]+0x10c): undefined reference to `jsonnet_make()&#39;
-/usr/bin/ld: convert_jsonnet_fuzzer_regular.cc:(.text.LLVMFuzzerTestOneInput[LLVMFuzzerTestOneInput]+0x1ee): undefined reference to `jsonnet_evaluate_file(JsonnetVm*, char const*, int*)&#39;
-/usr/bin/ld: convert_jsonnet_fuzzer_regular.cc:(.text.LLVMFuzzerTestOneInput[LLVMFuzzerTestOneInput]+0x206): undefined reference to `jsonnet_realloc(JsonnetVm*, char*, unsigned long)&#39;
-/usr/bin/ld: convert_jsonnet_fuzzer_regular.cc:(.text.LLVMFuzzerTestOneInput[LLVMFuzzerTestOneInput]+0x21c): undefined reference to `jsonnet_destroy(JsonnetVm*)&#39;
-&lt;/error&gt;
-
-Fix code:
-1. Consider possible solutions for the issues listed above.
-2. Choose a solution that can maximize fuzzing result, which is utilizing the function under test and feeding it not null input.
-3. Apply the solutions to the original code.
-It&#39;s important to show the complete code, not only the fixed line.
-&lt;solution&gt;
-</pre>
-
-
-
-<h3>Code #1</h3>
-
-<pre>
-Here is the fixed code to resolve the build issues:
-
-```cpp
-#include &lt;fuzzer/FuzzedDataProvider.h&gt;
-#include &lt;string&gt;
-#include &#34;libjsonnet.h&#34; // Ensure the correct header file is included for the function declaration
-
-extern &#34;C&#34; {
-    JsonnetVm* jsonnet_make();
-    char* jsonnet_evaluate_file(JsonnetVm* vm, const char* filename, int* error);
-    void jsonnet_realloc(JsonnetVm* vm, char* str, unsigned long n);
-    void jsonnet_destroy(JsonnetVm* vm);
-}
-
-extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
-    // Initialize the library or any resources `jsonnet_evaluate_file` within the `jsonnet` project needs for the fuzzing process.
-    return 0;
-}
-
-extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
-    FuzzedDataProvider fuzzed_data(data, size);
-
-    JsonnetVm *vm = jsonnet_make();
-    if (vm == nullptr) {
-        return 0;
-    }
-
-    std::string filename_str = fuzzed_data.ConsumeRandomLengthString();
-    const char *filename = filename_str.c_str();
-
-    int error = 0;
-
-    char *result = jsonnet_evaluate_file(vm, filename, &amp;error);
-
-    if (result != nullptr) {
-        jsonnet_realloc(vm, result, 0);
-    }
-
-    jsonnet_destroy(vm);
-
-    return 0;
-}
-```
-
-### Explanation:
-1. **Include `&lt;string&gt;`**: The `std::string` type is used in the code, so we need to include the `&lt;string&gt;` header.
-2. **Wrap C functions with `extern &#34;C&#34;`**: The functions `jsonnet_make`, `jsonnet_evaluate_file`, `jsonnet_realloc`, and `jsonnet_destroy` are C functions. Wrapping their declarations with `extern &#34;C&#34;` ensures proper linkage.
-3. **Ensure proper header inclusion**: The `libjsonnet.h` header is included, which should contain the declarations for the `jsonnet` functions.
-
-This should resolve the undefined reference errors and make the code build successfully for fuzzing.
-</pre>
-
-
-<h3>Fixer prompt #2</h3>
-<pre>
-
-Given the following C++ fuzz harness and its build error message, fix the code to make it build for fuzzing.
-
-If there is undeclared identifier or unknown type name error, fix it by finding and including the related libraries.
-
-Note that some code may need to be wrapped with &lt;code&gt;extern &#34;C&#34;&lt;/code&gt; as their source is C program.
-
-MUST RETURN THE FULL CODE, INCLUDING UNCHANGED PARTS.
-EXTREMELY IMPORTANT: AVOID USING &lt;code&gt;goto&lt;/code&gt;. If you have to write code using &lt;code&gt;goto&lt;/code&gt;, you MUST MUST also declare all variables BEFORE the &lt;code&gt;goto&lt;/code&gt;. Never introduce new variables after the &lt;code&gt;goto&lt;/code&gt;.
-
-Below is the code needs to be built:
-&lt;code&gt;
-#include &lt;fuzzer/FuzzedDataProvider.h&gt;
-#include &lt;string&gt;
-#include &#34;libjsonnet.h&#34; // Ensure the correct header file is included for the function declaration
-
-extern &#34;C&#34; {
-    JsonnetVm* jsonnet_make();
-    char* jsonnet_evaluate_file(JsonnetVm* vm, const char* filename, int* error);
-    void jsonnet_realloc(JsonnetVm* vm, char* str, unsigned long n);
-    void jsonnet_destroy(JsonnetVm* vm);
-}
-
-extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
-    // Initialize the library or any resources `jsonnet_evaluate_file` within the `jsonnet` project needs for the fuzzing process.
-    return 0;
-}
-
-extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
-    FuzzedDataProvider fuzzed_data(data, size);
-
-    JsonnetVm *vm = jsonnet_make();
-    if (vm == nullptr) {
-        return 0;
-    }
-
-    std::string filename_str = fuzzed_data.ConsumeRandomLengthString();
-    const char *filename = filename_str.c_str();
-
-    int error = 0;
-
-    char *result = jsonnet_evaluate_file(vm, filename, &amp;error);
-
-    if (result != nullptr) {
-        jsonnet_realloc(vm, result, 0);
-    }
-
-    jsonnet_destroy(vm);
-
-    return 0;
-}
-&lt;/code&gt;
-
-The code has the following build issues:
-&lt;error&gt;
-convert_jsonnet_fuzzer_regular.cc:6:16: error: declaration of &#39;jsonnet_make&#39; has a different language linkage
-    6 |     JsonnetVm* jsonnet_make();
-      |                ^
-/src/jsonnet/include/libjsonnet.h:46:19: note: previous declaration is here
-   46 | struct JsonnetVm *jsonnet_make(void);
-      |                   ^
-convert_jsonnet_fuzzer_regular.cc:7:11: error: declaration of &#39;jsonnet_evaluate_file&#39; has a different language linkage
-    7 |     char* jsonnet_evaluate_file(JsonnetVm* vm, const char* filename, int* error);
-      |           ^
-/src/jsonnet/include/libjsonnet.h:232:7: note: previous declaration is here
-  232 | char *jsonnet_evaluate_file(struct JsonnetVm *vm, const char *filename, int *error);
-      |       ^
-convert_jsonnet_fuzzer_regular.cc:8:10: error: functions that differ only in their return type cannot be overloaded
-    8 |     void jsonnet_realloc(JsonnetVm* vm, char* str, unsigned long n);
-      |     ~~~~ ^
-/src/jsonnet/include/libjsonnet.h:169:7: note: previous declaration is here
-  169 | char *jsonnet_realloc(struct JsonnetVm *vm, char *buf, size_t sz);
-      | ~~~~~~^
-convert_jsonnet_fuzzer_regular.cc:9:10: error: declaration of &#39;jsonnet_destroy&#39; has a different language linkage
-    9 |     void jsonnet_destroy(JsonnetVm* vm);
-      |          ^
-/src/jsonnet/include/libjsonnet.h:295:6: note: previous declaration is here
-  295 | void jsonnet_destroy(struct JsonnetVm *vm);
-      |      ^
-convert_jsonnet_fuzzer_regular.cc:30:20: error: call to &#39;jsonnet_evaluate_file&#39; is ambiguous
-   30 |     char *result = jsonnet_evaluate_file(vm, filename, &amp;error);
-      |                    ^~~~~~~~~~~~~~~~~~~~~
-/src/jsonnet/include/libjsonnet.h:232:7: note: candidate function
-  232 | char *jsonnet_evaluate_file(struct JsonnetVm *vm, const char *filename, int *error);
-      |       ^
-convert_jsonnet_fuzzer_regular.cc:7:11: note: candidate function
-    7 |     char* jsonnet_evaluate_file(JsonnetVm* vm, const char* filename, int* error);
-      |           ^
-convert_jsonnet_fuzzer_regular.cc:33:9: error: call to &#39;jsonnet_realloc&#39; is ambiguous
-   33 |         jsonnet_realloc(vm, result, 0);
-      |         ^~~~~~~~~~~~~~~
-/src/jsonnet/include/libjsonnet.h:169:7: note: candidate function
-  169 | char *jsonnet_realloc(struct JsonnetVm *vm, char *buf, size_t sz);
-      |       ^
-convert_jsonnet_fuzzer_regular.cc:8:10: note: candidate function
-    8 |     void jsonnet_realloc(JsonnetVm* vm, char* str, unsigned long n);
-      |          ^
-convert_jsonnet_fuzzer_regular.cc:36:5: error: call to &#39;jsonnet_destroy&#39; is ambiguous
-   36 |     jsonnet_destroy(vm);
-      |     ^~~~~~~~~~~~~~~
-/src/jsonnet/include/libjsonnet.h:295:6: note: candidate function
-  295 | void jsonnet_destroy(struct JsonnetVm *vm);
-      |      ^
-convert_jsonnet_fuzzer_regular.cc:9:10: note: candidate function
-    9 |     void jsonnet_destroy(JsonnetVm* vm);
-      |          ^
-&lt;/error&gt;
-
-Fix code:
-1. Consider possible solutions for the issues listed above.
-2. Choose a solution that can maximize fuzzing result, which is utilizing the function under test and feeding it not null input.
-3. Apply the solutions to the original code.
-It&#39;s important to show the complete code, not only the fixed line.
-&lt;solution&gt;
-</pre>
-
-
-
-<h3>Code #2</h3>
-
-<pre>
-Here is the fixed code:
-
-```cpp
-#include &lt;fuzzer/FuzzedDataProvider.h&gt;
-#include &lt;string&gt;
-#include &#34;libjsonnet.h&#34; // Ensure the correct header file is included for the function declaration
-
-extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
-    // Initialize the library or any resources `jsonnet_evaluate_file` within the `jsonnet` project needs for the fuzzing process.
-    return 0;
-}
-
-extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
-    FuzzedDataProvider fuzzed_data(data, size);
-
-    JsonnetVm *vm = jsonnet_make();
-    if (vm == nullptr) {
-        return 0;
-    }
-
-    std::string filename_str = fuzzed_data.ConsumeRandomLengthString();
-    const char *filename = filename_str.c_str();
-
-    int error = 0;
-
-    char *result = jsonnet_evaluate_file(vm, filename, &amp;error);
-
-    if (result != nullptr) {
-        jsonnet_realloc(vm, result, 0);
-    }
-
-    jsonnet_destroy(vm);
-
-    return 0;
-}
-```
-
-### Explanation of Changes:
-1. **Removed the redundant function declarations**:
-   - The functions `jsonnet_make`, `jsonnet_evaluate_file`, `jsonnet_realloc`, and `jsonnet_destroy` were already declared in the included `libjsonnet.h` header file. Redefining them in the code with different language linkage caused the errors.
-   - By removing these redundant declarations, we rely on the correct declarations from the header file, which resolves the linkage issues.
-
-2. **Ensured the correct usage of `jsonnet_realloc`**:
-   - The original code had a mismatch in the return type of `jsonnet_realloc`. The correct return type is `char *`, not `void`.
-
-By making these changes, the code should now compile correctly and be ready for fuzzing.
-</pre>
-
-
-<h3>Fixer prompt #3</h3>
-<pre>
-
-Given the following C++ fuzz harness and its build error message, fix the code to make it build for fuzzing.
-
-If there is undeclared identifier or unknown type name error, fix it by finding and including the related libraries.
-
-Note that some code may need to be wrapped with &lt;code&gt;extern &#34;C&#34;&lt;/code&gt; as their source is C program.
-
-MUST RETURN THE FULL CODE, INCLUDING UNCHANGED PARTS.
-EXTREMELY IMPORTANT: AVOID USING &lt;code&gt;goto&lt;/code&gt;. If you have to write code using &lt;code&gt;goto&lt;/code&gt;, you MUST MUST also declare all variables BEFORE the &lt;code&gt;goto&lt;/code&gt;. Never introduce new variables after the &lt;code&gt;goto&lt;/code&gt;.
-
-Below is the code needs to be built:
-&lt;code&gt;
-#include &lt;fuzzer/FuzzedDataProvider.h&gt;
-#include &lt;string&gt;
-#include &#34;libjsonnet.h&#34; // Ensure the correct header file is included for the function declaration
-
-extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
-    // Initialize the library or any resources `jsonnet_evaluate_file` within the `jsonnet` project needs for the fuzzing process.
-    return 0;
-}
-
-extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
-    FuzzedDataProvider fuzzed_data(data, size);
-
-    JsonnetVm *vm = jsonnet_make();
-    if (vm == nullptr) {
-        return 0;
-    }
-
-    std::string filename_str = fuzzed_data.ConsumeRandomLengthString();
-    const char *filename = filename_str.c_str();
-
-    int error = 0;
-
-    char *result = jsonnet_evaluate_file(vm, filename, &amp;error);
-
-    if (result != nullptr) {
-        jsonnet_realloc(vm, result, 0);
-    }
-
-    jsonnet_destroy(vm);
-
-    return 0;
-}
-&lt;/code&gt;
-
-The code has the following build issues:
-&lt;error&gt;
-convert_jsonnet_fuzzer_regular.cc:(.text.LLVMFuzzerTestOneInput[LLVMFuzzerTestOneInput]+0x10c): undefined reference to `jsonnet_make()&#39;
-/usr/bin/ld: convert_jsonnet_fuzzer_regular.cc:(.text.LLVMFuzzerTestOneInput[LLVMFuzzerTestOneInput]+0x1ee): undefined reference to `jsonnet_evaluate_file(JsonnetVm*, char const*, int*)&#39;
-/usr/bin/ld: convert_jsonnet_fuzzer_regular.cc:(.text.LLVMFuzzerTestOneInput[LLVMFuzzerTestOneInput]+0x206): undefined reference to `jsonnet_realloc(JsonnetVm*, char*, unsigned long)&#39;
-/usr/bin/ld: convert_jsonnet_fuzzer_regular.cc:(.text.LLVMFuzzerTestOneInput[LLVMFuzzerTestOneInput]+0x21c): undefined reference to `jsonnet_destroy(JsonnetVm*)&#39;
-&lt;/error&gt;
-
-Fix code:
-1. Consider possible solutions for the issues listed above.
-2. Choose a solution that can maximize fuzzing result, which is utilizing the function under test and feeding it not null input.
-3. Apply the solutions to the original code.
-It&#39;s important to show the complete code, not only the fixed line.
-&lt;solution&gt;
-</pre>
-
-
-
-<h3>Code #3</h3>
-
-<pre>
-Here&#39;s the fixed code with the necessary includes and corrections to address the build issues:
-
-```cpp
-#include &lt;fuzzer/FuzzedDataProvider.h&gt;
-#include &lt;string&gt;
-#include &#34;libjsonnet.h&#34; // Ensure the correct header file is included for the function declaration
-
-extern &#34;C&#34; {
-    #include &#34;libjsonnet.h&#34; // Ensure the correct header file is included for the function declaration
-}
-
-extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
-    // Initialize the library or any resources `jsonnet_evaluate_file` within the `jsonnet` project needs for the fuzzing process.
-    return 0;
-}
-
-extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
-    FuzzedDataProvider fuzzed_data(data, size);
-
-    JsonnetVm *vm = jsonnet_make();
-    if (vm == nullptr) {
-        return 0;
-    }
-
-    std::string filename_str = fuzzed_data.ConsumeRandomLengthString(size);
-    const char *filename = filename_str.c_str();
-
-    int error = 0;
-
-    char *result = jsonnet_evaluate_file(vm, filename, &amp;error);
-
-    if (result != nullptr) {
-        jsonnet_realloc(vm, result, 0);
-    }
-
-    jsonnet_destroy(vm);
-
-    return 0;
-}
-```
-
-### Explanation of Changes:
-1. **Include the C Header in `extern &#34;C&#34;` block**: The functions from `libjsonnet.h` are C functions, so they need to be wrapped in an `extern &#34;C&#34;` block to avoid name mangling.
-2. **Correct the `ConsumeRandomLengthString` Call**: The `ConsumeRandomLengthString` function requires a size parameter to limit the length of the string. This ensures that the string length is within the bounds of the provided data.
-
-### Additional Notes:
-- Ensure that the `libjsonnet` library is correctly linked during the build process. This typically involves specifying the library path and name in the linker flags, for example: `-ljsonnet`.
-- The `jsonnet_realloc` function is used to free the result memory. The `jsonnet_realloc(vm, result, 0);` call is correct for this purpose.
-</pre>
-
-
-<h3>Fixer prompt #4</h3>
-<pre>
-
-Given the following C++ fuzz harness and its build error message, fix the code to make it build for fuzzing.
-
-If there is undeclared identifier or unknown type name error, fix it by finding and including the related libraries.
-
-Note that some code may need to be wrapped with &lt;code&gt;extern &#34;C&#34;&lt;/code&gt; as their source is C program.
-
-MUST RETURN THE FULL CODE, INCLUDING UNCHANGED PARTS.
-EXTREMELY IMPORTANT: AVOID USING &lt;code&gt;goto&lt;/code&gt;. If you have to write code using &lt;code&gt;goto&lt;/code&gt;, you MUST MUST also declare all variables BEFORE the &lt;code&gt;goto&lt;/code&gt;. Never introduce new variables after the &lt;code&gt;goto&lt;/code&gt;.
-
-Below is the code needs to be built:
-&lt;code&gt;
-#include &lt;fuzzer/FuzzedDataProvider.h&gt;
-#include &lt;string&gt;
-#include &#34;libjsonnet.h&#34; // Ensure the correct header file is included for the function declaration
-
-extern &#34;C&#34; {
-    #include &#34;libjsonnet.h&#34; // Ensure the correct header file is included for the function declaration
-}
-
-extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
-    // Initialize the library or any resources `jsonnet_evaluate_file` within the `jsonnet` project needs for the fuzzing process.
-    return 0;
-}
-
-extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
-    FuzzedDataProvider fuzzed_data(data, size);
-
-    JsonnetVm *vm = jsonnet_make();
-    if (vm == nullptr) {
-        return 0;
-    }
-
-    std::string filename_str = fuzzed_data.ConsumeRandomLengthString(size);
-    const char *filename = filename_str.c_str();
-
-    int error = 0;
-
-    char *result = jsonnet_evaluate_file(vm, filename, &amp;error);
-
-    if (result != nullptr) {
-        jsonnet_realloc(vm, result, 0);
-    }
-
-    jsonnet_destroy(vm);
-
-    return 0;
-}
-&lt;/code&gt;
-
-The code has the following build issues:
-&lt;error&gt;
-convert_jsonnet_fuzzer_regular.cc:(.text.LLVMFuzzerTestOneInput[LLVMFuzzerTestOneInput]+0x10b): undefined reference to `jsonnet_make()&#39;
-/usr/bin/ld: convert_jsonnet_fuzzer_regular.cc:(.text.LLVMFuzzerTestOneInput[LLVMFuzzerTestOneInput]+0x1e6): undefined reference to `jsonnet_evaluate_file(JsonnetVm*, char const*, int*)&#39;
-/usr/bin/ld: convert_jsonnet_fuzzer_regular.cc:(.text.LLVMFuzzerTestOneInput[LLVMFuzzerTestOneInput]+0x1ff): undefined reference to `jsonnet_realloc(JsonnetVm*, char*, unsigned long)&#39;
-/usr/bin/ld: convert_jsonnet_fuzzer_regular.cc:(.text.LLVMFuzzerTestOneInput[LLVMFuzzerTestOneInput]+0x216): undefined reference to `jsonnet_destroy(JsonnetVm*)&#39;
-&lt;/error&gt;
-
-Fix code:
-1. Consider possible solutions for the issues listed above.
-2. Choose a solution that can maximize fuzzing result, which is utilizing the function under test and feeding it not null input.
-3. Apply the solutions to the original code.
-It&#39;s important to show the complete code, not only the fixed line.
-&lt;solution&gt;
-</pre>
-
-
-
-<h3>Code #4</h3>
-
-<pre>
-Here is the fixed code with the necessary changes to make it build for fuzzing:
-
-```cpp
-#include &lt;fuzzer/FuzzedDataProvider.h&gt;
-#include &lt;string&gt;
-#include &#34;libjsonnet.h&#34; // Ensure the correct header file is included for the function declaration
-
-extern &#34;C&#34; {
-    #include &#34;libjsonnet.h&#34; // Ensure the correct header file is included for the function declaration
-}
-
-extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
-    // Initialize the library or any resources `jsonnet_evaluate_file` within the `jsonnet` project needs for the fuzzing process.
-    return 0;
-}
-
-extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
-    FuzzedDataProvider fuzzed_data(data, size);
-
-    JsonnetVm *vm = jsonnet_make();
-    if (vm == nullptr) {
-        return 0;
-    }
-
-    std::string filename_str = fuzzed_data.ConsumeRandomLengthString(size);
-    const char *filename = filename_str.c_str();
-
-    int error = 0;
-
-    char *result = jsonnet_evaluate_file(vm, filename, &amp;error);
-
-    if (result != nullptr) {
-        jsonnet_realloc(vm, result, 0);
-    }
-
-    jsonnet_destroy(vm);
-
-    return 0;
-}
-```
-
-The key changes are:
-1. Ensure that the `libjsonnet.h` header file is correctly included within the `extern &#34;C&#34;` block to resolve the undefined reference errors.
-2. No changes are needed for the logic itself as it correctly uses the functions from the `libjsonnet` library.
-
-This should resolve the build issues and allow the code to be compiled and used for fuzzing.
-</pre>
-
-
-<h3>Fixer prompt #5</h3>
-<pre>
-
-Given the following C++ fuzz harness and its build error message, fix the code to make it build for fuzzing.
-
-If there is undeclared identifier or unknown type name error, fix it by finding and including the related libraries.
-
-Note that some code may need to be wrapped with &lt;code&gt;extern &#34;C&#34;&lt;/code&gt; as their source is C program.
-
-MUST RETURN THE FULL CODE, INCLUDING UNCHANGED PARTS.
-EXTREMELY IMPORTANT: AVOID USING &lt;code&gt;goto&lt;/code&gt;. If you have to write code using &lt;code&gt;goto&lt;/code&gt;, you MUST MUST also declare all variables BEFORE the &lt;code&gt;goto&lt;/code&gt;. Never introduce new variables after the &lt;code&gt;goto&lt;/code&gt;.
-
-Below is the code needs to be built:
-&lt;code&gt;
-#include &lt;fuzzer/FuzzedDataProvider.h&gt;
-#include &lt;string&gt;
-#include &#34;libjsonnet.h&#34; // Ensure the correct header file is included for the function declaration
-
-extern &#34;C&#34; {
-    #include &#34;libjsonnet.h&#34; // Ensure the correct header file is included for the function declaration
-}
-
-extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
-    // Initialize the library or any resources `jsonnet_evaluate_file` within the `jsonnet` project needs for the fuzzing process.
-    return 0;
-}
-
-extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
-    FuzzedDataProvider fuzzed_data(data, size);
-
-    JsonnetVm *vm = jsonnet_make();
-    if (vm == nullptr) {
-        return 0;
-    }
-
-    std::string filename_str = fuzzed_data.ConsumeRandomLengthString(size);
-    const char *filename = filename_str.c_str();
-
-    int error = 0;
-
-    char *result = jsonnet_evaluate_file(vm, filename, &amp;error);
-
-    if (result != nullptr) {
-        jsonnet_realloc(vm, result, 0);
-    }
-
-    jsonnet_destroy(vm);
-
-    return 0;
-}
-&lt;/code&gt;
-
-The code has the following build issues:
-&lt;error&gt;
-convert_jsonnet_fuzzer_regular.cc:(.text.LLVMFuzzerTestOneInput[LLVMFuzzerTestOneInput]+0x10b): undefined reference to `jsonnet_make()&#39;
-/usr/bin/ld: convert_jsonnet_fuzzer_regular.cc:(.text.LLVMFuzzerTestOneInput[LLVMFuzzerTestOneInput]+0x1e6): undefined reference to `jsonnet_evaluate_file(JsonnetVm*, char const*, int*)&#39;
-/usr/bin/ld: convert_jsonnet_fuzzer_regular.cc:(.text.LLVMFuzzerTestOneInput[LLVMFuzzerTestOneInput]+0x1ff): undefined reference to `jsonnet_realloc(JsonnetVm*, char*, unsigned long)&#39;
-/usr/bin/ld: convert_jsonnet_fuzzer_regular.cc:(.text.LLVMFuzzerTestOneInput[LLVMFuzzerTestOneInput]+0x216): undefined reference to `jsonnet_destroy(JsonnetVm*)&#39;
-&lt;/error&gt;
-
-Fix code:
-1. Consider possible solutions for the issues listed above.
-2. Choose a solution that can maximize fuzzing result, which is utilizing the function under test and feeding it not null input.
-3. Apply the solutions to the original code.
-It&#39;s important to show the complete code, not only the fixed line.
-&lt;solution&gt;
-</pre>
-
-
-
-<h3>Code #5</h3>
-
-<pre>
-Here is the complete fixed code:
-
-```cpp
-#include &lt;fuzzer/FuzzedDataProvider.h&gt;
-#include &lt;string&gt;
-#include &#34;libjsonnet.h&#34; // Ensure the correct header file is included for the function declaration
-
-extern &#34;C&#34; {
-    #include &#34;libjsonnet.h&#34; // Ensure the correct header file is included for the function declaration
-}
-
-extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
-    // Initialize the library or any resources `jsonnet_evaluate_file` within the `jsonnet` project needs for the fuzzing process.
-    return 0;
-}
-
-extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
-    FuzzedDataProvider fuzzed_data(data, size);
-
-    JsonnetVm *vm = jsonnet_make();
-    if (vm == nullptr) {
-        return 0;
-    }
-
-    std::string filename_str = fuzzed_data.ConsumeRandomLengthString(size);
-    const char *filename = filename_str.c_str();
-
-    int error = 0;
-
-    char *result = jsonnet_evaluate_file(vm, filename, &amp;error);
-
-    if (result != nullptr) {
-        jsonnet_realloc(vm, result, 0);
-    }
-
-    jsonnet_destroy(vm);
-
-    return 0;
-}
-```
-
-Explanation of the fixes:
-1. Included the `libjsonnet.h` header file inside the `extern &#34;C&#34;` block to ensure that the C functions are correctly linked.
-2. Ensured that the `extern &#34;C&#34;` block is correctly placed to wrap the inclusion of the `libjsonnet.h` header file and the function declarations.
-
-This should resolve the undefined reference errors and allow the code to build correctly for fuzzing.
 </pre>
 
 
 <h2>Logs</h2>
 <pre>
-Fixing /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-jsonnet-jsonnet_evaluate_file/fixed_targets/02.cc with gpt-4o, attempt 1.
-Fixing /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-jsonnet-jsonnet_evaluate_file/fixed_targets/02.cc with gpt-4o, attempt 2.
-Fixing /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-jsonnet-jsonnet_evaluate_file/fixed_targets/02.cc with gpt-4o, attempt 3.
-Fixing /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-jsonnet-jsonnet_evaluate_file/fixed_targets/02.cc with gpt-4o, attempt 4.
-Fixing /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-jsonnet-jsonnet_evaluate_file/fixed_targets/02.cc with gpt-4o, attempt 5.
-Failed to build /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-jsonnet-jsonnet_evaluate_file/fixed_targets/02.cc with gpt-4o in 5 iterations of fixing.
+Successfully built /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-jsonnet-jsonnet_evaluate_file/fixed_targets/02.cc with gpt-4o in 0 iterations of fixing.
+Result for jsonnet-jsonnet_evaluate_file-02: crashes=False, coverage=0.006036817701877611 (263/43566), coverage diff=0.000929520476789327 (17/18289)
 
 </pre>
 
 <h2>Run logs</h2>
 <pre>
+INFO:__main__:Running: docker run --rm --privileged --shm-size=2g --platform linux/amd64 -e FUZZING_ENGINE=libfuzzer -e SANITIZER=address -e RUN_FUZZER_MODE=interactive -e HELPER=True -v /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-jsonnet-jsonnet_evaluate_file/corpora/02.cc:/tmp/convert_jsonnet_fuzzer_regular_corpus -v /tmp/tmpzsjfth50/build/out/jsonnet-jsonnet_evaluate_file-02:/out -t gcr.io/oss-fuzz-base/base-runner run_fuzzer convert_jsonnet_fuzzer_regular -print_final_stats=1 -max_total_time=30 -len_control=0 -timeout=30.
+vm.mmap_rnd_bits = 28
+rm: cannot remove &#39;/tmp/convert_jsonnet_fuzzer_regular_corpus&#39;: Device or resource busy
+/out/convert_jsonnet_fuzzer_regular -rss_limit_mb=2560 -timeout=25 -print_final_stats=1 -max_total_time=30 -len_control=0 -timeout=30 /tmp/convert_jsonnet_fuzzer_regular_corpus &lt; /dev/null
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 383100835
+INFO: Loaded 1 modules   (43566 inline 8-bit counters): 43566 [0x5618dd50d540, 0x5618dd517f6e), 
+INFO: Loaded 1 PC tables (43566 PCs): 43566 [0x5618dd517f70,0x5618dd5c2250), 
+INFO:        0 files found in /tmp/convert_jsonnet_fuzzer_regular_corpus
+INFO: -max_len is not provided; libFuzzer will not generate inputs larger than 4096 bytes
+INFO: A corpus is not provided, starting from an empty corpus
+#2	INITED cov: 106 ft: 107 corp: 1/1b exec/s: 0 rss: 35Mb
+#11	NEW    cov: 106 ft: 111 corp: 2/10b lim: 4096 exec/s: 0 rss: 35Mb L: 9/9 MS: 4 ShuffleBytes-ShuffleBytes-ChangeBit-CMP- DE: &#34;\020\000\000\000\000\000\000\000&#34;-
+#12	NEW    cov: 109 ft: 118 corp: 3/15b lim: 4096 exec/s: 0 rss: 35Mb L: 5/9 MS: 1 InsertRepeatedBytes-
+#13	NEW    cov: 110 ft: 127 corp: 4/16b lim: 4096 exec/s: 0 rss: 35Mb L: 1/9 MS: 1 ChangeByte-
+#15	NEW    cov: 110 ft: 128 corp: 5/25b lim: 4096 exec/s: 0 rss: 35Mb L: 9/9 MS: 2 ChangeByte-ChangeBinInt-
+#35	NEW    cov: 110 ft: 133 corp: 6/43b lim: 4096 exec/s: 0 rss: 35Mb L: 18/18 MS: 5 PersAutoDict-ChangeBinInt-PersAutoDict-PersAutoDict-CrossOver- DE: &#34;\020\000\000\000\000\000\000\000&#34;-&#34;\020\000\000\000\000\000\000\000&#34;-&#34;\020\000\000\000\000\000\000\000&#34;-
+#38	NEW    cov: 110 ft: 134 corp: 7/60b lim: 4096 exec/s: 0 rss: 35Mb L: 17/18 MS: 3 ChangeByte-ChangeBit-PersAutoDict- DE: &#34;\020\000\000\000\000\000\000\000&#34;-
+#39	NEW    cov: 116 ft: 150 corp: 8/187b lim: 4096 exec/s: 0 rss: 35Mb L: 127/127 MS: 1 InsertRepeatedBytes-
+#50	NEW    cov: 116 ft: 154 corp: 9/189b lim: 4096 exec/s: 0 rss: 35Mb L: 2/127 MS: 1 CrossOver-
+#61	NEW    cov: 116 ft: 158 corp: 10/192b lim: 4096 exec/s: 0 rss: 36Mb L: 3/127 MS: 1 CrossOver-
+#65	NEW    cov: 116 ft: 162 corp: 11/364b lim: 4096 exec/s: 0 rss: 36Mb L: 172/172 MS: 4 ShuffleBytes-InsertByte-InsertRepeatedBytes-InsertRepeatedBytes-
+#66	NEW    cov: 116 ft: 163 corp: 12/491b lim: 4096 exec/s: 0 rss: 36Mb L: 127/172 MS: 1 PersAutoDict- DE: &#34;\020\000\000\000\000\000\000\000&#34;-
+#74	NEW    cov: 116 ft: 164 corp: 13/599b lim: 4096 exec/s: 0 rss: 36Mb L: 108/172 MS: 3 ChangeBit-InsertByte-InsertRepeatedBytes-
+#87	NEW    cov: 116 ft: 165 corp: 14/711b lim: 4096 exec/s: 0 rss: 36Mb L: 112/172 MS: 3 CMP-ChangeBit-PersAutoDict- DE: &#34;\377\377\377\377&#34;-&#34;\020\000\000\000\000\000\000\000&#34;-
+#182	NEW    cov: 117 ft: 166 corp: 15/855b lim: 4096 exec/s: 0 rss: 37Mb L: 144/172 MS: 5 CopyPart-CopyPart-PersAutoDict-InsertByte-PersAutoDict- DE: &#34;\020\000\000\000\000\000\000\000&#34;-&#34;\020\000\000\000\000\000\000\000&#34;-
+#234	REDUCE cov: 117 ft: 166 corp: 15/835b lim: 4096 exec/s: 0 rss: 37Mb L: 152/152 MS: 2 EraseBytes-CopyPart-
+#265	REDUCE cov: 117 ft: 166 corp: 15/831b lim: 4096 exec/s: 0 rss: 38Mb L: 140/152 MS: 1 EraseBytes-
+#266	REDUCE cov: 117 ft: 166 corp: 15/788b lim: 4096 exec/s: 0 rss: 38Mb L: 84/152 MS: 1 EraseBytes-
+#287	REDUCE cov: 117 ft: 166 corp: 15/744b lim: 4096 exec/s: 0 rss: 38Mb L: 96/152 MS: 1 EraseBytes-
+#318	NEW    cov: 117 ft: 169 corp: 16/984b lim: 4096 exec/s: 0 rss: 38Mb L: 240/240 MS: 1 InsertRepeatedBytes-
+#325	REDUCE cov: 117 ft: 169 corp: 16/964b lim: 4096 exec/s: 0 rss: 38Mb L: 76/240 MS: 2 ChangeByte-EraseBytes-
+#345	REDUCE cov: 117 ft: 169 corp: 16/945b lim: 4096 exec/s: 0 rss: 38Mb L: 133/240 MS: 5 CrossOver-PersAutoDict-CrossOver-ChangeByte-EraseBytes- DE: &#34;\377\377\377\377&#34;-
+#356	REDUCE cov: 117 ft: 169 corp: 16/924b lim: 4096 exec/s: 0 rss: 38Mb L: 55/240 MS: 1 EraseBytes-
+#367	REDUCE cov: 117 ft: 169 corp: 16/862b lim: 4096 exec/s: 0 rss: 38Mb L: 178/178 MS: 1 EraseBytes-
+#388	REDUCE cov: 117 ft: 169 corp: 16/839b lim: 4096 exec/s: 0 rss: 38Mb L: 85/178 MS: 1 EraseBytes-
+#412	NEW    cov: 117 ft: 170 corp: 17/1186b lim: 4096 exec/s: 0 rss: 39Mb L: 347/347 MS: 4 InsertByte-ChangeByte-CopyPart-InsertRepeatedBytes-
+#442	NEW    cov: 117 ft: 171 corp: 18/1746b lim: 4096 exec/s: 0 rss: 39Mb L: 560/560 MS: 5 PersAutoDict-InsertByte-ChangeByte-InsertByte-CopyPart- DE: &#34;\377\377\377\377&#34;-
+#449	REDUCE cov: 117 ft: 171 corp: 18/1745b lim: 4096 exec/s: 0 rss: 39Mb L: 346/560 MS: 2 InsertByte-EraseBytes-
+#455	REDUCE cov: 117 ft: 171 corp: 18/1725b lim: 4096 exec/s: 0 rss: 39Mb L: 92/560 MS: 1 EraseBytes-
+#516	REDUCE cov: 117 ft: 171 corp: 18/1635b lim: 4096 exec/s: 0 rss: 40Mb L: 256/560 MS: 1 EraseBytes-
+#583	REDUCE cov: 117 ft: 171 corp: 18/1633b lim: 4096 exec/s: 0 rss: 40Mb L: 176/560 MS: 2 InsertByte-EraseBytes-
+#665	REDUCE cov: 118 ft: 172 corp: 19/1720b lim: 4096 exec/s: 0 rss: 41Mb L: 87/560 MS: 2 ChangeBit-EraseBytes-
+#678	REDUCE cov: 118 ft: 172 corp: 19/1711b lim: 4096 exec/s: 0 rss: 41Mb L: 167/560 MS: 3 InsertByte-ChangeBinInt-EraseBytes-
+#680	REDUCE cov: 118 ft: 172 corp: 19/1710b lim: 4096 exec/s: 0 rss: 41Mb L: 54/560 MS: 2 ShuffleBytes-EraseBytes-
+#703	REDUCE cov: 118 ft: 172 corp: 19/1699b lim: 4096 exec/s: 0 rss: 41Mb L: 81/560 MS: 3 InsertByte-CopyPart-EraseBytes-
+#731	REDUCE cov: 118 ft: 172 corp: 19/1670b lim: 4096 exec/s: 0 rss: 41Mb L: 531/531 MS: 3 InsertByte-ShuffleBytes-EraseBytes-
+	NEW_FUNC[1/27]: 0x5618dd002170 in std::__1::basic_ostream&lt;char, std::__1::char_traits&lt;char&gt;&gt;&amp; std::__1::endl[abi:v180000]&lt;char, std::__1::char_traits&lt;char&gt;&gt;(std::__1::basic_ostream&lt;char, std::__1::char_traits&lt;char&gt;&gt;&amp;) /usr/local/bin/../include/c++/v1/ostream:1045
+	NEW_FUNC[2/27]: 0x5618dd008780 in std::__1::basic_stringstream&lt;char, std::__1::char_traits&lt;char&gt;, std::__1::allocator&lt;char&gt;&gt;::basic_stringstream[abi:v180000]() /usr/local/bin/../include/c++/v1/sstream:1094
+#820	NEW    cov: 232 ft: 311 corp: 20/1672b lim: 4096 exec/s: 0 rss: 43Mb L: 2/531 MS: 3 EraseBytes-CopyPart-InsertByte-
+#882	REDUCE cov: 232 ft: 311 corp: 20/1671b lim: 4096 exec/s: 0 rss: 44Mb L: 1/531 MS: 2 ShuffleBytes-EraseBytes-
+#951	REDUCE cov: 232 ft: 311 corp: 20/1657b lim: 4096 exec/s: 0 rss: 44Mb L: 73/531 MS: 4 PersAutoDict-ChangeBit-ChangeBinInt-EraseBytes- DE: &#34;\377\377\377\377&#34;-
+#965	REDUCE cov: 232 ft: 311 corp: 20/1645b lim: 4096 exec/s: 0 rss: 44Mb L: 42/531 MS: 4 CMP-CrossOver-ShuffleBytes-EraseBytes- DE: &#34;\001\000\000\000\000\000\000\000&#34;-
+#1132	REDUCE cov: 232 ft: 312 corp: 21/2811b lim: 4096 exec/s: 0 rss: 46Mb L: 1166/1166 MS: 2 CopyPart-CopyPart-
+	NEW_FUNC[1/1]: 0x5618dcfff450 in std::__1::basic_string&lt;char, std::__1::char_traits&lt;char&gt;, std::__1::allocator&lt;char&gt;&gt;::__shrink_or_extend[abi:v180000](unsigned long) /usr/local/bin/../include/c++/v1/string:3269
+#1187	NEW    cov: 244 ft: 324 corp: 22/2966b lim: 4096 exec/s: 0 rss: 46Mb L: 155/1166 MS: 5 CopyPart-InsertRepeatedBytes-EraseBytes-InsertRepeatedBytes-ChangeBit-
+#1211	REDUCE cov: 244 ft: 324 corp: 22/2965b lim: 4096 exec/s: 0 rss: 47Mb L: 8/1166 MS: 4 CopyPart-CrossOver-EraseBytes-EraseBytes-
+#1223	REDUCE cov: 244 ft: 324 corp: 22/2958b lim: 4096 exec/s: 0 rss: 47Mb L: 10/1166 MS: 2 EraseBytes-ChangeByte-
+#1264	REDUCE cov: 244 ft: 324 corp: 22/2941b lim: 4096 exec/s: 0 rss: 47Mb L: 138/1166 MS: 1 EraseBytes-
+#1269	REDUCE cov: 244 ft: 324 corp: 22/2927b lim: 4096 exec/s: 0 rss: 47Mb L: 124/1166 MS: 5 InsertByte-InsertByte-ChangeBinInt-ChangeBinInt-EraseBytes-
+#1437	REDUCE cov: 244 ft: 324 corp: 22/2926b lim: 4096 exec/s: 0 rss: 49Mb L: 84/1166 MS: 3 ShuffleBytes-ShuffleBytes-EraseBytes-
+#1483	NEW    cov: 245 ft: 325 corp: 23/2928b lim: 4096 exec/s: 0 rss: 49Mb L: 2/1166 MS: 1 InsertByte-
+#1530	REDUCE cov: 247 ft: 327 corp: 24/3028b lim: 4096 exec/s: 0 rss: 49M
+...truncated...
+utoDict-EraseBytes- DE: &#34;\377\377\377\377\377\377\377\377&#34;-
+#173868	REDUCE cov: 263 ft: 360 corp: 39/13634b lim: 4096 exec/s: 28978 rss: 60Mb L: 488/4089 MS: 3 InsertByte-CMP-EraseBytes- DE: &#34;\000\000\000\000&#34;-
+#175266	REDUCE cov: 263 ft: 360 corp: 39/13602b lim: 4096 exec/s: 25038 rss: 60Mb L: 101/4089 MS: 3 EraseBytes-CrossOver-CrossOver-
+#177442	REDUCE cov: 263 ft: 360 corp: 39/13584b lim: 4096 exec/s: 25348 rss: 60Mb L: 1806/4089 MS: 1 CrossOver-
+#178398	REDUCE cov: 263 ft: 360 corp: 39/13577b lim: 4096 exec/s: 25485 rss: 60Mb L: 94/4089 MS: 1 EraseBytes-
+#180005	REDUCE cov: 263 ft: 360 corp: 39/13575b lim: 4096 exec/s: 25715 rss: 60Mb L: 486/4089 MS: 2 CopyPart-EraseBytes-
+#180692	REDUCE cov: 263 ft: 360 corp: 39/13574b lim: 4096 exec/s: 25813 rss: 60Mb L: 10/4089 MS: 2 ChangeBit-EraseBytes-
+#181513	REDUCE cov: 263 ft: 360 corp: 39/13573b lim: 4096 exec/s: 25930 rss: 60Mb L: 9/4089 MS: 1 EraseBytes-
+#181977	REDUCE cov: 263 ft: 360 corp: 39/13559b lim: 4096 exec/s: 25996 rss: 60Mb L: 472/4089 MS: 4 ChangeBinInt-ChangeBit-CrossOver-CrossOver-
+#182903	REDUCE cov: 263 ft: 360 corp: 39/13555b lim: 4096 exec/s: 26129 rss: 60Mb L: 90/4089 MS: 1 EraseBytes-
+#184270	REDUCE cov: 263 ft: 360 corp: 39/13553b lim: 4096 exec/s: 26324 rss: 60Mb L: 27/4089 MS: 2 EraseBytes-CopyPart-
+#184416	REDUCE cov: 263 ft: 360 corp: 39/13535b lim: 4096 exec/s: 26345 rss: 60Mb L: 454/4089 MS: 1 EraseBytes-
+#197457	REDUCE cov: 263 ft: 360 corp: 39/13533b lim: 4096 exec/s: 28208 rss: 60Mb L: 25/4089 MS: 1 EraseBytes-
+#201216	REDUCE cov: 263 ft: 360 corp: 39/13502b lim: 4096 exec/s: 28745 rss: 60Mb L: 1775/4089 MS: 4 PersAutoDict-ChangeByte-CopyPart-EraseBytes- DE: &#34;\377\377\377\377\377\377\377\377&#34;-
+#201814	REDUCE cov: 263 ft: 360 corp: 39/13464b lim: 4096 exec/s: 28830 rss: 60Mb L: 1737/4089 MS: 3 ShuffleBytes-EraseBytes-CopyPart-
+#205278	REDUCE cov: 263 ft: 360 corp: 39/13463b lim: 4096 exec/s: 25659 rss: 60Mb L: 242/4089 MS: 4 InsertRepeatedBytes-ChangeByte-ChangeASCIIInt-EraseBytes-
+#205707	REDUCE cov: 263 ft: 360 corp: 39/13378b lim: 4096 exec/s: 25713 rss: 60Mb L: 1652/4089 MS: 4 PersAutoDict-ChangeBit-ChangeBinInt-CrossOver- DE: &#34;\000\000\000\000&#34;-
+#210893	REDUCE cov: 263 ft: 360 corp: 39/13372b lim: 4096 exec/s: 26361 rss: 60Mb L: 84/4089 MS: 1 EraseBytes-
+#212569	REDUCE cov: 263 ft: 360 corp: 39/13293b lim: 4096 exec/s: 26571 rss: 60Mb L: 1573/4089 MS: 1 EraseBytes-
+#217570	REDUCE cov: 263 ft: 360 corp: 39/13290b lim: 4096 exec/s: 27196 rss: 60Mb L: 81/4089 MS: 1 EraseBytes-
+#227451	REDUCE cov: 263 ft: 360 corp: 39/13289b lim: 4096 exec/s: 28431 rss: 60Mb L: 24/4089 MS: 1 EraseBytes-
+#233197	REDUCE cov: 263 ft: 360 corp: 39/13281b lim: 4096 exec/s: 29149 rss: 60Mb L: 446/4089 MS: 1 EraseBytes-
+#233388	REDUCE cov: 263 ft: 360 corp: 39/13280b lim: 4096 exec/s: 29173 rss: 60Mb L: 23/4089 MS: 1 EraseBytes-
+#233436	REDUCE cov: 263 ft: 360 corp: 39/13276b lim: 4096 exec/s: 29179 rss: 60Mb L: 442/4089 MS: 3 CrossOver-PersAutoDict-EraseBytes- DE: &#34;2\000\000\000\000\000\000\000&#34;-
+#236725	REDUCE cov: 263 ft: 360 corp: 39/13259b lim: 4096 exec/s: 26302 rss: 60Mb L: 3040/4089 MS: 4 CopyPart-ChangeBinInt-ChangeByte-EraseBytes-
+#238516	REDUCE cov: 263 ft: 360 corp: 39/13249b lim: 4096 exec/s: 26501 rss: 60Mb L: 71/4089 MS: 1 EraseBytes-
+#251882	REDUCE cov: 263 ft: 360 corp: 39/13247b lim: 4096 exec/s: 27986 rss: 60Mb L: 21/4089 MS: 1 EraseBytes-
+#257083	REDUCE cov: 263 ft: 360 corp: 39/13246b lim: 4096 exec/s: 28564 rss: 60Mb L: 20/4089 MS: 1 EraseBytes-
+#257308	REDUCE cov: 263 ft: 360 corp: 39/13224b lim: 4096 exec/s: 28589 rss: 60Mb L: 420/4089 MS: 5 PersAutoDict-ShuffleBytes-ChangeASCIIInt-ChangeByte-EraseBytes- DE: &#34;\377\377\377q&#34;-
+#262144	pulse  cov: 263 ft: 360 corp: 39/13224b lim: 4096 exec/s: 29127 rss: 60Mb
+#265459	REDUCE cov: 263 ft: 360 corp: 39/13192b lim: 4096 exec/s: 29495 rss: 60Mb L: 1541/4089 MS: 1 EraseBytes-
+#267495	REDUCE cov: 263 ft: 360 corp: 39/13186b lim: 4096 exec/s: 26749 rss: 60Mb L: 1535/4089 MS: 1 EraseBytes-
+#279003	REDUCE cov: 263 ft: 360 corp: 39/13183b lim: 4096 exec/s: 27900 rss: 60Mb L: 17/4089 MS: 3 CopyPart-EraseBytes-CopyPart-
+#280470	REDUCE cov: 263 ft: 360 corp: 39/13175b lim: 4096 exec/s: 28047 rss: 60Mb L: 63/4089 MS: 2 EraseBytes-CrossOver-
+#282956	REDUCE cov: 263 ft: 360 corp: 39/13167b lim: 4096 exec/s: 28295 rss: 60Mb L: 412/4089 MS: 1 EraseBytes-
+#288408	REDUCE cov: 263 ft: 360 corp: 39/13147b lim: 4096 exec/s: 28840 rss: 60Mb L: 1515/4089 MS: 2 ChangeBit-EraseBytes-
+#292177	REDUCE cov: 263 ft: 360 corp: 39/13059b lim: 4096 exec/s: 29217 rss: 60Mb L: 1427/4089 MS: 4 PersAutoDict-EraseBytes-InsertRepeatedBytes-CopyPart- DE: &#34;2\000\000\000\000\000\000\000&#34;-
+#306033	REDUCE cov: 263 ft: 360 corp: 39/13058b lim: 4096 exec/s: 27821 rss: 60Mb L: 16/4089 MS: 1 EraseBytes-
+#313069	REDUCE cov: 263 ft: 360 corp: 39/13056b lim: 4096 exec/s: 28460 rss: 60Mb L: 61/4089 MS: 1 EraseBytes-
+#342415	REDUCE cov: 263 ft: 360 corp: 39/13047b lim: 4096 exec/s: 28534 rss: 60Mb L: 1418/4089 MS: 1 EraseBytes-
+#405035	REDUCE cov: 263 ft: 360 corp: 39/13039b lim: 4096 exec/s: 25314 rss: 60Mb L: 404/4089 MS: 5 ChangeBinInt-CrossOver-ChangeBinInt-CrossOver-EraseBytes-
+#419682	REDUCE cov: 263 ft: 360 corp: 39/13027b lim: 4096 exec/s: 24687 rss: 60Mb L: 1406/4089 MS: 2 InsertByte-EraseBytes-
+#429431	REDUCE cov: 263 ft: 360 corp: 39/13016b lim: 4096 exec/s: 23857 rss: 60Mb L: 50/4089 MS: 4 EraseBytes-ChangeBinInt-PersAutoDict-CopyPart- DE: &#34;\000\000\000\000&#34;-
+#430249	REDUCE cov: 263 ft: 360 corp: 39/13012b lim: 4096 exec/s: 23902 rss: 60Mb L: 46/4089 MS: 3 EraseBytes-EraseBytes-CopyPart-
+#439544	REDUCE cov: 263 ft: 360 corp: 39/13011b lim: 4096 exec/s: 23133 rss: 60Mb L: 4088/4088 MS: 5 CrossOver-ChangeByte-ChangeBit-ChangeBinInt-InsertByte-
+#440850	REDUCE cov: 263 ft: 360 corp: 39/13007b lim: 4096 exec/s: 23202 rss: 60Mb L: 42/4088 MS: 1 EraseBytes-
+#445399	REDUCE cov: 263 ft: 360 corp: 39/12995b lim: 4096 exec/s: 22269 rss: 60Mb L: 1394/4088 MS: 4 ShuffleBytes-CMP-CopyPart-EraseBytes- DE: &#34;\377\377\377t&#34;-
+#449376	REDUCE cov: 263 ft: 360 corp: 39/12976b lim: 4096 exec/s: 22468 rss: 60Mb L: 1375/4088 MS: 2 ChangeBit-EraseBytes-
+#453982	REDUCE cov: 263 ft: 360 corp: 39/12969b lim: 4096 exec/s: 21618 rss: 60Mb L: 397/4088 MS: 1 EraseBytes-
+#466303	REDUCE cov: 263 ft: 360 corp: 39/12968b lim: 4096 exec/s: 21195 rss: 60Mb L: 396/4088 MS: 1 EraseBytes-
+#478901	REDUCE cov: 263 ft: 360 corp: 39/12825b lim: 4096 exec/s: 20821 rss: 60Mb L: 253/4088 MS: 3 CMP-EraseBytes-CrossOver- DE: &#34;c\000\000\000&#34;-
+#491598	REDUCE cov: 263 ft: 360 corp: 39/12803b lim: 4096 exec/s: 20483 rss: 60Mb L: 231/4088 MS: 2 CopyPart-EraseBytes-
+#512664	REDUCE cov: 263 ft: 360 corp: 39/12802b lim: 4096 exec/s: 20506 rss: 60Mb L: 41/4088 MS: 1 EraseBytes-
+#516825	REDUCE cov: 263 ft: 360 corp: 39/12785b lim: 4096 exec/s: 19877 rss: 60Mb L: 214/4088 MS: 1 EraseBytes-
+#524288	pulse  cov: 263 ft: 360 corp: 39/12785b lim: 4096 exec/s: 20164 rss: 60Mb
+#527174	REDUCE cov: 263 ft: 360 corp: 39/12783b lim: 4096 exec/s: 19524 rss: 60Mb L: 504/4088 MS: 4 EraseBytes-ChangeBit-InsertByte-InsertByte-
+#569230	REDUCE cov: 263 ft: 360 corp: 39/12774b lim: 4096 exec/s: 18974 rss: 60Mb L: 205/4088 MS: 1 EraseBytes-
+#575240	DONE   cov: 263 ft: 360 corp: 39/12774b lim: 4096 exec/s: 18556 rss: 60Mb
+###### Recommended dictionary. ######
+&#34;\020\000\000\000\000\000\000\000&#34; # Uses: 3947
+&#34;\377\377\377\377&#34; # Uses: 4303
+&#34;\001\000\000\000\000\000\000\000&#34; # Uses: 3879
+&#34;2\000\000\000\000\000\000\000&#34; # Uses: 3847
+&#34;\377\377\377\003&#34; # Uses: 4236
+&#34;\377\377\377q&#34; # Uses: 4244
+&#34;y\000\000\000&#34; # Uses: 3877
+&#34;\033\001\000\000\000\000\000\000&#34; # Uses: 3501
+&#34;\001\000\000N&#34; # Uses: 3599
+&#34;\377\377\377\377\377\377\377\377&#34; # Uses: 2629
+&#34;\001\000\000\000\000\000\000\001&#34; # Uses: 2631
+&#34;\000\000\000L&#34; # Uses: 2927
+&#34;\000\000\000\000&#34; # Uses: 2595
+&#34;\377\377\377t&#34; # Uses: 730
+&#34;c\000\000\000&#34; # Uses: 526
+###### End of recommended dictionary. ######
+Done 575240 runs in 31 second(s)
+stat::number_of_executed_units: 575240
+stat::average_exec_per_sec:     18556
+stat::new_units_added:          298
+stat::slowest_unit_time_sec:    0
+stat::peak_rss_mb:              60
 
 </pre>
 

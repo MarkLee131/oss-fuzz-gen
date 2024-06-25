@@ -40,12 +40,12 @@ tbody tr:nth-child(odd) {
 }
 </style>
 <body>
-    LLM:
-
+    LLM: 
+    
 <h1>output-tinyxml2-_znk8tinyxml210xmlelement12shallowcloneepns_11xmldocumente / 02</h1>
 Bug: False
 <br>
-Crash reason: -
+Crash reason: NO_SEMANTIC_ERR
 <br>
 <br>
 
@@ -56,58 +56,14 @@ Crash reason: -
 
 <pre>
 #include &lt;fuzzer/FuzzedDataProvider.h&gt;
-#include &lt;tinyxml2.h&gt;
+#include &lt;string&gt;
+#include &lt;cstdint&gt;
+#include &lt;cstdlib&gt;
 #include &lt;cstring&gt;
-
-// Ensure that the C++ compiler does not mangle the names of the functions
-extern &#34;C&#34; {
-    int LLVMFuzzerInitialize(int *argc, char ***argv) {
-        return 0;
-    }
-
-    int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
-        if (size == 0) {
-            return 0;
-        }
-
-        FuzzedDataProvider dataProvider(data, size);
-
-        tinyxml2::XMLDocument doc;
-        tinyxml2::XMLError eResult = doc.Parse(reinterpret_cast&lt;const char*&gt;(data), size);
-        if (eResult != tinyxml2::XML_SUCCESS) {
-            return 0;
-        }
-
-        tinyxml2::XMLElement* element = doc.NewElement(&#34;test&#34;);
-
-        tinyxml2::XMLNode* clonedElement = element-&gt;ShallowClone(&amp;doc);
-
-        if (clonedElement) {
-            delete clonedElement;
-        }
-
-        return 0;
-    }
-}
-</pre>
-
-
-<h3>Fixer prompt #1</h3>
-<pre>
-
-Given the following C++ fuzz harness and its build error message, fix the code to make it build for fuzzing.
-
-If there is undeclared identifier or unknown type name error, fix it by finding and including the related libraries.
-
-Note that some code may need to be wrapped with &lt;code&gt;extern &#34;C&#34;&lt;/code&gt; as their source is C program.
-
-MUST RETURN THE FULL CODE, INCLUDING UNCHANGED PARTS.
-EXTREMELY IMPORTANT: AVOID USING &lt;code&gt;goto&lt;/code&gt;. If you have to write code using &lt;code&gt;goto&lt;/code&gt;, you MUST MUST also declare all variables BEFORE the &lt;code&gt;goto&lt;/code&gt;. Never introduce new variables after the &lt;code&gt;goto&lt;/code&gt;.
-
-Below is the code needs to be built:
-&lt;code&gt;
-#include &lt;fuzzer/FuzzedDataProvider.h&gt;
+#include &lt;cassert&gt;
 #include &#34;tinyxml2.h&#34;
+
+using namespace tinyxml2;
 
 extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
     return 0;
@@ -116,534 +72,237 @@ extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
 extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     FuzzedDataProvider dataProvider(data, size);
 
-    tinyxml2::XMLDocument doc;
-    tinyxml2::XMLElement* element = doc.NewElement(&#34;test&#34;);
+    // Create a dummy XMLDocument for testing
+    XMLDocument doc;
+    std::string elementName = dataProvider.ConsumeRandomLengthString();
+    XMLElement* originalElement = doc.NewElement(elementName.c_str());
 
-    tinyxml2::XMLNode* clonedElement = element-&gt;ShallowClone(&amp;doc);
-
-    if (clonedElement) {
-        delete clonedElement;
+    // Add random attributes to the original element
+    int numAttributes = dataProvider.ConsumeIntegralInRange&lt;int&gt;(0, 10);
+    for (int i = 0; i &lt; numAttributes; ++i) {
+        std::string attrName = dataProvider.ConsumeRandomLengthString();
+        std::string attrValue = dataProvider.ConsumeRandomLengthString();
+        originalElement-&gt;SetAttribute(attrName.c_str(), attrValue.c_str());
     }
 
-    return 0;
-}
-&lt;/code&gt;
-
-The code has the following build issues:
-&lt;error&gt;
-/src/xmltest.cpp:2:10: fatal error: &#39;tinyxml2.h&#39; file not found
-    2 | #include &#34;tinyxml2.h&#34;
-      |          ^~~~~~~~~~~~
-&lt;/error&gt;
-
-Fix code:
-1. Consider possible solutions for the issues listed above.
-2. Choose a solution that can maximize fuzzing result, which is utilizing the function under test and feeding it not null input.
-3. Apply the solutions to the original code.
-It&#39;s important to show the complete code, not only the fixed line.
-&lt;solution&gt;
-</pre>
-
-
-
-<h3>Code #1</h3>
-
-<pre>
-To address the build issues and make the fuzz harness functional, we need to ensure that the `tinyxml2.h` header file is correctly included. Additionally, since `tinyxml2` is a C++ library, we should ensure that the `extern &#34;C&#34;` linkage specification is correctly applied only to the fuzzing functions. Here&#39;s the corrected code:
-
-```cpp
-#include &lt;fuzzer/FuzzedDataProvider.h&gt;
-#include &#34;tinyxml2.h&#34;
-
-extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
-    return 0;
-}
-
-extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
-    FuzzedDataProvider dataProvider(data, size);
-
-    tinyxml2::XMLDocument doc;
-    tinyxml2::XMLElement* element = doc.NewElement(&#34;test&#34;);
-
-    tinyxml2::XMLNode* clonedElement = element-&gt;ShallowClone(&amp;doc);
-
-    if (clonedElement) {
-        delete clonedElement;
-    }
-
-    return 0;
-}
-```
-
-This code should now correctly include the `tinyxml2` header and compile successfully for fuzzing. Make sure that the `tinyxml2` library is correctly installed and available in your include path when building the fuzz harness.
-</pre>
-
-
-<h3>Fixer prompt #2</h3>
-<pre>
-
-Given the following C++ fuzz harness and its build error message, fix the code to make it build for fuzzing.
-
-If there is undeclared identifier or unknown type name error, fix it by finding and including the related libraries.
-
-Note that some code may need to be wrapped with &lt;code&gt;extern &#34;C&#34;&lt;/code&gt; as their source is C program.
-
-MUST RETURN THE FULL CODE, INCLUDING UNCHANGED PARTS.
-EXTREMELY IMPORTANT: AVOID USING &lt;code&gt;goto&lt;/code&gt;. If you have to write code using &lt;code&gt;goto&lt;/code&gt;, you MUST MUST also declare all variables BEFORE the &lt;code&gt;goto&lt;/code&gt;. Never introduce new variables after the &lt;code&gt;goto&lt;/code&gt;.
-
-Below is the code needs to be built:
-&lt;code&gt;
-#include &lt;fuzzer/FuzzedDataProvider.h&gt;
-#include &#34;tinyxml2.h&#34;
-
-extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
-    return 0;
-}
-
-extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
-    FuzzedDataProvider dataProvider(data, size);
-
-    tinyxml2::XMLDocument doc;
-    tinyxml2::XMLElement* element = doc.NewElement(&#34;test&#34;);
-
-    tinyxml2::XMLNode* clonedElement = element-&gt;ShallowClone(&amp;doc);
-
-    if (clonedElement) {
-        delete clonedElement;
-    }
-
-    return 0;
-}
-&lt;/code&gt;
-
-The code has the following build issues:
-&lt;error&gt;
-/src/xmltest.cpp:2:10: fatal error: &#39;tinyxml2.h&#39; file not found
-    2 | #include &#34;tinyxml2.h&#34;
-      |          ^~~~~~~~~~~~
-&lt;/error&gt;
-
-Fix code:
-1. Consider possible solutions for the issues listed above.
-2. Choose a solution that can maximize fuzzing result, which is utilizing the function under test and feeding it not null input.
-3. Apply the solutions to the original code.
-It&#39;s important to show the complete code, not only the fixed line.
-&lt;solution&gt;
-</pre>
-
-
-
-<h3>Code #2</h3>
-
-<pre>
-To fix the build issues and ensure the code compiles correctly for fuzzing, we need to address the missing header file and ensure that the necessary libraries are included. The `tinyxml2.h` file is part of the TinyXML-2 library, so we need to ensure that the library is available and correctly referenced.
-
-Additionally, we need to ensure that the code is properly wrapped in `extern &#34;C&#34;` where necessary to avoid name mangling issues when linking with C code.
-
-Here is the corrected code:
-
-```cpp
-#include &lt;fuzzer/FuzzedDataProvider.h&gt;
-#include &#34;tinyxml2.h&#34;
-
-extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
-    return 0;
-}
-
-extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
-    FuzzedDataProvider dataProvider(data, size);
-
-    tinyxml2::XMLDocument doc;
-    tinyxml2::XMLError eResult = doc.Parse(reinterpret_cast&lt;const char*&gt;(data), size);
-    if (eResult != tinyxml2::XML_SUCCESS) {
-        return 0;
-    }
-
-    tinyxml2::XMLElement* element = doc.NewElement(&#34;test&#34;);
-
-    tinyxml2::XMLNode* clonedElement = element-&gt;ShallowClone(&amp;doc);
-
-    if (clonedElement) {
-        delete clonedElement;
-    }
-
-    return 0;
-}
-```
-
-### Explanation:
-1. **Include the necessary libraries**: The `tinyxml2.h` header is included, assuming that the TinyXML-2 library is available in the include path.
-2. **FuzzedDataProvider**: This is used to provide the fuzzing input data.
-3. **XML Parsing**: Added code to parse the input data as XML to ensure the function under test is being utilized with non-null input.
-4. **Element Creation and Cloning**: The code creates a new XML element and then clones it. If the cloned element is not null, it is deleted to avoid memory leaks.
-
-Ensure that the TinyXML-2 library is correctly installed and referenced in your build system (e.g., CMake, Makefile) to avoid the `tinyxml2.h file not found` error. This typically involves specifying the include directory and linking against the TinyXML-2 library.
-</pre>
-
-
-<h3>Fixer prompt #3</h3>
-<pre>
-
-Given the following C++ fuzz harness and its build error message, fix the code to make it build for fuzzing.
-
-If there is undeclared identifier or unknown type name error, fix it by finding and including the related libraries.
-
-Note that some code may need to be wrapped with &lt;code&gt;extern &#34;C&#34;&lt;/code&gt; as their source is C program.
-
-MUST RETURN THE FULL CODE, INCLUDING UNCHANGED PARTS.
-EXTREMELY IMPORTANT: AVOID USING &lt;code&gt;goto&lt;/code&gt;. If you have to write code using &lt;code&gt;goto&lt;/code&gt;, you MUST MUST also declare all variables BEFORE the &lt;code&gt;goto&lt;/code&gt;. Never introduce new variables after the &lt;code&gt;goto&lt;/code&gt;.
-
-Below is the code needs to be built:
-&lt;code&gt;
-#include &lt;fuzzer/FuzzedDataProvider.h&gt;
-#include &#34;tinyxml2.h&#34;
-
-extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
-    return 0;
-}
-
-extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
-    FuzzedDataProvider dataProvider(data, size);
-
-    tinyxml2::XMLDocument doc;
-    tinyxml2::XMLError eResult = doc.Parse(reinterpret_cast&lt;const char*&gt;(data), size);
-    if (eResult != tinyxml2::XML_SUCCESS) {
-        return 0;
-    }
-
-    tinyxml2::XMLElement* element = doc.NewElement(&#34;test&#34;);
-
-    tinyxml2::XMLNode* clonedElement = element-&gt;ShallowClone(&amp;doc);
-
-    if (clonedElement) {
-        delete clonedElement;
-    }
-
-    return 0;
-}
-&lt;/code&gt;
-
-The code has the following build issues:
-&lt;error&gt;
-/src/xmltest.cpp:2:10: fatal error: &#39;tinyxml2.h&#39; file not found
-    2 | #include &#34;tinyxml2.h&#34;
-      |          ^~~~~~~~~~~~
-&lt;/error&gt;
-
-Fix code:
-1. Consider possible solutions for the issues listed above.
-2. Choose a solution that can maximize fuzzing result, which is utilizing the function under test and feeding it not null input.
-3. Apply the solutions to the original code.
-It&#39;s important to show the complete code, not only the fixed line.
-&lt;solution&gt;
-</pre>
-
-
-
-<h3>Code #3</h3>
-
-<pre>
-To fix the build error and ensure the code compiles correctly for fuzzing, we need to include the correct header file for `tinyxml2`. The error indicates that the compiler cannot find the `tinyxml2.h` file. This usually means that the file is either not in the include path or the path is incorrect.
-
-Additionally, we need to wrap the `extern &#34;C&#34;` block correctly to ensure that the C++ compiler does not mangle the names of the functions used for fuzzing.
-
-Here is the complete fixed code:
-
-```cpp
-#include &lt;fuzzer/FuzzedDataProvider.h&gt;
-#include &#34;tinyxml2.h&#34;
-
-// Ensure that the C++ compiler does not mangle the names of the functions
-extern &#34;C&#34; {
-    int LLVMFuzzerInitialize(int *argc, char ***argv) {
-        return 0;
-    }
-
-    int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
-        FuzzedDataProvider dataProvider(data, size);
-
-        tinyxml2::XMLDocument doc;
-        tinyxml2::XMLError eResult = doc.Parse(reinterpret_cast&lt;const char*&gt;(data), size);
-        if (eResult != tinyxml2::XML_SUCCESS) {
-            return 0;
-        }
-
-        tinyxml2::XMLElement* element = doc.NewElement(&#34;test&#34;);
-
-        tinyxml2::XMLNode* clonedElement = element-&gt;ShallowClone(&amp;doc);
-
+    // Randomly decide whether to pass a valid document or nullptr
+    XMLDocument* docPtr = dataProvider.ConsumeBool() ? &amp;doc : nullptr;
+
+    // Call the function under test
+    XMLNode* clonedNode = originalElement-&gt;ShallowClone(docPtr);
+
+    // Validate the result
+    if (clonedNode) {
+        XMLElement* clonedElement = clonedNode-&gt;ToElement();
         if (clonedElement) {
-            delete clonedElement;
-        }
+            // Check that the name matches
+            assert(strcmp(clonedElement-&gt;Value(), originalElement-&gt;Value()) == 0);
 
-        return 0;
+            // Check that the attributes match
+            const XMLAttribute* originalAttr = originalElement-&gt;FirstAttribute();
+            const XMLAttribute* clonedAttr = clonedElement-&gt;FirstAttribute();
+            while (originalAttr &amp;&amp; clonedAttr) {
+                assert(strcmp(originalAttr-&gt;Name(), clonedAttr-&gt;Name()) == 0);
+                assert(strcmp(originalAttr-&gt;Value(), clonedAttr-&gt;Value()) == 0);
+                originalAttr = originalAttr-&gt;Next();
+                clonedAttr = clonedAttr-&gt;Next();
+            }
+            assert(originalAttr == nullptr &amp;&amp; clonedAttr == nullptr);
+        }
     }
+
+    return 0;
 }
-```
-
-Make sure that `tinyxml2.h` is available in the include path when you compile this code. You may need to adjust your build system to include the directory where `tinyxml2.h` is located. For example, if you are using `g++`, you can use the `-I` flag to specify the include directory:
-
-```sh
-g++ -I/path/to/tinyxml2/include -fsanitize=fuzzer,address -o fuzz_target fuzz_target.cpp /path/to/tinyxml2/libtinyxml2.a
-```
-
-This ensures that the compiler can find the `tinyxml2.h` header file and link against the `tinyxml2` library correctly.
-</pre>
-
-
-<h3>Fixer prompt #4</h3>
-<pre>
-
-Given the following C++ fuzz harness and its build error message, fix the code to make it build for fuzzing.
-
-If there is undeclared identifier or unknown type name error, fix it by finding and including the related libraries.
-
-Note that some code may need to be wrapped with &lt;code&gt;extern &#34;C&#34;&lt;/code&gt; as their source is C program.
-
-MUST RETURN THE FULL CODE, INCLUDING UNCHANGED PARTS.
-EXTREMELY IMPORTANT: AVOID USING &lt;code&gt;goto&lt;/code&gt;. If you have to write code using &lt;code&gt;goto&lt;/code&gt;, you MUST MUST also declare all variables BEFORE the &lt;code&gt;goto&lt;/code&gt;. Never introduce new variables after the &lt;code&gt;goto&lt;/code&gt;.
-
-Below is the code needs to be built:
-&lt;code&gt;
-#include &lt;fuzzer/FuzzedDataProvider.h&gt;
-#include &#34;tinyxml2.h&#34;
-
-// Ensure that the C++ compiler does not mangle the names of the functions
-extern &#34;C&#34; {
-    int LLVMFuzzerInitialize(int *argc, char ***argv) {
-        return 0;
-    }
-
-    int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
-        FuzzedDataProvider dataProvider(data, size);
-
-        tinyxml2::XMLDocument doc;
-        tinyxml2::XMLError eResult = doc.Parse(reinterpret_cast&lt;const char*&gt;(data), size);
-        if (eResult != tinyxml2::XML_SUCCESS) {
-            return 0;
-        }
-
-        tinyxml2::XMLElement* element = doc.NewElement(&#34;test&#34;);
-
-        tinyxml2::XMLNode* clonedElement = element-&gt;ShallowClone(&amp;doc);
-
-        if (clonedElement) {
-            delete clonedElement;
-        }
-
-        return 0;
-    }
-}
-&lt;/code&gt;
-
-The code has the following build issues:
-&lt;error&gt;
-/src/xmltest.cpp:2:10: fatal error: &#39;tinyxml2.h&#39; file not found
-    2 | #include &#34;tinyxml2.h&#34;
-      |          ^~~~~~~~~~~~
-&lt;/error&gt;
-
-Fix code:
-1. Consider possible solutions for the issues listed above.
-2. Choose a solution that can maximize fuzzing result, which is utilizing the function under test and feeding it not null input.
-3. Apply the solutions to the original code.
-It&#39;s important to show the complete code, not only the fixed line.
-&lt;solution&gt;
-</pre>
-
-
-
-<h3>Code #4</h3>
-
-<pre>
-Here is the complete fixed code:
-
-```cpp
-#include &lt;fuzzer/FuzzedDataProvider.h&gt;
-#include &#34;tinyxml2.h&#34;
-#include &lt;cstring&gt;
-
-// Ensure that the C++ compiler does not mangle the names of the functions
-extern &#34;C&#34; {
-    int LLVMFuzzerInitialize(int *argc, char ***argv) {
-        return 0;
-    }
-
-    int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
-        if (size == 0) {
-            return 0;
-        }
-
-        FuzzedDataProvider dataProvider(data, size);
-
-        tinyxml2::XMLDocument doc;
-        tinyxml2::XMLError eResult = doc.Parse(reinterpret_cast&lt;const char*&gt;(data), size);
-        if (eResult != tinyxml2::XML_SUCCESS) {
-            return 0;
-        }
-
-        tinyxml2::XMLElement* element = doc.NewElement(&#34;test&#34;);
-
-        tinyxml2::XMLNode* clonedElement = element-&gt;ShallowClone(&amp;doc);
-
-        if (clonedElement) {
-            delete clonedElement;
-        }
-
-        return 0;
-    }
-}
-```
-
-### Explanation of Changes:
-1. **Include `&lt;cstring&gt;`**: This is necessary for the `reinterpret_cast&lt;const char*&gt;` to work properly.
-2. **Check if `size` is zero**: Added a check to ensure that the size of the input data is not zero. This prevents the `doc.Parse` function from being called with a null input, which can lead to undefined behavior.
-</pre>
-
-
-<h3>Fixer prompt #5</h3>
-<pre>
-
-Given the following C++ fuzz harness and its build error message, fix the code to make it build for fuzzing.
-
-If there is undeclared identifier or unknown type name error, fix it by finding and including the related libraries.
-
-Note that some code may need to be wrapped with &lt;code&gt;extern &#34;C&#34;&lt;/code&gt; as their source is C program.
-
-MUST RETURN THE FULL CODE, INCLUDING UNCHANGED PARTS.
-EXTREMELY IMPORTANT: AVOID USING &lt;code&gt;goto&lt;/code&gt;. If you have to write code using &lt;code&gt;goto&lt;/code&gt;, you MUST MUST also declare all variables BEFORE the &lt;code&gt;goto&lt;/code&gt;. Never introduce new variables after the &lt;code&gt;goto&lt;/code&gt;.
-
-Below is the code needs to be built:
-&lt;code&gt;
-#include &lt;fuzzer/FuzzedDataProvider.h&gt;
-#include &#34;tinyxml2.h&#34;
-#include &lt;cstring&gt;
-
-// Ensure that the C++ compiler does not mangle the names of the functions
-extern &#34;C&#34; {
-    int LLVMFuzzerInitialize(int *argc, char ***argv) {
-        return 0;
-    }
-
-    int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
-        if (size == 0) {
-            return 0;
-        }
-
-        FuzzedDataProvider dataProvider(data, size);
-
-        tinyxml2::XMLDocument doc;
-        tinyxml2::XMLError eResult = doc.Parse(reinterpret_cast&lt;const char*&gt;(data), size);
-        if (eResult != tinyxml2::XML_SUCCESS) {
-            return 0;
-        }
-
-        tinyxml2::XMLElement* element = doc.NewElement(&#34;test&#34;);
-
-        tinyxml2::XMLNode* clonedElement = element-&gt;ShallowClone(&amp;doc);
-
-        if (clonedElement) {
-            delete clonedElement;
-        }
-
-        return 0;
-    }
-}
-&lt;/code&gt;
-
-The code has the following build issues:
-&lt;error&gt;
-/src/xmltest.cpp:2:10: fatal error: &#39;tinyxml2.h&#39; file not found
-    2 | #include &#34;tinyxml2.h&#34;
-      |          ^~~~~~~~~~~~
-&lt;/error&gt;
-
-Fix code:
-1. Consider possible solutions for the issues listed above.
-2. Choose a solution that can maximize fuzzing result, which is utilizing the function under test and feeding it not null input.
-3. Apply the solutions to the original code.
-It&#39;s important to show the complete code, not only the fixed line.
-&lt;solution&gt;
-</pre>
-
-
-
-<h3>Code #5</h3>
-
-<pre>
-Here is the fixed code:
-
-```cpp
-#include &lt;fuzzer/FuzzedDataProvider.h&gt;
-#include &lt;tinyxml2.h&gt;
-#include &lt;cstring&gt;
-
-// Ensure that the C++ compiler does not mangle the names of the functions
-extern &#34;C&#34; {
-    int LLVMFuzzerInitialize(int *argc, char ***argv) {
-        return 0;
-    }
-
-    int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
-        if (size == 0) {
-            return 0;
-        }
-
-        FuzzedDataProvider dataProvider(data, size);
-
-        tinyxml2::XMLDocument doc;
-        tinyxml2::XMLError eResult = doc.Parse(reinterpret_cast&lt;const char*&gt;(data), size);
-        if (eResult != tinyxml2::XML_SUCCESS) {
-            return 0;
-        }
-
-        tinyxml2::XMLElement* element = doc.NewElement(&#34;test&#34;);
-
-        tinyxml2::XMLNode* clonedElement = element-&gt;ShallowClone(&amp;doc);
-
-        if (clonedElement) {
-            delete clonedElement;
-        }
-
-        return 0;
-    }
-}
-```
-
-### Explanation of Changes:
-1. **Include Correct Header for `tinyxml2`**: Changed the include statement from `#include &#34;tinyxml2.h&#34;` to `#include &lt;tinyxml2.h&gt;`. This assumes that the `tinyxml2` library is installed and available in the include path of the compiler.
-2. **Ensure Correct Linking**: Make sure that when you compile this code, you link against the `tinyxml2` library. This can typically be done by adding `-ltinyxml2` to your linker flags.
-
-### Compilation Command:
-To compile this code with `clang` and `libFuzzer`, you would use a command similar to the following:
-
-```sh
-clang++ -fsanitize=fuzzer -o fuzz_target fuzz_target.cpp -ltinyxml2
-```
-
-Make sure that the `tinyxml2` library is installed on your system. If it is not, you can install it using a package manager like `apt` on Ubuntu:
-
-```sh
-sudo apt-get install libtinyxml2-dev
-```
-
-Or you can download and build it from source if necessary.
 </pre>
 
 
 <h2>Logs</h2>
 <pre>
-Fixing /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-tinyxml2-_znk8tinyxml210xmlelement12shallowcloneepns_11xmldocumente/fixed_targets/02.cpp with gpt-4o, attempt 1.
-Fixing /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-tinyxml2-_znk8tinyxml210xmlelement12shallowcloneepns_11xmldocumente/fixed_targets/02.cpp with gpt-4o, attempt 2.
-Fixing /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-tinyxml2-_znk8tinyxml210xmlelement12shallowcloneepns_11xmldocumente/fixed_targets/02.cpp with gpt-4o, attempt 3.
-Fixing /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-tinyxml2-_znk8tinyxml210xmlelement12shallowcloneepns_11xmldocumente/fixed_targets/02.cpp with gpt-4o, attempt 4.
-Fixing /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-tinyxml2-_znk8tinyxml210xmlelement12shallowcloneepns_11xmldocumente/fixed_targets/02.cpp with gpt-4o, attempt 5.
-Failed to build /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-tinyxml2-_znk8tinyxml210xmlelement12shallowcloneepns_11xmldocumente/fixed_targets/02.cpp with gpt-4o in 5 iterations of fixing.
+Successfully built /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-tinyxml2-_znk8tinyxml210xmlelement12shallowcloneepns_11xmldocumente/fixed_targets/02.cpp with gpt-4o in 0 iterations of fixing.
+Result for tinyxml2-znk8tinyxml210xmlelement12shallowcloneepns_11xmldocumente-02: crashes=False, coverage=0.07565130260521043 (151/1996), coverage diff=0.02162565249813572 (58/2682)
 
 </pre>
 
 <h2>Run logs</h2>
 <pre>
+INFO:__main__:Running: docker run --rm --privileged --shm-size=2g --platform linux/amd64 -e FUZZING_ENGINE=libfuzzer -e SANITIZER=address -e RUN_FUZZER_MODE=interactive -e HELPER=True -v /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-tinyxml2-_znk8tinyxml210xmlelement12shallowcloneepns_11xmldocumente/corpora/02.cpp:/tmp/xmltest_corpus -v /tmp/tmpzsjfth50/build/out/tinyxml2-znk8tinyxml210xmlelement12shallowcloneepns_11xmldocumente-02:/out -t gcr.io/oss-fuzz-base/base-runner run_fuzzer xmltest -print_final_stats=1 -max_total_time=30 -len_control=0 -timeout=30.
+vm.mmap_rnd_bits = 28
+rm: cannot remove &#39;/tmp/xmltest_corpus&#39;: Device or resource busy
+/out/xmltest -rss_limit_mb=2560 -timeout=25 -print_final_stats=1 -max_total_time=30 -len_control=0 -timeout=30 /tmp/xmltest_corpus -dict=xml.dict &lt; /dev/null
+Dictionary: 60 entries
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 4176230833
+INFO: Loaded 1 modules   (1996 inline 8-bit counters): 1996 [0x55a9bc1b12d8, 0x55a9bc1b1aa4), 
+INFO: Loaded 1 PC tables (1996 PCs): 1996 [0x55a9bc1b1aa8,0x55a9bc1b9768), 
+INFO:        0 files found in /tmp/xmltest_corpus
+INFO: -max_len is not provided; libFuzzer will not generate inputs larger than 4096 bytes
+INFO: A corpus is not provided, starting from an empty corpus
+#2	INITED cov: 74 ft: 75 corp: 1/1b exec/s: 0 rss: 30Mb
+#3	NEW    cov: 74 ft: 79 corp: 2/3b lim: 4096 exec/s: 0 rss: 31Mb L: 2/2 MS: 1 CrossOver-
+#5	NEW    cov: 79 ft: 88 corp: 3/104b lim: 4096 exec/s: 0 rss: 31Mb L: 101/101 MS: 2 ShuffleBytes-InsertRepeatedBytes-
+#16	NEW    cov: 79 ft: 92 corp: 4/252b lim: 4096 exec/s: 0 rss: 31Mb L: 148/148 MS: 1 CopyPart-
+#20	REDUCE cov: 79 ft: 92 corp: 4/206b lim: 4096 exec/s: 0 rss: 31Mb L: 55/148 MS: 4 CrossOver-ChangeBit-ShuffleBytes-EraseBytes-
+#26	NEW    cov: 79 ft: 96 corp: 5/209b lim: 4096 exec/s: 0 rss: 31Mb L: 3/148 MS: 1 InsertByte-
+#28	REDUCE cov: 79 ft: 96 corp: 5/203b lim: 4096 exec/s: 0 rss: 31Mb L: 49/148 MS: 2 ChangeBinInt-EraseBytes-
+#30	NEW    cov: 79 ft: 100 corp: 6/218b lim: 4096 exec/s: 0 rss: 31Mb L: 15/148 MS: 2 InsertByte-ManualDict- DE: &#34; version=\&#34;1\&#34;&#34;-
+#36	NEW    cov: 79 ft: 104 corp: 7/222b lim: 4096 exec/s: 0 rss: 31Mb L: 4/148 MS: 1 InsertByte-
+#44	NEW    cov: 79 ft: 108 corp: 8/239b lim: 4096 exec/s: 0 rss: 31Mb L: 17/148 MS: 3 CopyPart-CrossOver-PersAutoDict- DE: &#34; version=\&#34;1\&#34;&#34;-
+#47	REDUCE cov: 79 ft: 108 corp: 8/231b lim: 4096 exec/s: 0 rss: 31Mb L: 41/148 MS: 3 PersAutoDict-ChangeASCIIInt-EraseBytes- DE: &#34; version=\&#34;1\&#34;&#34;-
+#66	REDUCE cov: 79 ft: 108 corp: 8/226b lim: 4096 exec/s: 0 rss: 31Mb L: 10/148 MS: 4 PersAutoDict-InsertByte-InsertByte-EraseBytes- DE: &#34; version=\&#34;1\&#34;&#34;-
+#118	REDUCE cov: 79 ft: 108 corp: 8/224b lim: 4096 exec/s: 0 rss: 32Mb L: 8/148 MS: 2 InsertByte-EraseBytes-
+#210	REDUCE cov: 79 ft: 108 corp: 8/223b lim: 4096 exec/s: 0 rss: 32Mb L: 40/148 MS: 2 CrossOver-EraseBytes-
+#217	REDUCE cov: 79 ft: 108 corp: 8/205b lim: 4096 exec/s: 0 rss: 32Mb L: 130/130 MS: 2 EraseBytes-CrossOver-
+	NEW_FUNC[1/8]: 0x55a9bc0f6f30 in tinyxml2::XMLAttribute::Name() const /src/tinyxml2/tinyxml2.cpp:1441
+	NEW_FUNC[2/8]: 0x55a9bc0f6f60 in tinyxml2::XMLAttribute::Value() const /src/tinyxml2/tinyxml2.cpp:1446
+#293	NEW    cov: 129 ft: 169 corp: 9/209b lim: 4096 exec/s: 0 rss: 33Mb L: 4/130 MS: 1 InsertByte-
+	NEW_FUNC[1/1]: 0x55a9bc0e6e90 in std::__1::basic_string&lt;char, std::__1::char_traits&lt;char&gt;, std::__1::allocator&lt;char&gt;&gt;::__shrink_or_extend[abi:v180000](unsigned long) /usr/local/bin/../include/c++/v1/string:3269
+#317	NEW    cov: 140 ft: 182 corp: 10/235b lim: 4096 exec/s: 0 rss: 33Mb L: 26/130 MS: 4 PersAutoDict-PersAutoDict-ChangeASCIIInt-CopyPart- DE: &#34; version=\&#34;1\&#34;&#34;-&#34; version=\&#34;1\&#34;&#34;-
+#319	REDUCE cov: 140 ft: 182 corp: 10/231b lim: 4096 exec/s: 0 rss: 33Mb L: 36/130 MS: 2 ManualDict-EraseBytes- DE: &#34;NOTATION&#34;-
+#472	NEW    cov: 140 ft: 201 corp: 11/237b lim: 4096 exec/s: 0 rss: 34Mb L: 6/130 MS: 3 InsertByte-InsertByte-ChangeByte-
+#516	REDUCE cov: 143 ft: 205 corp: 12/370b lim: 4096 exec/s: 0 rss: 34Mb L: 133/133 MS: 4 ShuffleBytes-CrossOver-CopyPart-CrossOver-
+#527	NEW    cov: 143 ft: 245 corp: 13/374b lim: 4096 exec/s: 0 rss: 35Mb L: 4/133 MS: 1 ChangeBinInt-
+#586	REDUCE cov: 143 ft: 245 corp: 13/373b lim: 4096 exec/s: 0 rss: 35Mb L: 16/133 MS: 4 ChangeBinInt-CopyPart-EraseBytes-ManualDict- DE: &#34;EMPTY&#34;-
+#589	NEW    cov: 143 ft: 260 corp: 14/397b lim: 4096 exec/s: 0 rss: 35Mb L: 24/133 MS: 3 InsertRepeatedBytes-ChangeBinInt-CopyPart-
+#601	NEW    cov: 143 ft: 263 corp: 15/412b lim: 4096 exec/s: 0 rss: 35Mb L: 15/133 MS: 2 ChangeBit-EraseBytes-
+#603	NEW    cov: 143 ft: 269 corp: 16/416b lim: 4096 exec/s: 0 rss: 35Mb L: 4/133 MS: 2 ChangeBit-EraseBytes-
+#633	NEW    cov: 143 ft: 270 corp: 17/449b lim: 4096 exec/s: 0 rss: 35Mb L: 33/133 MS: 5 ShuffleBytes-ShuffleBytes-CopyPart-ChangeByte-CopyPart-
+#649	NEW    cov: 145 ft: 272 corp: 18/524b lim: 4096 exec/s: 0 rss: 36Mb L: 75/133 MS: 1 InsertRepeatedBytes-
+#656	REDUCE cov: 145 ft: 272 corp: 18/515b lim: 4096 exec/s: 0 rss: 36Mb L: 66/133 MS: 2 InsertByte-EraseBytes-
+#667	NEW    cov: 147 ft: 287 corp: 19/614b lim: 4096 exec/s: 0 rss: 36Mb L: 99/133 MS: 1 CrossOver-
+#676	NEW    cov: 147 ft: 292 corp: 20/620b lim: 4096 exec/s: 0 rss: 36Mb L: 6/133 MS: 4 EraseBytes-ChangeBit-CrossOver-ChangeBit-
+#715	REDUCE cov: 147 ft: 296 corp: 21/883b lim: 4096 exec/s: 0 rss: 36Mb L: 263/263 MS: 4 CrossOver-ManualDict-ShuffleBytes-CrossOver- DE: &#34;EMPTY&#34;-
+#722	REDUCE cov: 147 ft: 296 corp: 21/879b lim: 4096 exec/s: 0 rss: 36Mb L: 11/263 MS: 2 ChangeBinInt-EraseBytes-
+#729	NEW    cov: 149 ft: 307 corp: 22/985b lim: 4096 exec/s: 0 rss: 36Mb L: 106/263 MS: 2 InsertByte-CrossOver-
+#777	NEW    cov: 149 ft: 326 corp: 23/1487b lim: 4096 exec/s: 0 rss: 37Mb L: 502/502 MS: 3 CopyPart-ChangeASCIIInt-CopyPart-
+#796	NEW    cov: 149 ft: 329 corp: 24/1989b lim: 4096 exec/s: 0 rss: 37Mb L: 502/502 MS: 4 ManualDict-ChangeBit-ChangeByte-CopyPart- DE: &#34;&lt;!ELEMENT&#34;-
+#913	REDUCE cov: 149 ft: 329 corp: 24/1953b lim: 4096 exec/s: 0 rss: 38Mb L: 227/502 MS: 2 ChangeBinInt-EraseBytes-
+#988	NEW    cov: 149 ft: 331 corp: 25/2043b lim: 4096 exec/s: 0 rss: 39Mb L: 90/502 MS: 5 CopyPart-InsertByte-CrossOver-ChangeASCIIInt-InsertRepeatedBytes-
+#1005	NEW    cov: 149 ft: 336 corp: 26/2046b lim: 4096 exec/s: 0 rss: 39Mb L: 3/502 MS: 2 CopyPart-EraseBytes-
+#1009	REDUCE cov: 149 ft: 336 corp: 26/2023b lim: 4096 exec/s: 0 rss: 39Mb L: 43/502 MS: 4 ChangeBit-ManualDict-InsertByte-EraseBytes- DE: &#34;#IMPLIED&#34;-
+#1010	NEW    cov: 149 ft: 338 corp: 27/2139b lim: 4096 exec/s: 0 rss: 39Mb L: 116/502 MS: 1 CrossOver-
+#1017	NEW    cov: 150 ft: 339 corp: 28/2143b lim: 4096 exec/s: 0 rss: 39Mb L: 4/502 MS: 2 ShuffleBytes-CopyPart-
+#1033	NEW    cov: 150 ft: 342 corp: 29/2146b lim: 4096 exec/s: 0 rss: 39Mb L: 3/502 MS: 1 ChangeBinInt-
+#1044	NEW    cov: 150 ft: 343 corp: 30/2150b lim: 4096 exec/s: 0 rss: 39Mb L: 4/502 MS: 1 InsertByte-
+#1063	REDUCE cov: 150 ft: 343 corp: 30/2140b lim: 4096 exec/s: 0 rss: 40Mb L: 80/502 MS: 4 ChangeBinInt-ChangeByte-InsertByte-EraseBytes-
+#1099	REDUCE cov: 150 ft: 343 corp: 30/2138b lim: 4096 exec/s: 0 rss: 40Mb L: 2/502 MS: 1 EraseBytes-
+#1157	REDUCE cov: 150 ft: 343 corp: 30/2109b lim: 4096 exec/s: 0 rss: 40Mb L: 473/502 MS: 3 ChangeBit-CMP-EraseBytes- DE: &#34;\000\000\000\000&#34;-
+#1189	REDUCE cov: 150 ft: 343 corp: 30/2099b lim: 4096 exec/s: 0 rss: 41Mb L: 70/502 MS: 2 InsertByte-EraseBytes-
+#1195	REDUCE cov: 150 ft: 343 corp: 30/2068b lim: 4096 exec/s: 0 rss: 41Mb L: 39/502 MS: 1 EraseBytes-
+#1215	NEW    cov: 150 ft: 356 corp: 31/2492b lim: 4096 exec/s: 0 rss: 41Mb L: 424/502 MS: 5 ManualDict-ManualDict-ChangeASCIIInt-CMP-CrossOver- DE: &#34;&#39;&#39;&#34;-&#34;NOTATION&#34;-&#34;\377\377\377\377\377\377\377\377&#34;-
+#1216	NEW    cov: 150 ft: 358 corp: 32/2591b lim: 4096 exec/s: 0 rss: 41Mb L: 99/502 MS: 1 CrossOver-
+#1224	NEW    cov: 150 ft: 359 corp: 33/2597b lim: 4096 exec/s: 0 rss: 41Mb L: 6/502 MS: 3 InsertByte-ChangeByte-InsertByte-
+#1287	REDUCE cov: 150 ft: 359 corp: 33/2592b lim: 4096 exec/s: 0 rss: 42Mb L: 6/502 MS: 3 CMP-ChangeBit-EraseBytes- DE: &#34;\001\000&#34;-
+#1316	REDUCE cov: 150 ft: 359 corp: 33/2587b lim: 4096 exec/s: 0 rss: 42Mb L: 111/502 MS: 4 ChangeBinInt-CrossOver-ChangeBit-EraseBytes-
+#1342	REDUCE cov: 151 ft: 360
+...truncated...
+rt-EraseBytes-
+#710914	REDUCE cov: 151 ft: 469 corp: 55/2508b lim: 4096 exec/s: 50779 rss: 54Mb L: 274/542 MS: 2 EraseBytes-CopyPart-
+#715620	REDUCE cov: 151 ft: 469 corp: 55/2506b lim: 4096 exec/s: 51115 rss: 54Mb L: 32/542 MS: 1 EraseBytes-
+#718641	REDUCE cov: 151 ft: 469 corp: 55/2504b lim: 4096 exec/s: 51331 rss: 54Mb L: 44/542 MS: 1 EraseBytes-
+#722197	REDUCE cov: 151 ft: 469 corp: 55/2500b lim: 4096 exec/s: 51585 rss: 54Mb L: 107/542 MS: 1 EraseBytes-
+#724358	REDUCE cov: 151 ft: 469 corp: 55/2499b lim: 4096 exec/s: 51739 rss: 54Mb L: 54/542 MS: 1 EraseBytes-
+#734129	REDUCE cov: 151 ft: 469 corp: 55/2492b lim: 4096 exec/s: 52437 rss: 54Mb L: 267/542 MS: 1 EraseBytes-
+#738150	REDUCE cov: 151 ft: 469 corp: 55/2487b lim: 4096 exec/s: 49210 rss: 54Mb L: 254/542 MS: 1 EraseBytes-
+#744506	REDUCE cov: 151 ft: 469 corp: 55/2485b lim: 4096 exec/s: 49633 rss: 54Mb L: 28/542 MS: 1 EraseBytes-
+#761834	REDUCE cov: 151 ft: 469 corp: 55/2482b lim: 4096 exec/s: 50788 rss: 54Mb L: 51/542 MS: 3 ChangeBit-InsertByte-EraseBytes-
+#761970	REDUCE cov: 151 ft: 469 corp: 55/2481b lim: 4096 exec/s: 50798 rss: 54Mb L: 41/542 MS: 1 EraseBytes-
+#764167	REDUCE cov: 151 ft: 469 corp: 55/2479b lim: 4096 exec/s: 50944 rss: 54Mb L: 252/542 MS: 2 PersAutoDict-EraseBytes- DE: &#34;&amp;#x1;&#34;-
+#767363	REDUCE cov: 151 ft: 469 corp: 55/2477b lim: 4096 exec/s: 51157 rss: 54Mb L: 49/542 MS: 1 EraseBytes-
+#767679	REDUCE cov: 151 ft: 469 corp: 55/2475b lim: 4096 exec/s: 51178 rss: 54Mb L: 66/542 MS: 1 EraseBytes-
+#768060	REDUCE cov: 151 ft: 469 corp: 55/2474b lim: 4096 exec/s: 51204 rss: 54Mb L: 48/542 MS: 1 EraseBytes-
+#768662	REDUCE cov: 151 ft: 469 corp: 55/2473b lim: 4096 exec/s: 51244 rss: 54Mb L: 75/542 MS: 2 ChangeBinInt-EraseBytes-
+#773584	REDUCE cov: 151 ft: 469 corp: 55/2472b lim: 4096 exec/s: 51572 rss: 54Mb L: 20/542 MS: 2 ChangeBit-EraseBytes-
+#787575	REDUCE cov: 151 ft: 469 corp: 55/2470b lim: 4096 exec/s: 52505 rss: 54Mb L: 95/542 MS: 1 EraseBytes-
+#798616	REDUCE cov: 151 ft: 469 corp: 55/2469b lim: 4096 exec/s: 49913 rss: 54Mb L: 27/542 MS: 1 EraseBytes-
+#799037	REDUCE cov: 151 ft: 469 corp: 55/2467b lim: 4096 exec/s: 49939 rss: 54Mb L: 30/542 MS: 1 EraseBytes-
+#813018	REDUCE cov: 151 ft: 469 corp: 55/2466b lim: 4096 exec/s: 50813 rss: 54Mb L: 29/542 MS: 1 EraseBytes-
+#827794	REDUCE cov: 151 ft: 469 corp: 55/2463b lim: 4096 exec/s: 51737 rss: 54Mb L: 92/542 MS: 1 EraseBytes-
+#830501	REDUCE cov: 151 ft: 469 corp: 55/2461b lim: 4096 exec/s: 51906 rss: 54Mb L: 250/542 MS: 2 CMP-EraseBytes- DE: &#34;xm&#34;-
+#835429	REDUCE cov: 151 ft: 469 corp: 55/2460b lim: 4096 exec/s: 52214 rss: 54Mb L: 40/542 MS: 3 ChangeASCIIInt-ChangeBinInt-EraseBytes-
+#837601	REDUCE cov: 151 ft: 469 corp: 55/2459b lim: 4096 exec/s: 52350 rss: 54Mb L: 249/542 MS: 2 ChangeByte-EraseBytes-
+#839102	REDUCE cov: 151 ft: 469 corp: 55/2453b lim: 4096 exec/s: 52443 rss: 54Mb L: 536/536 MS: 1 EraseBytes-
+#841413	REDUCE cov: 151 ft: 469 corp: 55/2452b lim: 4096 exec/s: 49494 rss: 54Mb L: 28/536 MS: 1 EraseBytes-
+#850581	REDUCE cov: 151 ft: 469 corp: 55/2444b lim: 4096 exec/s: 50034 rss: 54Mb L: 528/528 MS: 3 CMP-CopyPart-EraseBytes- DE: &#34;I\012&#34;-
+#857734	REDUCE cov: 151 ft: 469 corp: 55/2443b lim: 4096 exec/s: 50454 rss: 54Mb L: 125/528 MS: 3 ChangeByte-ChangeBinInt-EraseBytes-
+#861086	REDUCE cov: 151 ft: 469 corp: 55/2438b lim: 4096 exec/s: 50652 rss: 54Mb L: 262/528 MS: 2 EraseBytes-CopyPart-
+#878942	REDUCE cov: 151 ft: 469 corp: 55/2435b lim: 4096 exec/s: 48830 rss: 54Mb L: 41/528 MS: 1 EraseBytes-
+#880568	REDUCE cov: 151 ft: 469 corp: 55/2433b lim: 4096 exec/s: 48920 rss: 54Mb L: 105/528 MS: 1 EraseBytes-
+#882540	REDUCE cov: 151 ft: 469 corp: 55/2432b lim: 4096 exec/s: 49030 rss: 54Mb L: 65/528 MS: 2 ChangeBit-EraseBytes-
+#888971	REDUCE cov: 151 ft: 469 corp: 55/2431b lim: 4096 exec/s: 46787 rss: 54Mb L: 26/528 MS: 1 EraseBytes-
+#889847	REDUCE cov: 151 ft: 469 corp: 55/2426b lim: 4096 exec/s: 46834 rss: 54Mb L: 100/528 MS: 1 EraseBytes-
+#894868	REDUCE cov: 151 ft: 469 corp: 55/2423b lim: 4096 exec/s: 47098 rss: 54Mb L: 525/525 MS: 1 EraseBytes-
+#899259	REDUCE cov: 151 ft: 469 corp: 55/2422b lim: 4096 exec/s: 47329 rss: 54Mb L: 47/525 MS: 1 EraseBytes-
+#917745	REDUCE cov: 151 ft: 469 corp: 55/2421b lim: 4096 exec/s: 45887 rss: 54Mb L: 64/525 MS: 1 EraseBytes-
+#941336	REDUCE cov: 151 ft: 469 corp: 55/2420b lim: 4096 exec/s: 44825 rss: 54Mb L: 40/525 MS: 1 EraseBytes-
+#945007	REDUCE cov: 151 ft: 469 corp: 55/2413b lim: 4096 exec/s: 42954 rss: 54Mb L: 85/525 MS: 1 EraseBytes-
+#945709	REDUCE cov: 151 ft: 469 corp: 55/2410b lim: 4096 exec/s: 42986 rss: 54Mb L: 522/522 MS: 2 PersAutoDict-EraseBytes- DE: &#34;#IMPLIED&#34;-
+#950160	REDUCE cov: 151 ft: 469 corp: 55/2409b lim: 4096 exec/s: 43189 rss: 54Mb L: 248/522 MS: 1 EraseBytes-
+#958591	REDUCE cov: 151 ft: 469 corp: 55/2407b lim: 4096 exec/s: 43572 rss: 54Mb L: 520/520 MS: 1 EraseBytes-
+#962957	REDUCE cov: 151 ft: 469 corp: 55/2406b lim: 4096 exec/s: 41867 rss: 54Mb L: 27/520 MS: 1 EraseBytes-
+#964068	REDUCE cov: 151 ft: 469 corp: 55/2404b lim: 4096 exec/s: 41916 rss: 54Mb L: 45/520 MS: 1 EraseBytes-
+#984974	REDUCE cov: 151 ft: 469 corp: 55/2400b lim: 4096 exec/s: 41040 rss: 54Mb L: 516/516 MS: 1 EraseBytes-
+#998750	REDUCE cov: 151 ft: 469 corp: 55/2399b lim: 4096 exec/s: 41614 rss: 54Mb L: 26/516 MS: 1 EraseBytes-
+#1011897	REDUCE cov: 151 ft: 469 corp: 55/2398b lim: 4096 exec/s: 40475 rss: 54Mb L: 32/516 MS: 2 CopyPart-EraseBytes-
+#1014499	REDUCE cov: 151 ft: 469 corp: 55/2397b lim: 4096 exec/s: 40579 rss: 54Mb L: 99/516 MS: 2 ChangeBinInt-EraseBytes-
+#1048576	pulse  cov: 151 ft: 469 corp: 55/2397b lim: 4096 exec/s: 38836 rss: 54Mb
+#1058924	REDUCE cov: 151 ft: 469 corp: 55/2395b lim: 4096 exec/s: 39219 rss: 54Mb L: 514/514 MS: 5 ChangeBinInt-ManualDict-ChangeByte-ManualDict-EraseBytes- DE: &#34;&lt;!&#34;-&#34;&lt;a&gt;&#34;-
+#1090101	REDUCE cov: 151 ft: 469 corp: 55/2394b lim: 4096 exec/s: 38932 rss: 54Mb L: 84/514 MS: 2 ChangeASCIIInt-EraseBytes-
+#1102313	REDUCE cov: 151 ft: 469 corp: 55/2389b lim: 4096 exec/s: 38010 rss: 54Mb L: 509/509 MS: 2 ChangeByte-EraseBytes-
+#1113219	REDUCE cov: 151 ft: 469 corp: 55/2388b lim: 4096 exec/s: 38386 rss: 54Mb L: 63/509 MS: 1 EraseBytes-
+#1129763	REDUCE cov: 151 ft: 469 corp: 55/2387b lim: 4096 exec/s: 37658 rss: 54Mb L: 39/509 MS: 4 ChangeBinInt-ChangeByte-ChangeByte-EraseBytes-
+#1149653	DONE   cov: 151 ft: 469 corp: 55/2387b lim: 4096 exec/s: 37085 rss: 54Mb
+###### Recommended dictionary. ######
+&#34;\000\000\000\000&#34; # Uses: 1133
+&#34;\377\377\377\377\377\377\377\377&#34; # Uses: 995
+&#34;\001\000&#34; # Uses: 1127
+&#34;F\000\000\000\000\000\000\000&#34; # Uses: 1031
+&#34;\035\000\000\000\000\000\000\000&#34; # Uses: 1053
+&#34;\377\377\377\377\377\377\377\010&#34; # Uses: 1067
+&#34;\003\000&#34; # Uses: 1206
+&#34;\000\000\000\000\000\000\000\002&#34; # Uses: 1012
+&#34;\243\243\243\243&#34; # Uses: 1079
+&#34;\022\000\000\000\000\000\000\000&#34; # Uses: 1021
+&#34;\000\005&#34; # Uses: 1161
+&#34;\000\000\000\000\000\000\000 &#34; # Uses: 1040
+&#34;\025\000\000\000\000\000\000\000&#34; # Uses: 1053
+&#34;*******\\&#34; # Uses: 989
+&#34;\\U&#34; # Uses: 1153
+&#34;\000\002&#34; # Uses: 1166
+&#34;\373\023\\\\\\\\&#34; # Uses: 1082
+&#34;\001\000\000\000\000\000\0005&#34; # Uses: 1067
+&#34;\012\000\000\000\000\000\000\000&#34; # Uses: 999
+&#34;?\\\\&#34; # Uses: 1138
+&#34;\012\012&#34; # Uses: 1190
+&#34;\377\377\377\377&#34; # Uses: 1089
+&#34;\012ION&#34; # Uses: 1101
+&#34;@\377&#34; # Uses: 1105
+&#34;%U&#34; # Uses: 1115
+&#34;\001\000\000\000&#34; # Uses: 1151
+&#34;?\\&#34; # Uses: 1106
+&#34;\027\000\000\000\000\000\000\000&#34; # Uses: 1016
+&#34;ver&#34; # Uses: 1092
+&#34;\024&lt;?\024\024&#34; # Uses: 1061
+&#34;\001\000\000\000\000\000\000\272&#34; # Uses: 939
+&#34;\377\011&#34; # Uses: 1058
+&#34;\000\000\000\000\000\000\000\030&#34; # Uses: 977
+&#34;\012\012IO#**&#34; # Uses: 969
+&#34;e\000\000\000\000\000\000\000&#34; # Uses: 875
+&#34;\377\010&#34; # Uses: 1093
+&#34;\\\\&#34; # Uses: 1069
+&#34;\000\000&#34; # Uses: 984
+&#34;\001\000\000\001&#34; # Uses: 783
+&#34;\377\377\377\377\377\377\377 &#34; # Uses: 782
+&#34;w\000\000\000\000\000\000\000&#34; # Uses: 633
+&#34;\010\366&#34; # Uses: 511
+&#34;xm&#34; # Uses: 288
+&#34;I\012&#34; # Uses: 295
+###### End of recommended dictionary. ######
+Done 1149653 runs in 31 second(s)
+stat::number_of_executed_units: 1149653
+stat::average_exec_per_sec:     37085
+stat::new_units_added:          787
+stat::slowest_unit_time_sec:    0
+stat::peak_rss_mb:              54
 
 </pre>
 
