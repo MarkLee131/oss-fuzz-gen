@@ -287,8 +287,7 @@ class GoogleModel(LLM):
   def generate_code(self,
                     prompt: prompts.Prompt,
                     response_dir: str,
-                    log_output: bool = False,
-                    spec=False) -> None:
+                    log_output: bool = False) -> None:
     """Generates code with internal LLM."""
     if not self.ai_binary:
       print(f'Error: This model requires a local AI binary: {self.ai_binary}')
