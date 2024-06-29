@@ -29,15 +29,19 @@ def parse_log(log_path: str):
     projects_finished = []
 
     for line in f:
+      benchmark_name = ""
+      function_name = ""
+      
       if "Finished benchmark" in line:
         # print(line)
-        benchmark_name = re.search(
-            r'Finished benchmark (.+?),', line).group(1) if re.search(
-                r'Finished benchmark (.+?),', line) else None
+        if re.search(r'Finished benchmark (.+?),', line):
+          benchmark_name = re.search(r'Finished benchmark (.+?),', line).group(1) 
         ## function_name is followed
-        function_name = re.search(
-            r'Finished benchmark .+?, (.+?) ', line).group(1) if re.search(
-                r'Finished benchmark .+?, (.+?) ', line) else None
+        if re.search(r'Finished benchmark .+?, (.+?) ', line):
+          function_name = re.search(
+            r'Finished benchmark .+?, (.+?) ', line).group(1)
+        
+        
         # print(benchmark_name)
         # print(function_name)
         # print("\n")
