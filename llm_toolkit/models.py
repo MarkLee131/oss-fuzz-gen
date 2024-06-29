@@ -288,7 +288,7 @@ class GoogleModel(LLM):
                     prompt: prompts.Prompt,
                     response_dir: str,
                     log_output: bool = False,
-                    spec = False) -> None:
+                    spec=False) -> None:
     """Generates code with internal LLM."""
     if not self.ai_binary:
       print(f'Error: This model requires a local AI binary: {self.ai_binary}')
@@ -351,8 +351,7 @@ class VertexAIModel(GoogleModel):
                     prompt: prompts.Prompt,
                     response_dir: str,
                     log_output: bool = False,
-                    spec=False
-                    ) -> None:
+                    spec=False) -> None:
     del log_output
     if self.ai_binary:
       print(f'VertexAI does not use local AI binary: {self.ai_binary}')
