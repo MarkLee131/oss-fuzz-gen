@@ -29,8 +29,6 @@ def parse_log(log_path: str):
     projects_finished = []
 
     for line in f:
-      benchmark_name = ""
-      function_name = ""
 
       if "Finished benchmark" in line:
         benchmark_name_re = re.search(r'Finished benchmark (.+?),', line)
