@@ -31,17 +31,17 @@ def parse_log(log_path: str):
     for line in f:
       benchmark_name = ""
       function_name = ""
-      
+
       if "Finished benchmark" in line:
         # print(line)
         if re.search(r'Finished benchmark (.+?),', line):
-          benchmark_name = re.search(r'Finished benchmark (.+?),', line).group(1) 
+          benchmark_name = re.search(r'Finished benchmark (.+?),',
+                                     line).group(1)
         ## function_name is followed
         if re.search(r'Finished benchmark .+?, (.+?) ', line):
-          function_name = re.search(
-            r'Finished benchmark .+?, (.+?) ', line).group(1)
-        
-        
+          function_name = re.search(r'Finished benchmark .+?, (.+?) ',
+                                    line).group(1)
+
         # print(benchmark_name)
         # print(function_name)
         # print("\n")
