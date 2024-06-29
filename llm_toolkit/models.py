@@ -120,7 +120,7 @@ class LLM:
     """Estimates the number of tokens in |text|."""
 
   # ============================== Generation ============================== #
-  # @abstractmethod ## temprarily removed for testing
+  @abstractmethod
   def generate_code(self,
                     prompt: prompts.Prompt,
                     response_dir: str,
@@ -287,7 +287,8 @@ class GoogleModel(LLM):
   def generate_code(self,
                     prompt: prompts.Prompt,
                     response_dir: str,
-                    log_output: bool = False) -> None:
+                    log_output: bool = False,
+                    spec = False) -> None:
     """Generates code with internal LLM."""
     if not self.ai_binary:
       print(f'Error: This model requires a local AI binary: {self.ai_binary}')
@@ -349,7 +350,9 @@ class VertexAIModel(GoogleModel):
   def generate_code(self,
                     prompt: prompts.Prompt,
                     response_dir: str,
-                    log_output: bool = False) -> None:
+                    log_output: bool = False,
+                    spec=False
+                    ) -> None:
     del log_output
     if self.ai_binary:
       print(f'VertexAI does not use local AI binary: {self.ai_binary}')
