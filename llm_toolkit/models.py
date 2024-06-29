@@ -227,7 +227,7 @@ class GPT(LLM):
                     prompt: prompts.Prompt,
                     response_dir: str,
                     log_output: bool = False,
-                    spec = False) -> None:
+                    spec=False) -> None:
     """Generates code with OpenAI's API."""
     if self.ai_binary:
       print(f'OpenAI does not use local AI binary: {self.ai_binary}')
@@ -240,18 +240,17 @@ class GPT(LLM):
                                                  n=1,
                                                  temperature=self.temperature,
                                                  max_tokens=self.max_tokens,
-                                                 stop=None),
-          openai.OpenAIError)
-      
+                                                 stop=None), openai.OpenAIError)
+
     else:
-      
+
       completion = self.with_retry_on_error(
           lambda: client.chat.completions.create(messages=prompt.get(),
-                                                model=self.name,
-                                                n=self.num_samples,
-                                                temperature=self.temperature),
+                                                 model=self.name,
+                                                 n=self.num_samples,
+                                                 temperature=self.temperature),
           openai.OpenAIError)
-      
+
     # TODO: Add a default value for completion.
     if log_output:
       print(completion)

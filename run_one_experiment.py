@@ -89,7 +89,8 @@ def generate_spec(benchmark: Benchmark,
         f'{benchmark.function_signature} using {model.name}..')
   model.generate_code(prompt,
                       response_dir=work_dirs.raw_specification_dir,
-                      log_output=debug, spec=True)
+                      log_output=debug,
+                      spec=True)
 
   generated_specs = []
   for file in os.listdir(work_dirs.raw_specification_dir):
