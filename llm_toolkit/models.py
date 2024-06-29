@@ -120,7 +120,7 @@ class LLM:
     """Estimates the number of tokens in |text|."""
 
   # ============================== Generation ============================== #
-  @abstractmethod
+  # @abstractmethod ## temprarily removed for testing
   def generate_code(self,
                     prompt: prompts.Prompt,
                     response_dir: str,
@@ -288,7 +288,7 @@ class GoogleModel(LLM):
                     prompt: prompts.Prompt,
                     response_dir: str,
                     log_output: bool = False,
-                    spec = False) -> None:
+                    spec=False) -> None:
     """Generates code with internal LLM."""
     if not self.ai_binary:
       print(f'Error: This model requires a local AI binary: {self.ai_binary}')
