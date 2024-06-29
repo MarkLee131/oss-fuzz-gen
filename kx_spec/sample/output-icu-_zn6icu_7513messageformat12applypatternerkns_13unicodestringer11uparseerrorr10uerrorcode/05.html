@@ -1,0 +1,447 @@
+<!doctype html>
+
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Experiment results</title>
+<style>
+* {
+    box-sizing: border-box;
+}
+
+html {
+    line-height: 1.15;
+}
+
+body {
+    font-family: sans-serif;
+    font-size: 16px;
+}
+
+table {
+    border-collapse: collapse;
+    border-spacing: 0;
+}
+
+td, th {
+    border-right: 1px #dedede solid;
+    border-bottom: 1px #dedede solid;
+    padding: 5px;
+    text-align: left;
+}
+td:first-child, th:first-child {
+    border-left: 1px #dedede solid;
+}
+th {
+    border-top: 1px #dedede solid;
+}
+
+tbody tr:nth-child(odd) {
+    background-color: #f4f5ff;
+}
+</style>
+<body>
+    LLM: 
+    
+<h1>output-icu-_zn6icu_7513messageformat12applypatternerkns_13unicodestringer11uparseerrorr10uerrorcode / 05</h1>
+Bug: False
+<br>
+Crash reason: NO_SEMANTIC_ERR
+<br>
+<br>
+
+
+
+
+<h3>Final code</h3>
+
+<pre>
+#include &lt;fuzzer/FuzzedDataProvider.h&gt;
+#include &lt;unicode/unistr.h&gt;
+#include &lt;unicode/parseerr.h&gt;
+#include &lt;unicode/utypes.h&gt;
+#include &lt;unicode/msgfmt.h&gt;
+
+extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    return 0;
+}
+
+extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    FuzzedDataProvider dataProvider(data, size);
+
+    std::string patternStr = dataProvider.ConsumeRandomLengthString();
+    icu::UnicodeString pattern(patternStr.c_str(), &#34;UTF-8&#34;);
+
+    UParseError parseError;
+    UErrorCode errorCode = U_ZERO_ERROR;
+
+    // Create a MessageFormat object with a valid pattern to avoid using the deleted default constructor
+    icu::MessageFormat messageFormat(pattern, errorCode);
+
+    // Apply a new pattern to the existing MessageFormat object
+    messageFormat.applyPattern(pattern, parseError, errorCode);
+
+    return 0;
+}
+</pre>
+
+
+<h3>Fixer prompt #1</h3>
+<pre>
+
+Given the following C++ fuzz harness and its build error message, fix the code to make it build for fuzzing.
+
+If there is undeclared identifier or unknown type name error, fix it by finding and including the related libraries.
+
+You MUST wrap the headers with &lt;code&gt;extern &#34;C&#34;&lt;/code&gt; if they are C headers, especially the headers are from the project.
+
+Note that some code may need to be wrapped with &lt;code&gt;extern &#34;C&#34;&lt;/code&gt; as their source is C program.
+
+MUST RETURN THE FULL CODE, INCLUDING UNCHANGED PARTS.
+EXTREMELY IMPORTANT: AVOID USING &lt;code&gt;goto&lt;/code&gt;. If you have to write code using &lt;code&gt;goto&lt;/code&gt;, you MUST MUST also declare all variables BEFORE the &lt;code&gt;goto&lt;/code&gt;. Never introduce new variables after the &lt;code&gt;goto&lt;/code&gt;.
+
+Below is the code needs to be built:
+&lt;code&gt;
+#include &lt;fuzzer/FuzzedDataProvider.h&gt;
+#include &lt;unicode/unistr.h&gt;
+#include &lt;unicode/parseerr.h&gt;
+#include &lt;unicode/utypes.h&gt;
+#include &lt;unicode/msgfmt.h&gt;
+
+extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    return 0;
+}
+
+extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    FuzzedDataProvider dataProvider(data, size);
+
+    std::string patternStr = dataProvider.ConsumeRandomLengthString();
+    icu::UnicodeString pattern(patternStr.c_str(), &#34;UTF-8&#34;);
+
+    UParseError parseError;
+    UErrorCode errorCode = U_ZERO_ERROR;
+
+    icu::MessageFormat messageFormat;
+
+    messageFormat.applyPattern(pattern, parseError, errorCode);
+
+    return 0;
+}
+&lt;/code&gt;
+
+The code has the following build issues:
+&lt;error&gt;
+/src/icu/icu4c/source/test/fuzzer/relative_date_time_formatter_fuzzer.cpp:20:24: error: call to deleted constructor of &#39;icu::MessageFormat&#39;
+   20 |     icu::MessageFormat messageFormat;
+      |                        ^
+/src/icu/icu4c/source/i18n/unicode/msgfmt.h:889:5: note: &#39;MessageFormat&#39; has been explicitly marked deleted here
+  889 |     MessageFormat() = delete; // default constructor not implemented
+      |     ^
+&lt;/error&gt;
+
+Fix code:
+1. Consider possible solutions for the issues listed above.
+2. Choose a solution that can maximize fuzzing result, which is utilizing the function under test and feeding it not null input.
+3. Apply the solutions to the original code.
+It&#39;s important to show the complete code, not only the fixed line.
+&lt;solution&gt;
+</pre>
+
+
+
+<h3>Code #1</h3>
+
+<pre>
+Here is the fixed code with the necessary changes to address the build issues:
+
+```cpp
+#include &lt;fuzzer/FuzzedDataProvider.h&gt;
+#include &lt;unicode/unistr.h&gt;
+#include &lt;unicode/parseerr.h&gt;
+#include &lt;unicode/utypes.h&gt;
+#include &lt;unicode/msgfmt.h&gt;
+
+extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    return 0;
+}
+
+extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    FuzzedDataProvider dataProvider(data, size);
+
+    std::string patternStr = dataProvider.ConsumeRandomLengthString();
+    icu::UnicodeString pattern(patternStr.c_str(), &#34;UTF-8&#34;);
+
+    UParseError parseError;
+    UErrorCode errorCode = U_ZERO_ERROR;
+
+    // Create a MessageFormat object with a valid pattern to avoid using the deleted default constructor
+    icu::MessageFormat messageFormat(pattern, errorCode);
+
+    // Apply a new pattern to the existing MessageFormat object
+    messageFormat.applyPattern(pattern, parseError, errorCode);
+
+    return 0;
+}
+```
+
+### Explanation of Changes:
+1. **Initialization of `MessageFormat`:** The default constructor for `icu::MessageFormat` is deleted. Instead, we initialize `messageFormat` with a valid pattern and `UErrorCode` to avoid using the deleted default constructor.
+2. **Pattern Application:** The `applyPattern` method is used to apply a new pattern to the existing `MessageFormat` object.
+
+This ensures that the `MessageFormat` object is properly constructed and the fuzzing harness can proceed to test the function under different input patterns.
+</pre>
+
+
+<h2>Logs</h2>
+<pre>
+Fixing /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-icu-_zn6icu_7513messageformat12applypatternerkns_13unicodestringer11uparseerrorr10uerrorcode/fixed_targets/05.cpp with gpt-4o, attempt 1.
+Successfully built /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-icu-_zn6icu_7513messageformat12applypatternerkns_13unicodestringer11uparseerrorr10uerrorcode/fixed_targets/05.cpp with gpt-4o in 1 iterations of fixing.
+Result for icu-zn6icu_7513messageformat12applypatternerkns_13unicodestringer11uparseerrorr10uerrorcode-05: crashes=False, coverage=0.007144616900714462 (783/109593), coverage diff=0.0029110819314718925 (470/161452)
+
+</pre>
+
+<h2>Run logs</h2>
+<pre>
+INFO:__main__:Running: docker run --rm --privileged --shm-size=2g --platform linux/amd64 -e FUZZING_ENGINE=libfuzzer -e SANITIZER=address -e RUN_FUZZER_MODE=interactive -e HELPER=True -v /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-icu-_zn6icu_7513messageformat12applypatternerkns_13unicodestringer11uparseerrorr10uerrorcode/corpora/05.cpp:/tmp/relative_date_time_formatter_fuzzer_corpus -v /tmp/tmpk31m_hoq/build/out/icu-zn6icu_7513messageformat12applypatternerkns_13unicodestringer11uparseerrorr10uerrorcode-05:/out -t gcr.io/oss-fuzz-base/base-runner run_fuzzer relative_date_time_formatter_fuzzer -print_final_stats=1 -max_total_time=30 -len_control=0 -timeout=30.
+vm.mmap_rnd_bits = 28
+rm: cannot remove &#39;/tmp/relative_date_time_formatter_fuzzer_corpus&#39;: Device or resource busy
+/out/relative_date_time_formatter_fuzzer -rss_limit_mb=2560 -timeout=25 -print_final_stats=1 -max_total_time=30 -len_control=0 -timeout=30 /tmp/relative_date_time_formatter_fuzzer_corpus &lt; /dev/null
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 3210049300
+INFO: Loaded 1 modules   (109593 inline 8-bit counters): 109593 [0x56114576f040, 0x561145789c59), 
+INFO: Loaded 1 PC tables (109593 PCs): 109593 [0x561145789c60,0x561145935df0), 
+INFO:        0 files found in /tmp/relative_date_time_formatter_fuzzer_corpus
+INFO: -max_len is not provided; libFuzzer will not generate inputs larger than 4096 bytes
+INFO: A corpus is not provided, starting from an empty corpus
+#2	INITED cov: 163 ft: 164 corp: 1/1b exec/s: 0 rss: 41Mb
+	NEW_FUNC[1/3]: 0x5611436f25d0 in UCNV_TO_U_CALLBACK_SUBSTITUTE_76 /src/icu/icu4c/source/common/ucnv_err.cpp:389
+	NEW_FUNC[2/3]: 0x56114377e600 in ucnv_cbToUWriteSub_76 /src/icu/icu4c/source/common/ucnv_cb.cpp:250
+#3	NEW    cov: 184 ft: 192 corp: 2/2b lim: 4096 exec/s: 3 rss: 42Mb L: 1/1 MS: 1 ChangeBit-
+#4	NEW    cov: 209 ft: 255 corp: 3/66b lim: 4096 exec/s: 4 rss: 42Mb L: 64/64 MS: 1 InsertRepeatedBytes-
+#5	NEW    cov: 209 ft: 268 corp: 4/68b lim: 4096 exec/s: 5 rss: 42Mb L: 2/64 MS: 1 CrossOver-
+#7	NEW    cov: 209 ft: 270 corp: 5/155b lim: 4096 exec/s: 7 rss: 42Mb L: 87/87 MS: 2 ShuffleBytes-CopyPart-
+#8	NEW    cov: 209 ft: 277 corp: 6/204b lim: 4096 exec/s: 8 rss: 42Mb L: 49/87 MS: 1 InsertRepeatedBytes-
+#12	NEW    cov: 209 ft: 278 corp: 7/241b lim: 4096 exec/s: 12 rss: 42Mb L: 37/87 MS: 4 EraseBytes-ShuffleBytes-CopyPart-ChangeByte-
+#22	NEW    cov: 209 ft: 279 corp: 8/296b lim: 4096 exec/s: 22 rss: 42Mb L: 55/87 MS: 5 ChangeBinInt-ShuffleBytes-CopyPart-ShuffleBytes-ChangeBinInt-
+#25	NEW    cov: 209 ft: 280 corp: 9/383b lim: 4096 exec/s: 25 rss: 42Mb L: 87/87 MS: 3 CopyPart-ChangeByte-CrossOver-
+#26	NEW    cov: 209 ft: 286 corp: 10/548b lim: 4096 exec/s: 26 rss: 42Mb L: 165/165 MS: 1 InsertRepeatedBytes-
+#38	NEW    cov: 209 ft: 315 corp: 11/576b lim: 4096 exec/s: 38 rss: 42Mb L: 28/165 MS: 2 ChangeBit-EraseBytes-
+#50	NEW    cov: 209 ft: 321 corp: 12/579b lim: 4096 exec/s: 50 rss: 42Mb L: 3/165 MS: 2 ChangeByte-InsertByte-
+#51	NEW    cov: 209 ft: 322 corp: 13/666b lim: 4096 exec/s: 51 rss: 42Mb L: 87/165 MS: 1 ChangeBit-
+#59	NEW    cov: 209 ft: 323 corp: 14/721b lim: 4096 exec/s: 59 rss: 42Mb L: 55/165 MS: 3 ChangeBit-ChangeBit-CMP- DE: &#34;6\000&#34;-
+#61	REDUCE cov: 209 ft: 323 corp: 14/687b lim: 4096 exec/s: 61 rss: 42Mb L: 53/165 MS: 2 ChangeBinInt-EraseBytes-
+#71	NEW    cov: 209 ft: 347 corp: 15/775b lim: 4096 exec/s: 71 rss: 42Mb L: 88/165 MS: 5 CrossOver-CMP-CrossOver-CopyPart-CMP- DE: &#34;X\000\000\000\000\000\000\000&#34;-&#34;\000\000\000\000\000\000\002\020&#34;-
+#108	NEW    cov: 212 ft: 372 corp: 16/778b lim: 4096 exec/s: 54 rss: 43Mb L: 3/165 MS: 2 PersAutoDict-ChangeBinInt- DE: &#34;6\000&#34;-
+#109	NEW    cov: 212 ft: 383 corp: 17/783b lim: 4096 exec/s: 54 rss: 43Mb L: 5/165 MS: 1 CopyPart-
+#111	NEW    cov: 212 ft: 385 corp: 18/915b lim: 4096 exec/s: 55 rss: 43Mb L: 132/165 MS: 2 CrossOver-CrossOver-
+#113	REDUCE cov: 212 ft: 385 corp: 18/913b lim: 4096 exec/s: 56 rss: 43Mb L: 47/165 MS: 2 CopyPart-EraseBytes-
+#115	NEW    cov: 212 ft: 419 corp: 19/1052b lim: 4096 exec/s: 57 rss: 43Mb L: 139/165 MS: 2 ChangeBinInt-InsertRepeatedBytes-
+#128	pulse  cov: 212 ft: 419 corp: 19/1052b lim: 4096 exec/s: 64 rss: 43Mb
+#135	NEW    cov: 212 ft: 444 corp: 20/1329b lim: 4096 exec/s: 67 rss: 43Mb L: 277/277 MS: 5 ChangeBit-InsertRepeatedBytes-PersAutoDict-ChangeBinInt-InsertRepeatedBytes- DE: &#34;6\000&#34;-
+#140	NEW    cov: 212 ft: 448 corp: 21/1600b lim: 4096 exec/s: 70 rss: 43Mb L: 271/277 MS: 5 InsertRepeatedBytes-CMP-InsertRepeatedBytes-CopyPart-CrossOver- DE: &#34;\001b&#34;-
+#141	REDUCE cov: 212 ft: 450 corp: 22/1740b lim: 4096 exec/s: 70 rss: 43Mb L: 140/277 MS: 1 CrossOver-
+#151	REDUCE cov: 216 ft: 454 corp: 23/1795b lim: 4096 exec/s: 75 rss: 43Mb L: 55/277 MS: 5 ShuffleBytes-ShuffleBytes-CrossOver-PersAutoDict-ChangeBinInt- DE: &#34;\001b&#34;-
+#177	REDUCE cov: 216 ft: 454 corp: 23/1786b lim: 4096 exec/s: 88 rss: 43Mb L: 46/277 MS: 1 EraseBytes-
+#196	NEW    cov: 219 ft: 460 corp: 24/1943b lim: 4096 exec/s: 98 rss: 43Mb L: 157/277 MS: 4 InsertRepeatedBytes-ChangeBit-ChangeByte-InsertRepeatedBytes-
+#199	REDUCE cov: 219 ft: 460 corp: 24/1938b lim: 4096 exec/s: 99 rss: 43Mb L: 50/277 MS: 3 ChangeBit-ChangeByte-EraseBytes-
+#205	NEW    cov: 222 ft: 464 corp: 25/1939b lim: 4096 exec/s: 102 rss: 43Mb L: 1/277 MS: 1 ChangeByte-
+#236	REDUCE cov: 222 ft: 464 corp: 25/1932b lim: 4096 exec/s: 118 rss: 43Mb L: 40/277 MS: 1 EraseBytes-
+#256	pulse  cov: 222 ft: 464 corp: 25/1932b lim: 4096 exec/s: 128 rss: 43Mb
+#278	NEW    cov: 222 ft: 486 corp: 26/1960b lim: 4096 exec/s: 139 rss: 43Mb L: 28/277 MS: 2 ChangeByte-PersAutoDict- DE: &#34;\000\000\000\000\000\000\002\020&#34;-
+#283	NEW    cov: 222 ft: 489 corp: 27/2133b lim: 4096 exec/s: 141 rss: 43Mb L: 173/277 MS: 5 PersAutoDict-CopyPart-ShuffleBytes-ShuffleBytes-ChangeBinInt- DE: &#34;\000\000\000\000\000\000\002\020&#34;-
+#297	NEW    cov: 222 ft: 491 corp: 28/2180b lim: 4096 exec/s: 148 rss: 43Mb L: 47/277 MS: 4 ChangeBinInt-ChangeByte-CrossOver-InsertRepeatedBytes-
+#339	NEW    cov: 222 ft: 492 corp: 29/2439b lim: 4096 exec/s: 169 rss: 43Mb L: 259/277 MS: 2 InsertByte-InsertRepeatedBytes-
+#376	NEW    cov: 222 ft: 493 corp: 30/2567b lim: 4096 exec/s: 188 rss: 43Mb L: 128/277 MS: 2 InsertRepeatedBytes-CMP- DE: &#34;en_US&#34;-
+#381	REDUCE cov: 222 ft: 493 corp: 30/2560b lim: 4096 exec/s: 190 rss: 44Mb L: 39/277 MS: 5 PersAutoDict-ChangeByte-InsertByte-ChangeBit-EraseBytes- DE: &#34;en_US&#34;-
+	NEW_FUNC[1/1]: 0x561142f758b0 in std::__1::basic_string&lt;char, std::__1::char_traits&lt;char&gt;, std::__1::allocator&lt;char&gt;&gt;::__shrink_or_extend[abi:v180000](unsigned long) /usr/local/bin/../include/c++/v1/string:3269
+#387	NEW    cov: 234 ft: 505 corp: 31/2733b lim: 4096 exec/s: 193 rss: 44Mb L: 173/277 MS: 1 ChangeBit-
+#422	REDUCE cov: 234 ft: 505 corp: 31/2720b lim: 4096 exec/s: 211 rss: 44Mb L: 40/277 MS: 5 ChangeBinInt-EraseBytes-ChangeBit-InsertByte-ChangeBinInt-
+#424	NEW    cov: 234 ft: 506 corp: 32/2918b lim: 4096 exec/s: 212 rss: 44Mb L: 198/277 MS: 2 InsertRepeatedBytes-InsertByte-
+#428	NEW    cov: 234 ft: 507 corp: 33/3047b lim: 4096 exec/s: 214 rss: 44Mb L: 129/277 MS: 4 ChangeByte-ChangeBit-EraseBytes-InsertRepeatedBytes-
+#447	NEW    cov: 234 ft: 508 corp: 34/3245b lim: 4096 exec/s: 223 rss: 44Mb L: 198/277 MS: 4 ChangeByte-ShuffleBytes-ChangeByte-CMP- DE: &#34;\304\000&#34;-
+#489	REDUCE cov: 234 ft: 508 corp: 34/3242b lim: 4096 exec/s: 244 rss: 44Mb L: 84/277 MS: 2 EraseBytes-CrossOver-
+#496	NEW    cov: 234 ft: 511 corp: 35/3521b lim: 4096 exec/s: 248 rss: 44Mb L: 279/279 MS: 2 CrossOver-CrossOver-
+#508	NEW    cov: 234 ft: 514 corp: 36/4038b lim: 4096 exec/s: 254 rss: 44Mb L: 517/517 MS: 2 ChangeBinInt-CopyPart-
+#510	REDUCE cov: 234 ft: 514 corp: 36/4023b lim: 4096 exec/s: 255 rss: 44Mb L: 158/517 MS: 2 PersAutoDict-EraseBytes- DE: &#34;\000\000\000\000\000\000\002\020&#34;-
+#512	pulse  cov: 234 ft: 514 corp: 36/4023b lim: 4096 exec/s: 256 rss: 44Mb
+#517	NEW    cov: 234 ft: 518 corp: 37/4125b lim: 4096 exec/s: 258 rss: 44Mb L: 102/517 MS: 2 ChangeBit-InsertRepeatedBytes-
+#521	REDUCE cov: 234 ft: 518 corp: 37/4107b lim: 4096 exec/s: 260 rss: 44Mb L: 261/517 MS: 4 ShuffleBytes-PersAutoDict-ChangeBinInt-EraseBytes- DE: &#34;en_US&#34;-
+#542	NEW    cov: 234 ft: 519 corp: 38/4272b lim: 4096 exec/s: 271 r
+...truncated...
+: 1 EraseBytes-
+#222820	REDUCE cov: 783 ft: 2464 corp: 480/158Kb lim: 4096 exec/s: 7427 rss: 70Mb L: 1267/3925 MS: 1 EraseBytes-
+#222846	REDUCE cov: 783 ft: 2464 corp: 480/158Kb lim: 4096 exec/s: 7428 rss: 70Mb L: 197/3925 MS: 1 EraseBytes-
+#223137	REDUCE cov: 783 ft: 2464 corp: 480/158Kb lim: 4096 exec/s: 7437 rss: 70Mb L: 26/3925 MS: 1 EraseBytes-
+#223261	REDUCE cov: 783 ft: 2464 corp: 480/158Kb lim: 4096 exec/s: 7442 rss: 70Mb L: 226/3925 MS: 4 ChangeBinInt-ChangeByte-CMP-EraseBytes- DE: &#34;\377\377\377\377\377\377\377\360&#34;-
+#223412	REDUCE cov: 783 ft: 2464 corp: 480/158Kb lim: 4096 exec/s: 7447 rss: 70Mb L: 370/3925 MS: 1 EraseBytes-
+#223578	REDUCE cov: 783 ft: 2464 corp: 480/158Kb lim: 4096 exec/s: 7452 rss: 70Mb L: 33/3925 MS: 1 EraseBytes-
+#223609	REDUCE cov: 783 ft: 2464 corp: 480/158Kb lim: 4096 exec/s: 7453 rss: 70Mb L: 230/3925 MS: 1 EraseBytes-
+#223617	REDUCE cov: 783 ft: 2464 corp: 480/158Kb lim: 4096 exec/s: 7453 rss: 70Mb L: 61/3925 MS: 3 ChangeBit-ChangeBit-EraseBytes-
+#223654	REDUCE cov: 783 ft: 2464 corp: 480/158Kb lim: 4096 exec/s: 7455 rss: 70Mb L: 6/3925 MS: 2 ChangeBinInt-EraseBytes-
+#223744	REDUCE cov: 783 ft: 2464 corp: 480/158Kb lim: 4096 exec/s: 7458 rss: 70Mb L: 1074/3925 MS: 5 CopyPart-InsertByte-ShuffleBytes-EraseBytes-InsertRepeatedBytes-
+#223853	REDUCE cov: 783 ft: 2464 corp: 480/158Kb lim: 4096 exec/s: 7461 rss: 70Mb L: 46/3925 MS: 4 ChangeBit-ShuffleBytes-PersAutoDict-EraseBytes- DE: &#34;\006\000\000\000\000\000\000\000&#34;-
+#223879	REDUCE cov: 783 ft: 2464 corp: 480/158Kb lim: 4096 exec/s: 7462 rss: 70Mb L: 37/3925 MS: 1 EraseBytes-
+#223960	REDUCE cov: 783 ft: 2464 corp: 480/158Kb lim: 4096 exec/s: 7465 rss: 70Mb L: 218/3925 MS: 1 EraseBytes-
+#224086	REDUCE cov: 783 ft: 2464 corp: 480/158Kb lim: 4096 exec/s: 7469 rss: 70Mb L: 20/3925 MS: 1 EraseBytes-
+#224142	REDUCE cov: 783 ft: 2464 corp: 480/158Kb lim: 4096 exec/s: 7471 rss: 70Mb L: 123/3925 MS: 1 EraseBytes-
+#224253	REDUCE cov: 783 ft: 2464 corp: 480/158Kb lim: 4096 exec/s: 7475 rss: 70Mb L: 30/3925 MS: 1 EraseBytes-
+#224425	REDUCE cov: 783 ft: 2464 corp: 480/158Kb lim: 4096 exec/s: 7480 rss: 70Mb L: 16/3925 MS: 2 ChangeByte-EraseBytes-
+#224486	REDUCE cov: 783 ft: 2464 corp: 480/158Kb lim: 4096 exec/s: 7482 rss: 70Mb L: 50/3925 MS: 1 EraseBytes-
+#224670	REDUCE cov: 783 ft: 2464 corp: 480/158Kb lim: 4096 exec/s: 7489 rss: 70Mb L: 737/3925 MS: 4 ChangeByte-ChangeByte-ChangeBit-EraseBytes-
+#224911	REDUCE cov: 783 ft: 2464 corp: 480/158Kb lim: 4096 exec/s: 7497 rss: 70Mb L: 8/3925 MS: 1 EraseBytes-
+#225189	REDUCE cov: 783 ft: 2464 corp: 480/158Kb lim: 4096 exec/s: 7506 rss: 70Mb L: 14/3925 MS: 3 ShuffleBytes-EraseBytes-InsertByte-
+#225267	REDUCE cov: 783 ft: 2464 corp: 480/158Kb lim: 4096 exec/s: 7508 rss: 70Mb L: 67/3925 MS: 3 ChangeBit-ChangeBit-EraseBytes-
+#225537	DONE   cov: 783 ft: 2464 corp: 480/158Kb lim: 4096 exec/s: 7275 rss: 70Mb
+###### Recommended dictionary. ######
+&#34;6\000&#34; # Uses: 304
+&#34;X\000\000\000\000\000\000\000&#34; # Uses: 263
+&#34;\000\000\000\000\000\000\002\020&#34; # Uses: 275
+&#34;\001b&#34; # Uses: 283
+&#34;en_US&#34; # Uses: 320
+&#34;\304\000&#34; # Uses: 304
+&#34;\031\000&#34; # Uses: 288
+&#34;{\000\000\000&#34; # Uses: 282
+&#34;en_US_POSIX&#34; # Uses: 263
+&#34;\031\000\000\000&#34; # Uses: 262
+&#34;\000\242&#34; # Uses: 276
+&#34;\000\000\000\002&#34; # Uses: 287
+&#34;\000\000\000\022&#34; # Uses: 237
+&#34;}\000&#34; # Uses: 263
+&#34;POSIX&#34; # Uses: 268
+&#34;\001\000\000\000&#34; # Uses: 264
+&#34;\000\000&#34; # Uses: 233
+&#34;\012\000\000\000\000\000\000\000&#34; # Uses: 247
+&#34;\377\377\377\377\377\377\377\010&#34; # Uses: 209
+&#34;\000\000\000\000\000\000\000\000&#34; # Uses: 234
+&#34;0\000&#34; # Uses: 255
+&#34;\377\377\377\377\377\377\377\301&#34; # Uses: 224
+&#34;\324\000\000\000\000\000\000\000&#34; # Uses: 212
+&#34;\024\001\000\000&#34; # Uses: 239
+&#34;\266\003&#34; # Uses: 219
+&#34;\000\030&#34; # Uses: 215
+&#34;\010\000\000\000\000\000\000\000&#34; # Uses: 184
+&#34;S\001&#34; # Uses: 218
+&#34;\036\000\000\000\000\000\000\000&#34; # Uses: 216
+&#34;\001\000\000\000\000\000\000\035&#34; # Uses: 210
+&#34;\377\377\377\377\377\377\377\377&#34; # Uses: 209
+&#34;6\000\000\000&#34; # Uses: 219
+&#34;\264\002&#34; # Uses: 192
+&#34;\376\377\377\177\000\000\000\000&#34; # Uses: 213
+&#34;\001\003&#34; # Uses: 239
+&#34;\000\000\000\000\000\000\000\230&#34; # Uses: 207
+&#34;\000\000\000\024&#34; # Uses: 222
+&#34;\000\013&#34; # Uses: 210
+&#34;\000\000\003\377&#34; # Uses: 192
+&#34;\377\037&#34; # Uses: 191
+&#34;\237\002\000\000\000\000\000\000&#34; # Uses: 198
+&#34;\240\002\000\000&#34; # Uses: 204
+&#34;\015\000\000\000\000\000\000\000&#34; # Uses: 171
+&#34;\001\000\000\000\000\000\000\010&#34; # Uses: 196
+&#34;\001\000\000\000\000\000\000\000&#34; # Uses: 193
+&#34;\276\000\000\000\000\000\000\000&#34; # Uses: 156
+&#34;\033\000\000\000\000\000\000\000&#34; # Uses: 180
+&#34;\230\000\000\000&#34; # Uses: 161
+&#34;\377\377\377\377\377\377\377\307&#34; # Uses: 187
+&#34;\001\000\000\000\000\000\002\020&#34; # Uses: 178
+&#34;\023\001\000\000&#34; # Uses: 174
+&#34;\377\377\377\377\377\377\377\026&#34; # Uses: 157
+&#34;\001\000\000\000\000\000\000\313&#34; # Uses: 164
+&#34;art__LOJBAN&#34; # Uses: 161
+&#34;\000\000\000\014&#34; # Uses: 182
+&#34;\377\034&#34; # Uses: 181
+&#34;\377\377\377\377\377\377\013\374&#34; # Uses: 184
+&#34;\000\000\000$&#34; # Uses: 147
+&#34;\010\000&#34; # Uses: 171
+&#34;\000\000\000\000\000\000\000\030&#34; # Uses: 154
+&#34;\000\000\000\000\000\000\000\021&#34; # Uses: 121
+&#34;\225\000&#34; # Uses: 165
+&#34;\001\000\000\000\000\000\000\333&#34; # Uses: 152
+&#34;\000\000\000\011&#34; # Uses: 157
+&#34;\001\327&#34; # Uses: 133
+&#34;\001\000\000\000\000\000\000\002&#34; # Uses: 160
+&#34;\024\000\000\000\000\000\000\000&#34; # Uses: 155
+&#34;\377\377\377\377\377\377\377\012&#34; # Uses: 163
+&#34;\002\311&#34; # Uses: 159
+&#34;\377\377\377\377\377\377\3776&#34; # Uses: 163
+&#34;\000\000\000\000\000\000\004\331&#34; # Uses: 144
+&#34;[\000\000\000\000\000\000\000&#34; # Uses: 160
+&#34;\001\000\000\000\000\000\000\213&#34; # Uses: 140
+&#34;\377\377\377\377\377\377\377\275&#34; # Uses: 129
+&#34;~\000\000\000&#34; # Uses: 139
+&#34;\010\355&#34; # Uses: 130
+&#34;\377\377&#34; # Uses: 141
+&#34;\000\000\001\000&#34; # Uses: 122
+&#34;\001\000\0002&#34; # Uses: 109
+&#34;\005\000\000\000\000\000\000\000&#34; # Uses: 130
+&#34;\020\000\000\000\000\000\000\000&#34; # Uses: 116
+&#34;\002\321&#34; # Uses: 131
+&#34;hy__AREVMDA&#34; # Uses: 137
+&#34;j\016\000\000\000\000\000\000&#34; # Uses: 132
+&#34;\377\377\377\377\377\377\377\024&#34; # Uses: 120
+&#34;\001\000\000\000\000\000\000\013&#34; # Uses: 117
+&#34;D\001\000\000\000\000\000\000&#34; # Uses: 120
+&#34;\340\000\000\000\000\000\000\000&#34; # Uses: 125
+&#34;\325\001&#34; # Uses: 109
+&#34;\001y&#34; # Uses: 117
+&#34;\016\000&#34; # Uses: 118
+&#34;!\000&#34; # Uses: 131
+&#34;\026\000\000\000&#34; # Uses: 95
+&#34;\001\000\000\000\000\000\000,&#34; # Uses: 94
+&#34;i\005\000\000\000\000\000\000&#34; # Uses: 107
+&#34;\377\377\377\377\377\377\377&#39;&#34; # Uses: 96
+&#34;\013\000\000\000\000\000\000\000&#34; # Uses: 104
+&#34;\001\000\000\026&#34; # Uses: 101
+&#34;\000\000\000\000\000\000\000,&#34; # Uses: 90
+&#34;\030\000\000\000\000\000\000\000&#34; # Uses: 101
+&#34;\000\000\000\200\000\000\000\000&#34; # Uses: 90
+&#34;p\001\000\000\000\000\000\000&#34; # Uses: 82
+&#34;b\000\000\000&#34; # Uses: 92
+&#34;\201\005\000\000\000\000\000\000&#34; # Uses: 105
+&#34;\002\000\000\000&#34; # Uses: 85
+&#34;\001?&#34; # Uses: 87
+&#34;\001\002&#34; # Uses: 73
+&#34;\377\377\377\377\377\377\377\006&#34; # Uses: 62
+&#34;\037\001&#34; # Uses: 74
+&#34;\000\000\0007&#34; # Uses: 72
+&#34;\\\000\000\000\000\000\000\000&#34; # Uses: 68
+&#34;\&#34;\001&#34; # Uses: 73
+&#34;x\001\000\000&#34; # Uses: 55
+&#34;\006\000\000\000\000\000\000\000&#34; # Uses: 59
+&#34;q\017&#34; # Uses: 61
+&#34;\020b&#34; # Uses: 50
+&#34;\377\377\377\377\377\377\003N&#34; # Uses: 49
+&#34;\377\377\377\377\377\377\377E&#34; # Uses: 57
+&#34;\003\352&#34; # Uses: 62
+&#34;L\000\000\000&#34; # Uses: 46
+&#34;\000\020&#34; # Uses: 65
+&#34;\012\000\000\000&#34; # Uses: 51
+&#34;\014\222&#34; # Uses: 50
+&#34;\177\000\000\000\000\000\000\000&#34; # Uses: 53
+&#34;\377\377\377\003&#34; # Uses: 51
+&#34;\035\000&#34; # Uses: 53
+&#34;\313\000\000\000&#34; # Uses: 55
+&#34;\000\014&#34; # Uses: 44
+&#34;\220\000&#34; # Uses: 37
+&#34;\377\377\001\037&#34; # Uses: 45
+&#34;\023\000&#34; # Uses: 38
+&#34;1\000\000\000\000\000\000\000&#34; # Uses: 40
+&#34;8\000\000\000\000\000\000\000&#34; # Uses: 29
+&#34;\001\000\006\205&#34; # Uses: 27
+&#34;\007\000\000\000&#34; # Uses: 18
+&#34;\000\000\000\000\000\000\000&#39;&#34; # Uses: 29
+&#34;\377\377\377 &#34; # Uses: 21
+&#34;\377\377\377\004&#34; # Uses: 9
+&#34;\005\000\000\000&#34; # Uses: 11
+&#34;\001\004&#34; # Uses: 3
+&#34;\000\000\000\000&#34; # Uses: 2
+&#34;\377\377\377\377\377\377\377\360&#34; # Uses: 4
+###### End of recommended dictionary. ######
+Done 225537 runs in 31 second(s)
+stat::number_of_executed_units: 225537
+stat::average_exec_per_sec:     7275
+stat::new_units_added:          3099
+stat::slowest_unit_time_sec:    0
+stat::peak_rss_mb:              70
+
+</pre>
+
+</body>

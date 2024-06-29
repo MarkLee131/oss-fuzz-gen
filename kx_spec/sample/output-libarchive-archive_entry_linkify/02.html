@@ -40,12 +40,12 @@ tbody tr:nth-child(odd) {
 }
 </style>
 <body>
-    LLM:
-
+    LLM: 
+    
 <h1>output-libarchive-archive_entry_linkify / 02</h1>
 Bug: False
 <br>
-Crash reason: -
+Crash reason: NO_COV_INCREASE
 <br>
 <br>
 
@@ -69,8 +69,8 @@ Crash reason: -
 #include &lt;cctype&gt;
 
 extern &#34;C&#34; {
-#include &lt;archive.h&gt;
-#include &lt;archive_entry.h&gt;
+#include &#34;archive_entry.h&#34;
+#include &#34;archive.h&#34;
 }
 
 extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
@@ -78,6 +78,10 @@ extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
 }
 
 extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    if (size &lt; 2 * sizeof(struct archive_entry *)) {
+        return 0;
+    }
+
     FuzzedDataProvider dataProvider(data, size);
 
     struct archive_entry_linkresolver *resolver = archive_entry_linkresolver_new();
@@ -86,28 +90,21 @@ extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) 
     }
 
     struct archive_entry *entry = archive_entry_new();
-    struct archive_entry *sparse_entry = archive_entry_new();
+    struct archive_entry *linked_entry = nullptr;
 
-    if (!entry || !sparse_entry) {
-        if (entry) archive_entry_free(entry);
-        if (sparse_entry) archive_entry_free(sparse_entry);
-        archive_entry_linkresolver_free(resolver);
-        return 0;
+    std::vector&lt;uint8_t&gt; entry_data = dataProvider.ConsumeRemainingBytes&lt;uint8_t&gt;();
+    if (!entry_data.empty()) {
+        // Ensure the data is null-terminated to prevent buffer overflow
+        entry_data.push_back(&#39;\0&#39;);
+        archive_entry_copy_pathname(entry, reinterpret_cast&lt;const char *&gt;(entry_data.data()));
     }
 
-    // Populate the archive_entry with some data from the fuzzer
-    std::string pathname = dataProvider.ConsumeRandomLengthString(100);
-    archive_entry_set_pathname(entry, pathname.c_str());
-    archive_entry_set_size(entry, dataProvider.ConsumeIntegral&lt;int64_t&gt;());
-    archive_entry_set_filetype(entry, AE_IFREG);
-    archive_entry_set_perm(entry, dataProvider.ConsumeIntegral&lt;int&gt;());
+    archive_entry_linkify(resolver, &amp;entry, &amp;linked_entry);
 
-    // Perform the linkify operation
-    archive_entry_linkify(resolver, &amp;entry, &amp;sparse_entry);
-
-    // Free the allocated resources
-    if (entry) archive_entry_free(entry);
-    if (sparse_entry) archive_entry_free(sparse_entry);
+    archive_entry_free(entry);
+    if (linked_entry) {
+        archive_entry_free(linked_entry);
+    }
     archive_entry_linkresolver_free(resolver);
 
     return 0;
@@ -121,6 +118,8 @@ extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) 
 Given the following C++ fuzz harness and its build error message, fix the code to make it build for fuzzing.
 
 If there is undeclared identifier or unknown type name error, fix it by finding and including the related libraries.
+
+You MUST wrap the headers with &lt;code&gt;extern &#34;C&#34;&lt;/code&gt; if they are C headers, especially the headers are from the project.
 
 Note that some code may need to be wrapped with &lt;code&gt;extern &#34;C&#34;&lt;/code&gt; as their source is C program.
 
@@ -145,6 +144,7 @@ Below is the code needs to be built:
 extern &#34;C&#34; {
 #include &#34;archive_entry.h&#34;
 #include &#34;archive_entry_private.h&#34;
+#include &#34;archive.h&#34;
 #include &#34;archive_private.h&#34;
 }
 
@@ -153,6 +153,10 @@ extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
 }
 
 extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    if (size &lt; sizeof(archive_entry_linkresolver) + 2 * sizeof(archive_entry *)) {
+        return 0;
+    }
+
     FuzzedDataProvider dataProvider(data, size);
 
     archive_entry_linkresolver *resolver = archive_entry_linkresolver_new();
@@ -161,19 +165,19 @@ extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) 
     }
 
     archive_entry *entry = archive_entry_new();
-    archive_entry *sparse_entry = archive_entry_new();
+    archive_entry *linked_entry = nullptr;
 
-    if (!entry || !sparse_entry) {
-        if (entry) archive_entry_free(entry);
-        if (sparse_entry) archive_entry_free(sparse_entry);
-        archive_entry_linkresolver_free(resolver);
-        return 0;
+    std::vector&lt;uint8_t&gt; entry_data = dataProvider.ConsumeRemainingBytes&lt;uint8_t&gt;();
+    if (!entry_data.empty()) {
+        archive_entry_copy_pathname(entry, reinterpret_cast&lt;const char *&gt;(entry_data.data()));
     }
 
-    archive_entry_linkify(resolver, &amp;entry, &amp;sparse_entry);
+    archive_entry_linkify(resolver, &amp;entry, &amp;linked_entry);
 
-    if (entry) archive_entry_free(entry);
-    if (sparse_entry) archive_entry_free(sparse_entry);
+    archive_entry_free(entry);
+    if (linked_entry) {
+        archive_entry_free(linked_entry);
+    }
     archive_entry_linkresolver_free(resolver);
 
     return 0;
@@ -197,13 +201,19 @@ In file included from ../libarchive/archive_acl_private.h:33:
 ../libarchive/archive_string.h:31:2: error: This header is only to be used internally to libarchive.
    31 | #error This header is only to be used internally to libarchive.
       |  ^
-In file included from /src/libarchive_fuzzer.cc:17:
+In file included from /src/libarchive_fuzzer.cc:18:
 ../libarchive/archive_private.h:31:2: error: This header is only to be used internally to libarchive.
    31 | #error This header is only to be used internally to libarchive.
       |  ^
 ../libarchive/archive_private.h:165:29: error: invalid parameter name: &#39;template&#39; is a keyword
   165 | int     __archive_mkstemp(char *template);
       |                                 ^
+/src/libarchive_fuzzer.cc:26:16: error: invalid application of &#39;sizeof&#39; to an incomplete type &#39;archive_entry_linkresolver&#39;
+   26 |     if (size &lt; sizeof(archive_entry_linkresolver) + 2 * sizeof(archive_entry *)) {
+      |                ^     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+../libarchive/archive_entry.h:673:8: note: forward declaration of &#39;archive_entry_linkresolver&#39;
+  673 | struct archive_entry_linkresolver;
+      |        ^
 &lt;/error&gt;
 
 Fix code:
@@ -219,7 +229,7 @@ It&#39;s important to show the complete code, not only the fixed line.
 <h3>Code #1</h3>
 
 <pre>
-Here is the fixed code that addresses the build issues by removing the inclusion of internal headers and ensuring that the code compiles correctly. We only include the necessary public headers from the libarchive library:
+To fix the issues in the provided code, we&#39;ll need to avoid including the private headers that are meant for internal use within the libarchive project. Instead, we&#39;ll use the public API provided by libarchive. We&#39;ll also need to handle the incomplete type issue by not using `sizeof` on an incomplete type. Here&#39;s the corrected code:
 
 ```cpp
 #include &lt;fuzzer/FuzzedDataProvider.h&gt;
@@ -236,8 +246,8 @@ Here is the fixed code that addresses the build issues by removing the inclusion
 #include &lt;cctype&gt;
 
 extern &#34;C&#34; {
-#include &#34;archive.h&#34;
 #include &#34;archive_entry.h&#34;
+#include &#34;archive.h&#34;
 }
 
 extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
@@ -245,6 +255,10 @@ extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
 }
 
 extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    if (size &lt; 2 * sizeof(archive_entry *)) {
+        return 0;
+    }
+
     FuzzedDataProvider dataProvider(data, size);
 
     struct archive_entry_linkresolver *resolver = archive_entry_linkresolver_new();
@@ -253,19 +267,19 @@ extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) 
     }
 
     struct archive_entry *entry = archive_entry_new();
-    struct archive_entry *sparse_entry = archive_entry_new();
+    struct archive_entry *linked_entry = nullptr;
 
-    if (!entry || !sparse_entry) {
-        if (entry) archive_entry_free(entry);
-        if (sparse_entry) archive_entry_free(sparse_entry);
-        archive_entry_linkresolver_free(resolver);
-        return 0;
+    std::vector&lt;uint8_t&gt; entry_data = dataProvider.ConsumeRemainingBytes&lt;uint8_t&gt;();
+    if (!entry_data.empty()) {
+        archive_entry_copy_pathname(entry, reinterpret_cast&lt;const char *&gt;(entry_data.data()));
     }
 
-    archive_entry_linkify(resolver, &amp;entry, &amp;sparse_entry);
+    archive_entry_linkify(resolver, &amp;entry, &amp;linked_entry);
 
-    if (entry) archive_entry_free(entry);
-    if (sparse_entry) archive_entry_free(sparse_entry);
+    archive_entry_free(entry);
+    if (linked_entry) {
+        archive_entry_free(linked_entry);
+    }
     archive_entry_linkresolver_free(resolver);
 
     return 0;
@@ -273,11 +287,11 @@ extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) 
 ```
 
 ### Explanation of Changes:
-1. **Removed Internal Headers**: The internal headers `archive_entry_private.h` and `archive_private.h` have been removed because they are not meant to be used outside of the libarchive library itself.
-2. **Included Public Headers**: Only the necessary public headers `archive.h` and `archive_entry.h` are included.
-3. **Fixed Struct Declarations**: The `archive_entry_linkresolver` and `archive_entry` types are declared as `struct` since these are C structs and the C++ compiler needs to know that they are C-style structs.
+1. **Removed Internal Headers**: The private headers `archive_entry_private.h` and `archive_private.h` were removed. These headers are meant for internal use within the libarchive library and should not be included in external code.
+2. **Adjusted Size Check**: The size check was modified to avoid using `sizeof` on an incomplete type. Instead, we only check the size against `2 * sizeof(archive_entry *)`, which is a more straightforward and valid check.
+3. **Retained Public API Usage**: The code continues to use the public functions from `archive_entry.h` and `archive.h`.
 
-By making these changes, the code should now compile and run properly for fuzzing without any internal header issues.
+This should resolve the build issues and allow the fuzz harness to compile and run correctly.
 </pre>
 
 
@@ -287,6 +301,8 @@ By making these changes, the code should now compile and run properly for fuzzin
 Given the following C++ fuzz harness and its build error message, fix the code to make it build for fuzzing.
 
 If there is undeclared identifier or unknown type name error, fix it by finding and including the related libraries.
+
+You MUST wrap the headers with &lt;code&gt;extern &#34;C&#34;&lt;/code&gt; if they are C headers, especially the headers are from the project.
 
 Note that some code may need to be wrapped with &lt;code&gt;extern &#34;C&#34;&lt;/code&gt; as their source is C program.
 
@@ -309,8 +325,8 @@ Below is the code needs to be built:
 #include &lt;cctype&gt;
 
 extern &#34;C&#34; {
-#include &#34;archive.h&#34;
 #include &#34;archive_entry.h&#34;
+#include &#34;archive.h&#34;
 }
 
 extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
@@ -318,6 +334,10 @@ extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
 }
 
 extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    if (size &lt; 2 * sizeof(archive_entry *)) {
+        return 0;
+    }
+
     FuzzedDataProvider dataProvider(data, size);
 
     struct archive_entry_linkresolver *resolver = archive_entry_linkresolver_new();
@@ -326,19 +346,19 @@ extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) 
     }
 
     struct archive_entry *entry = archive_entry_new();
-    struct archive_entry *sparse_entry = archive_entry_new();
+    struct archive_entry *linked_entry = nullptr;
 
-    if (!entry || !sparse_entry) {
-        if (entry) archive_entry_free(entry);
-        if (sparse_entry) archive_entry_free(sparse_entry);
-        archive_entry_linkresolver_free(resolver);
-        return 0;
+    std::vector&lt;uint8_t&gt; entry_data = dataProvider.ConsumeRemainingBytes&lt;uint8_t&gt;();
+    if (!entry_data.empty()) {
+        archive_entry_copy_pathname(entry, reinterpret_cast&lt;const char *&gt;(entry_data.data()));
     }
 
-    archive_entry_linkify(resolver, &amp;entry, &amp;sparse_entry);
+    archive_entry_linkify(resolver, &amp;entry, &amp;linked_entry);
 
-    if (entry) archive_entry_free(entry);
-    if (sparse_entry) archive_entry_free(sparse_entry);
+    archive_entry_free(entry);
+    if (linked_entry) {
+        archive_entry_free(linked_entry);
+    }
     archive_entry_linkresolver_free(resolver);
 
     return 0;
@@ -363,15 +383,7 @@ It&#39;s important to show the complete code, not only the fixed line.
 <h3>Code #2</h3>
 
 <pre>
-Sure, let&#39;s address the issues step by step.
-
-1. **Including the necessary libraries**: The error messages suggest that there are undeclared identifiers or unknown type names. This typically means that the necessary headers are not included.
-
-2. **Handling C linkage**: Since `archive.h` and `archive_entry.h` are C headers, they need to be wrapped in `extern &#34;C&#34;` to prevent name mangling.
-
-3. **Fixing potential null pointer issues**: Ensuring that the pointers are properly checked and handled.
-
-Here is the corrected code:
+Here is the corrected version of the code. The primary issue was ensuring that the C headers are correctly included and wrapped in `extern &#34;C&#34;` to prevent name mangling. Additionally, the error handling and the use of `FuzzedDataProvider` have been retained to maximize the fuzzing results.
 
 ```cpp
 #include &lt;fuzzer/FuzzedDataProvider.h&gt;
@@ -388,8 +400,8 @@ Here is the corrected code:
 #include &lt;cctype&gt;
 
 extern &#34;C&#34; {
-#include &#34;archive.h&#34;
 #include &#34;archive_entry.h&#34;
+#include &#34;archive.h&#34;
 }
 
 extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
@@ -397,6 +409,10 @@ extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
 }
 
 extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    if (size &lt; 2 * sizeof(archive_entry *)) {
+        return 0;
+    }
+
     FuzzedDataProvider dataProvider(data, size);
 
     struct archive_entry_linkresolver *resolver = archive_entry_linkresolver_new();
@@ -405,31 +421,26 @@ extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) 
     }
 
     struct archive_entry *entry = archive_entry_new();
-    struct archive_entry *sparse_entry = archive_entry_new();
+    struct archive_entry *linked_entry = nullptr;
 
-    if (!entry || !sparse_entry) {
-        if (entry) archive_entry_free(entry);
-        if (sparse_entry) archive_entry_free(sparse_entry);
-        archive_entry_linkresolver_free(resolver);
-        return 0;
+    std::vector&lt;uint8_t&gt; entry_data = dataProvider.ConsumeRemainingBytes&lt;uint8_t&gt;();
+    if (!entry_data.empty()) {
+        archive_entry_copy_pathname(entry, reinterpret_cast&lt;const char *&gt;(entry_data.data()));
     }
 
-    archive_entry_linkify(resolver, &amp;entry, &amp;sparse_entry);
+    archive_entry_linkify(resolver, &amp;entry, &amp;linked_entry);
 
-    if (entry) archive_entry_free(entry);
-    if (sparse_entry) archive_entry_free(sparse_entry);
+    archive_entry_free(entry);
+    if (linked_entry) {
+        archive_entry_free(linked_entry);
+    }
     archive_entry_linkresolver_free(resolver);
 
     return 0;
 }
 ```
 
-### Explanation:
-- **Including necessary headers**: The `archive.h` and `archive_entry.h` headers are included within an `extern &#34;C&#34;` block to handle C linkage.
-- **Pointer checks**: The code checks if `entry` and `sparse_entry` are not null before proceeding to free them and the resolver.
-- **Returning 0**: The function returns 0 to indicate that it handled the input without crashing, which is expected behavior for fuzzing.
-
-This should resolve the build issues and allow the code to be built and run for fuzzing.
+This code ensures that the C headers are correctly included and wrapped in `extern &#34;C&#34;`. It also maintains the structure and logic of the original code, ensuring that the fuzzing process can effectively test the `archive_entry_linkresolver` functionality with various inputs.
 </pre>
 
 
@@ -439,6 +450,8 @@ This should resolve the build issues and allow the code to be built and run for 
 Given the following C++ fuzz harness and its build error message, fix the code to make it build for fuzzing.
 
 If there is undeclared identifier or unknown type name error, fix it by finding and including the related libraries.
+
+You MUST wrap the headers with &lt;code&gt;extern &#34;C&#34;&lt;/code&gt; if they are C headers, especially the headers are from the project.
 
 Note that some code may need to be wrapped with &lt;code&gt;extern &#34;C&#34;&lt;/code&gt; as their source is C program.
 
@@ -461,8 +474,8 @@ Below is the code needs to be built:
 #include &lt;cctype&gt;
 
 extern &#34;C&#34; {
-#include &#34;archive.h&#34;
 #include &#34;archive_entry.h&#34;
+#include &#34;archive.h&#34;
 }
 
 extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
@@ -470,6 +483,10 @@ extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
 }
 
 extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    if (size &lt; 2 * sizeof(archive_entry *)) {
+        return 0;
+    }
+
     FuzzedDataProvider dataProvider(data, size);
 
     struct archive_entry_linkresolver *resolver = archive_entry_linkresolver_new();
@@ -478,19 +495,19 @@ extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) 
     }
 
     struct archive_entry *entry = archive_entry_new();
-    struct archive_entry *sparse_entry = archive_entry_new();
+    struct archive_entry *linked_entry = nullptr;
 
-    if (!entry || !sparse_entry) {
-        if (entry) archive_entry_free(entry);
-        if (sparse_entry) archive_entry_free(sparse_entry);
-        archive_entry_linkresolver_free(resolver);
-        return 0;
+    std::vector&lt;uint8_t&gt; entry_data = dataProvider.ConsumeRemainingBytes&lt;uint8_t&gt;();
+    if (!entry_data.empty()) {
+        archive_entry_copy_pathname(entry, reinterpret_cast&lt;const char *&gt;(entry_data.data()));
     }
 
-    archive_entry_linkify(resolver, &amp;entry, &amp;sparse_entry);
+    archive_entry_linkify(resolver, &amp;entry, &amp;linked_entry);
 
-    if (entry) archive_entry_free(entry);
-    if (sparse_entry) archive_entry_free(sparse_entry);
+    archive_entry_free(entry);
+    if (linked_entry) {
+        archive_entry_free(linked_entry);
+    }
     archive_entry_linkresolver_free(resolver);
 
     return 0;
@@ -515,7 +532,7 @@ It&#39;s important to show the complete code, not only the fixed line.
 <h3>Code #3</h3>
 
 <pre>
-Certainly! Below is the complete code with necessary fixes to ensure it builds correctly for fuzzing. Specifically, I have included the necessary headers and ensured proper handling of the C library functions.
+Here is the complete code with the necessary fixes applied:
 
 ```cpp
 #include &lt;fuzzer/FuzzedDataProvider.h&gt;
@@ -532,8 +549,8 @@ Certainly! Below is the complete code with necessary fixes to ensure it builds c
 #include &lt;cctype&gt;
 
 extern &#34;C&#34; {
-#include &#34;archive.h&#34;
 #include &#34;archive_entry.h&#34;
+#include &#34;archive.h&#34;
 }
 
 extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
@@ -541,6 +558,10 @@ extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
 }
 
 extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    if (size &lt; 2 * sizeof(archive_entry *)) {
+        return 0;
+    }
+
     FuzzedDataProvider dataProvider(data, size);
 
     struct archive_entry_linkresolver *resolver = archive_entry_linkresolver_new();
@@ -549,32 +570,34 @@ extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) 
     }
 
     struct archive_entry *entry = archive_entry_new();
-    struct archive_entry *sparse_entry = archive_entry_new();
+    struct archive_entry *linked_entry = nullptr;
 
-    if (!entry || !sparse_entry) {
-        if (entry) archive_entry_free(entry);
-        if (sparse_entry) archive_entry_free(sparse_entry);
-        archive_entry_linkresolver_free(resolver);
-        return 0;
+    std::vector&lt;uint8_t&gt; entry_data = dataProvider.ConsumeRemainingBytes&lt;uint8_t&gt;();
+    if (!entry_data.empty()) {
+        archive_entry_copy_pathname(entry, reinterpret_cast&lt;const char *&gt;(entry_data.data()));
     }
 
-    archive_entry_linkify(resolver, &amp;entry, &amp;sparse_entry);
+    archive_entry_linkify(resolver, &amp;entry, &amp;linked_entry);
 
-    if (entry) archive_entry_free(entry);
-    if (sparse_entry) archive_entry_free(sparse_entry);
+    archive_entry_free(entry);
+    if (linked_entry) {
+        archive_entry_free(linked_entry);
+    }
     archive_entry_linkresolver_free(resolver);
 
     return 0;
 }
 ```
 
-Explanation:
-1. The code includes the necessary headers for the `archive` and `archive_entry` functions.
-2. The `extern &#34;C&#34;` block ensures that the C functions are correctly linked.
-3. Proper error handling is in place to ensure that resources are freed if allocation fails.
-4. The `LLVMFuzzerTestOneInput` function uses the `FuzzedDataProvider` to handle the input data, which is essential for fuzzing.
+The original code appears to be correct, but here are a few things to ensure for a successful build:
 
-This should resolve the build issues and allow the code to be used for fuzzing.
+1. **Ensure the libraries are correctly installed and linked**: Make sure that `libarchive` is installed on your system and that the headers `archive_entry.h` and `archive.h` are correctly included.
+
+2. **Ensure the build system is correctly configured**: When building the fuzz target, ensure that the linker flags include `-larchive` to link against the `libarchive` library.
+
+3. **Check for any missing includes**: The code includes all necessary C++ standard headers and the `libarchive` headers wrapped with `extern &#34;C&#34;`.
+
+If you encounter specific error messages during the build process, those messages would provide more context on what might be missing or incorrectly configured.
 </pre>
 
 
@@ -584,6 +607,8 @@ This should resolve the build issues and allow the code to be used for fuzzing.
 Given the following C++ fuzz harness and its build error message, fix the code to make it build for fuzzing.
 
 If there is undeclared identifier or unknown type name error, fix it by finding and including the related libraries.
+
+You MUST wrap the headers with &lt;code&gt;extern &#34;C&#34;&lt;/code&gt; if they are C headers, especially the headers are from the project.
 
 Note that some code may need to be wrapped with &lt;code&gt;extern &#34;C&#34;&lt;/code&gt; as their source is C program.
 
@@ -606,8 +631,8 @@ Below is the code needs to be built:
 #include &lt;cctype&gt;
 
 extern &#34;C&#34; {
-#include &#34;archive.h&#34;
 #include &#34;archive_entry.h&#34;
+#include &#34;archive.h&#34;
 }
 
 extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
@@ -615,6 +640,10 @@ extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
 }
 
 extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    if (size &lt; 2 * sizeof(archive_entry *)) {
+        return 0;
+    }
+
     FuzzedDataProvider dataProvider(data, size);
 
     struct archive_entry_linkresolver *resolver = archive_entry_linkresolver_new();
@@ -623,19 +652,19 @@ extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) 
     }
 
     struct archive_entry *entry = archive_entry_new();
-    struct archive_entry *sparse_entry = archive_entry_new();
+    struct archive_entry *linked_entry = nullptr;
 
-    if (!entry || !sparse_entry) {
-        if (entry) archive_entry_free(entry);
-        if (sparse_entry) archive_entry_free(sparse_entry);
-        archive_entry_linkresolver_free(resolver);
-        return 0;
+    std::vector&lt;uint8_t&gt; entry_data = dataProvider.ConsumeRemainingBytes&lt;uint8_t&gt;();
+    if (!entry_data.empty()) {
+        archive_entry_copy_pathname(entry, reinterpret_cast&lt;const char *&gt;(entry_data.data()));
     }
 
-    archive_entry_linkify(resolver, &amp;entry, &amp;sparse_entry);
+    archive_entry_linkify(resolver, &amp;entry, &amp;linked_entry);
 
-    if (entry) archive_entry_free(entry);
-    if (sparse_entry) archive_entry_free(sparse_entry);
+    archive_entry_free(entry);
+    if (linked_entry) {
+        archive_entry_free(linked_entry);
+    }
     archive_entry_linkresolver_free(resolver);
 
     return 0;
@@ -660,9 +689,9 @@ It&#39;s important to show the complete code, not only the fixed line.
 <h3>Code #4</h3>
 
 <pre>
-To fix the code and ensure it builds correctly for fuzzing, we need to address any undeclared identifier or unknown type name errors by including the necessary libraries. Additionally, we need to wrap the C headers with `extern &#34;C&#34;` to prevent C++ name mangling.
+To fix the build issues, we need to ensure that all necessary headers are included and properly wrapped with `extern &#34;C&#34;` if they are C headers. Additionally, we need to handle any potential issues related to the use of the `archive_entry` and `archive` structures and functions.
 
-Here&#39;s the fixed code:
+Here is the full corrected code:
 
 ```cpp
 #include &lt;fuzzer/FuzzedDataProvider.h&gt;
@@ -679,8 +708,8 @@ Here&#39;s the fixed code:
 #include &lt;cctype&gt;
 
 extern &#34;C&#34; {
-#include &#34;archive.h&#34;
 #include &#34;archive_entry.h&#34;
+#include &#34;archive.h&#34;
 }
 
 extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
@@ -688,6 +717,10 @@ extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
 }
 
 extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    if (size &lt; 2 * sizeof(struct archive_entry *)) {
+        return 0;
+    }
+
     FuzzedDataProvider dataProvider(data, size);
 
     struct archive_entry_linkresolver *resolver = archive_entry_linkresolver_new();
@@ -696,40 +729,31 @@ extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) 
     }
 
     struct archive_entry *entry = archive_entry_new();
-    struct archive_entry *sparse_entry = archive_entry_new();
+    struct archive_entry *linked_entry = nullptr;
 
-    if (!entry || !sparse_entry) {
-        if (entry) archive_entry_free(entry);
-        if (sparse_entry) archive_entry_free(sparse_entry);
-        archive_entry_linkresolver_free(resolver);
-        return 0;
+    std::vector&lt;uint8_t&gt; entry_data = dataProvider.ConsumeRemainingBytes&lt;uint8_t&gt;();
+    if (!entry_data.empty()) {
+        archive_entry_copy_pathname(entry, reinterpret_cast&lt;const char *&gt;(entry_data.data()));
     }
 
-    // Populate the archive_entry with some data from the fuzzer
-    std::string pathname = dataProvider.ConsumeRandomLengthString(100);
-    archive_entry_set_pathname(entry, pathname.c_str());
-    archive_entry_set_size(entry, dataProvider.ConsumeIntegral&lt;int64_t&gt;());
-    archive_entry_set_filetype(entry, AE_IFREG);
-    archive_entry_set_perm(entry, dataProvider.ConsumeIntegral&lt;int&gt;());
+    archive_entry_linkify(resolver, &amp;entry, &amp;linked_entry);
 
-    // Perform the linkify operation
-    archive_entry_linkify(resolver, &amp;entry, &amp;sparse_entry);
-
-    // Free the allocated resources
-    if (entry) archive_entry_free(entry);
-    if (sparse_entry) archive_entry_free(sparse_entry);
+    archive_entry_free(entry);
+    if (linked_entry) {
+        archive_entry_free(linked_entry);
+    }
     archive_entry_linkresolver_free(resolver);
 
     return 0;
 }
 ```
 
-### Explanation of Changes:
-1. **Included Necessary Libraries**: The code already includes the necessary libraries.
-2. **Wrapped C Headers with `extern &#34;C&#34;`**: This was already done correctly.
-3. **Populated `archive_entry` with Data**: Added code to populate the `archive_entry` with some data from the fuzzer to ensure the function under test is utilized effectively.
+### Explanation of Fixes:
+1. **Include Headers in `extern &#34;C&#34;` Block**: The `archive_entry.h` and `archive.h` headers are included within an `extern &#34;C&#34;` block to ensure proper linkage as they are C headers.
+2. **Correct Struct Declaration**: The `archive_entry` struct is correctly referenced as `struct archive_entry` in the size check to match C-style struct usage.
+3. **Consistent Use of Struct**: Ensure consistent use of `struct` keyword for `archive_entry` and `archive_entry_linkresolver`.
 
-This should resolve any build issues and ensure that the fuzzer can effectively test the `archive_entry_linkresolver` functionality.
+This should resolve the build issues and ensure that the code compiles correctly for fuzzing.
 </pre>
 
 
@@ -739,6 +763,8 @@ This should resolve any build issues and ensure that the fuzzer can effectively 
 Given the following C++ fuzz harness and its build error message, fix the code to make it build for fuzzing.
 
 If there is undeclared identifier or unknown type name error, fix it by finding and including the related libraries.
+
+You MUST wrap the headers with &lt;code&gt;extern &#34;C&#34;&lt;/code&gt; if they are C headers, especially the headers are from the project.
 
 Note that some code may need to be wrapped with &lt;code&gt;extern &#34;C&#34;&lt;/code&gt; as their source is C program.
 
@@ -761,8 +787,8 @@ Below is the code needs to be built:
 #include &lt;cctype&gt;
 
 extern &#34;C&#34; {
-#include &#34;archive.h&#34;
 #include &#34;archive_entry.h&#34;
+#include &#34;archive.h&#34;
 }
 
 extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
@@ -770,6 +796,10 @@ extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
 }
 
 extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    if (size &lt; 2 * sizeof(struct archive_entry *)) {
+        return 0;
+    }
+
     FuzzedDataProvider dataProvider(data, size);
 
     struct archive_entry_linkresolver *resolver = archive_entry_linkresolver_new();
@@ -778,37 +808,54 @@ extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) 
     }
 
     struct archive_entry *entry = archive_entry_new();
-    struct archive_entry *sparse_entry = archive_entry_new();
+    struct archive_entry *linked_entry = nullptr;
 
-    if (!entry || !sparse_entry) {
-        if (entry) archive_entry_free(entry);
-        if (sparse_entry) archive_entry_free(sparse_entry);
-        archive_entry_linkresolver_free(resolver);
-        return 0;
+    std::vector&lt;uint8_t&gt; entry_data = dataProvider.ConsumeRemainingBytes&lt;uint8_t&gt;();
+    if (!entry_data.empty()) {
+        archive_entry_copy_pathname(entry, reinterpret_cast&lt;const char *&gt;(entry_data.data()));
     }
 
-    // Populate the archive_entry with some data from the fuzzer
-    std::string pathname = dataProvider.ConsumeRandomLengthString(100);
-    archive_entry_set_pathname(entry, pathname.c_str());
-    archive_entry_set_size(entry, dataProvider.ConsumeIntegral&lt;int64_t&gt;());
-    archive_entry_set_filetype(entry, AE_IFREG);
-    archive_entry_set_perm(entry, dataProvider.ConsumeIntegral&lt;int&gt;());
+    archive_entry_linkify(resolver, &amp;entry, &amp;linked_entry);
 
-    // Perform the linkify operation
-    archive_entry_linkify(resolver, &amp;entry, &amp;sparse_entry);
-
-    // Free the allocated resources
-    if (entry) archive_entry_free(entry);
-    if (sparse_entry) archive_entry_free(sparse_entry);
+    archive_entry_free(entry);
+    if (linked_entry) {
+        archive_entry_free(linked_entry);
+    }
     archive_entry_linkresolver_free(resolver);
 
     return 0;
 }
 &lt;/code&gt;
 
-The code has the following build issues:
+The code can build successfully but has a runtime issue: Fuzzing crashed immediately at runtime (ASAN-ERROR: AddressSanitizer: heap-buffer-overflow on address 0x50300000e007 at pc 0x55f201ef89a9 bp 0x7ffd56d64fe0 sp 0x7ffd56d647a8), indicating fuzz target code for invoking the function under test is incorrect or unrobust.
 &lt;error&gt;
-
+Crash stacks:
+Stack 0:
+#0 0x55f201ef89a8 in strlen /src/llvm-project/compiler-rt/lib/asan/../sanitizer_common/sanitizer_common_interceptors.inc:390:5
+#1 0x55f201fcf80e in archive_mstring_copy_mbs /src/libarchive/libarchive/archive_string.c:4046:49
+#2 0x55f201fbcd93 in LLVMFuzzerTestOneInput /src/libarchive_fuzzer.cc:40:9
+#3 0x55f201e6f560 in fuzzer::Fuzzer::ExecuteCallback(unsigned char const*, unsigned long) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:614:13
+#4 0x55f201e6ed85 in fuzzer::Fuzzer::RunOne(unsigned char const*, unsigned long, bool, fuzzer::InputInfo*, bool, bool*) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:516:7
+#5 0x55f201e70d12 in fuzzer::Fuzzer::ReadAndExecuteSeedCorpora(std::__Fuzzer::vector&lt;fuzzer::SizedFile, std::__Fuzzer::allocator&lt;fuzzer::SizedFile&gt;&gt;&amp;) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:829:7
+#6 0x55f201e71047 in fuzzer::Fuzzer::Loop(std::__Fuzzer::vector&lt;fuzzer::SizedFile, std::__Fuzzer::allocator&lt;fuzzer::SizedFile&gt;&gt;&amp;) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:867:3
+#7 0x55f201e5f656 in fuzzer::FuzzerDriver(int*, char***, int (*)(unsigned char const*, unsigned long)) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerDriver.cpp:914:6
+#8 0x55f201e8bb82 in main /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerMain.cpp:20:10
+#9 0x7f3043a64082 in __libc_start_main (/lib/x86_64-linux-gnu/libc.so.6+0x24082) (BuildId: 0702430aef5fa3dda43986563e9ffcc47efbd75e)
+#10 0x55f201e507cd in _start (/out/libarchive_fuzzer+0x567cd)
+Stack 1:
+#0 0x55f201fba88d in operator new(unsigned long) /src/llvm-project/compiler-rt/lib/asan/asan_new_delete.cpp:95:3
+#1 0x55f201fbd277 in __libcpp_operator_new&lt;unsigned long&gt; /usr/local/bin/../include/c++/v1/new:268:10
+#2 0x55f201fbd277 in __libcpp_allocate /usr/local/bin/../include/c++/v1/new:294:10
+#3 0x55f201fbd277 in allocate /usr/local/bin/../include/c++/v1/__memory/allocator.h:114:38
+#4 0x55f201fbd277 in __allocate_at_least&lt;std::__1::allocator&lt;unsigned char&gt; &gt; /usr/local/bin/../include/c++/v1/__memory/allocate_at_least.h:55:19
+#5 0x55f201fbd277 in __vallocate /usr/local/bin/../include/c++/v1/vector:756:29
+#6 0x55f201fbd277 in std::__1::vector&lt;unsigned char, std::__1::allocator&lt;unsigned char&gt;&gt;::vector(unsigned long) /usr/local/bin/../include/c++/v1/vector:1195:9
+#7 0x55f201fbcd0a in ConsumeBytes&lt;unsigned char&gt; /usr/local/lib/clang/18/include/fuzzer/FuzzedDataProvider.h:361:18
+#8 0x55f201fbcd0a in ConsumeBytes&lt;unsigned char&gt; /usr/local/lib/clang/18/include/fuzzer/FuzzedDataProvider.h:110:10
+#9 0x55f201fbcd0a in ConsumeRemainingBytes&lt;unsigned char&gt; /usr/local/lib/clang/18/include/fuzzer/FuzzedDataProvider.h:129:10
+#10 0x55f201fbcd0a in LLVMFuzzerTestOneInput /src/libarchive_fuzzer.cc:38:52
+#11 0x55f201e6f560 in fuzzer::Fuzzer::ExecuteCallback(unsigned char const*, unsigned long) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:614:13
+#12 0x55f201e6ed85 in fuzzer::Fuzzer::RunOne(unsigned char const*, unsigned long, bool, fuzzer::InputInfo*, bool, bool*) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:516:7
 &lt;/error&gt;
 
 Fix code:
@@ -824,9 +871,7 @@ It&#39;s important to show the complete code, not only the fixed line.
 <h3>Code #5</h3>
 
 <pre>
-Sure, let&#39;s address the issues and provide the complete fixed code. The primary issues are likely related to missing includes or incorrect usage of the `libarchive` functions. Let&#39;s ensure all necessary headers are included and that the functions are used correctly.
-
-Here is the fixed code:
+Here is the corrected code with the necessary fixes to handle the potential issues that caused the runtime crash:
 
 ```cpp
 #include &lt;fuzzer/FuzzedDataProvider.h&gt;
@@ -843,8 +888,8 @@ Here is the fixed code:
 #include &lt;cctype&gt;
 
 extern &#34;C&#34; {
-#include &lt;archive.h&gt;
-#include &lt;archive_entry.h&gt;
+#include &#34;archive_entry.h&#34;
+#include &#34;archive.h&#34;
 }
 
 extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
@@ -852,6 +897,10 @@ extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
 }
 
 extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    if (size &lt; 2 * sizeof(struct archive_entry *)) {
+        return 0;
+    }
+
     FuzzedDataProvider dataProvider(data, size);
 
     struct archive_entry_linkresolver *resolver = archive_entry_linkresolver_new();
@@ -860,40 +909,35 @@ extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) 
     }
 
     struct archive_entry *entry = archive_entry_new();
-    struct archive_entry *sparse_entry = archive_entry_new();
+    struct archive_entry *linked_entry = nullptr;
 
-    if (!entry || !sparse_entry) {
-        if (entry) archive_entry_free(entry);
-        if (sparse_entry) archive_entry_free(sparse_entry);
-        archive_entry_linkresolver_free(resolver);
-        return 0;
+    std::vector&lt;uint8_t&gt; entry_data = dataProvider.ConsumeRemainingBytes&lt;uint8_t&gt;();
+    if (!entry_data.empty()) {
+        // Ensure the data is null-terminated to prevent buffer overflow
+        entry_data.push_back(&#39;\0&#39;);
+        archive_entry_copy_pathname(entry, reinterpret_cast&lt;const char *&gt;(entry_data.data()));
     }
 
-    // Populate the archive_entry with some data from the fuzzer
-    std::string pathname = dataProvider.ConsumeRandomLengthString(100);
-    archive_entry_set_pathname(entry, pathname.c_str());
-    archive_entry_set_size(entry, dataProvider.ConsumeIntegral&lt;int64_t&gt;());
-    archive_entry_set_filetype(entry, AE_IFREG);
-    archive_entry_set_perm(entry, dataProvider.ConsumeIntegral&lt;int&gt;());
+    archive_entry_linkify(resolver, &amp;entry, &amp;linked_entry);
 
-    // Perform the linkify operation
-    archive_entry_linkify(resolver, &amp;entry, &amp;sparse_entry);
-
-    // Free the allocated resources
-    if (entry) archive_entry_free(entry);
-    if (sparse_entry) archive_entry_free(sparse_entry);
+    archive_entry_free(entry);
+    if (linked_entry) {
+        archive_entry_free(linked_entry);
+    }
     archive_entry_linkresolver_free(resolver);
 
     return 0;
 }
 ```
 
-### Explanation of Fixes:
-1. **Include Headers in `extern &#34;C&#34;` Block**: The `libarchive` headers are C headers and should be included within an `extern &#34;C&#34;` block to prevent C++ name mangling.
-2. **Ensure All Necessary Headers are Included**: The necessary headers for `libarchive` functions are included.
-3. **Check for Null Pointers**: The code checks for null pointers after creating the `archive_entry` and `archive_entry_linkresolver` objects to ensure they are valid before proceeding.
+### Explanation of the Fixes:
+1. **Null-Termination of `entry_data`**: The crash was due to a buffer overflow when `archive_entry_copy_pathname` was called with a non-null-terminated string. By ensuring `entry_data` is null-terminated (`entry_data.push_back(&#39;\0&#39;);`), we prevent the function from reading beyond the allocated buffer.
 
-This should address the build issues and ensure that the code can be compiled and used for fuzzing.
+2. **Full Code Provided**: The entire code is shown, including unchanged parts, to ensure clarity and completeness.
+
+3. **No Use of `goto`**: The code avoids using `goto` and maintains clear and structured error handling.
+
+These changes should prevent the heap-buffer-overflow error and allow the fuzzer to run correctly, maximizing the fuzzing results by providing valid inputs to the function under test.
 </pre>
 
 
@@ -904,12 +948,65 @@ Fixing /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-libarchive-archive_entr
 Fixing /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-libarchive-archive_entry_linkify/fixed_targets/02.cc with gpt-4o, attempt 3.
 Fixing /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-libarchive-archive_entry_linkify/fixed_targets/02.cc with gpt-4o, attempt 4.
 Fixing /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-libarchive-archive_entry_linkify/fixed_targets/02.cc with gpt-4o, attempt 5.
-Failed to build /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-libarchive-archive_entry_linkify/fixed_targets/02.cc with gpt-4o in 5 iterations of fixing.
+Successfully built /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-libarchive-archive_entry_linkify/fixed_targets/02.cc with gpt-4o in 5 iterations of fixing.
+Warning: No cov info in run result of libarchive-archive_entry_linkify-02.
 
 </pre>
 
 <h2>Run logs</h2>
 <pre>
+INFO:__main__:Running: docker run --rm --privileged --shm-size=2g --platform linux/amd64 -e FUZZING_ENGINE=libfuzzer -e SANITIZER=address -e RUN_FUZZER_MODE=interactive -e HELPER=True -v /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-libarchive-archive_entry_linkify/corpora/02.cc:/tmp/libarchive_fuzzer_corpus -v /tmp/tmpk31m_hoq/build/out/libarchive-archive_entry_linkify-02:/out -t gcr.io/oss-fuzz-base/base-runner run_fuzzer libarchive_fuzzer -print_final_stats=1 -max_total_time=30 -len_control=0 -timeout=30.
+vm.mmap_rnd_bits = 28
+rm: cannot remove &#39;/tmp/libarchive_fuzzer_corpus&#39;: Device or resource busy
+Using seed corpus: libarchive_fuzzer_seed_corpus.zip
+/out/libarchive_fuzzer -rss_limit_mb=2560 -timeout=25 -print_final_stats=1 -max_total_time=30 -len_control=0 -timeout=30 /tmp/libarchive_fuzzer_corpus &lt; /dev/null
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 1197861516
+INFO: Loaded 1 modules   (2729 inline 8-bit counters): 2729 [0x55d378d55648, 0x55d378d560f1), 
+INFO: Loaded 1 PC tables (2729 PCs): 2729 [0x55d378d560f8,0x55d378d60b88), 
+INFO:      965 files found in /tmp/libarchive_fuzzer_corpus
+INFO: -max_len is not provided; libFuzzer will not generate inputs larger than 1048576 bytes
+INFO: seed corpus: files: 965 min: 2b max: 27570880b total: 104912470b rss: 32Mb
+#512	pulse  cov: 94 ft: 113 corp: 13/971b exec/s: 128 rss: 48Mb
+#952	INITED cov: 94 ft: 115 corp: 15/4048b exec/s: 38 rss: 62Mb
+#960	REDUCE cov: 94 ft: 115 corp: 15/4041b lim: 1048576 exec/s: 38 rss: 62Mb L: 16/2050 MS: 3 ShuffleBytes-ChangeBinInt-EraseBytes-
+#1006	REDUCE cov: 94 ft: 115 corp: 15/4032b lim: 1048576 exec/s: 40 rss: 62Mb L: 116/2050 MS: 1 EraseBytes-
+#1024	pulse  cov: 94 ft: 115 corp: 15/4032b lim: 1048576 exec/s: 39 rss: 62Mb
+#1063	REDUCE cov: 94 ft: 115 corp: 15/4027b lim: 1048576 exec/s: 40 rss: 62Mb L: 23/2050 MS: 2 CopyPart-EraseBytes-
+#1118	REDUCE cov: 94 ft: 115 corp: 15/4010b lim: 1048576 exec/s: 43 rss: 62Mb L: 23/2050 MS: 5 CopyPart-CopyPart-ChangeByte-EraseBytes-EraseBytes-
+#1142	REDUCE cov: 94 ft: 115 corp: 15/4004b lim: 1048576 exec/s: 43 rss: 62Mb L: 17/2050 MS: 4 ChangeBit-ShuffleBytes-CMP-EraseBytes- DE: &#34;q\000\000\000\000\000\000\000&#34;-
+#1173	REDUCE cov: 94 ft: 115 corp: 15/3952b lim: 1048576 exec/s: 45 rss: 62Mb L: 64/2050 MS: 1 EraseBytes-
+#1194	REDUCE cov: 94 ft: 115 corp: 15/3948b lim: 1048576 exec/s: 45 rss: 62Mb L: 60/2050 MS: 1 EraseBytes-
+#1220	REDUCE cov: 94 ft: 115 corp: 15/3947b lim: 1048576 exec/s: 46 rss: 62Mb L: 1/2050 MS: 1 EraseBytes-
+#1271	REDUCE cov: 94 ft: 115 corp: 15/3943b lim: 1048576 exec/s: 48 rss: 62Mb L: 37/2050 MS: 1 EraseBytes-
+#1323	NEW    cov: 94 ft: 116 corp: 16/4203b lim: 1048576 exec/s: 50 rss: 62Mb L: 260/2050 MS: 2 InsertRepeatedBytes-InsertRepeatedBytes-
+#1348	REDUCE cov: 94 ft: 116 corp: 16/4195b lim: 1048576 exec/s: 51 rss: 62Mb L: 52/2050 MS: 5 ChangeBit-CMP-CMP-PersAutoDict-EraseBytes- DE: &#34;\001\000\000\000&#34;-&#34;\003\000\000\000\000\000\000\000&#34;-&#34;q\000\000\000\000\000\000\000&#34;-
+#1361	REDUCE cov: 94 ft: 116 corp: 16/4194b lim: 1048576 exec/s: 52 rss: 62Mb L: 22/2050 MS: 3 InsertByte-ChangeByte-EraseBytes-
+#1377	REDUCE cov: 94 ft: 116 corp: 16/4169b lim: 1048576 exec/s: 52 rss: 62Mb L: 27/2050 MS: 1 EraseBytes-
+#1444	REDUCE cov: 94 ft: 116 corp: 16/4130b lim: 1048576 exec/s: 55 rss: 62Mb L: 77/2050 MS: 2 ShuffleBytes-EraseBytes-
+#1489	REDUCE cov: 94 ft: 116 corp: 16/4127b lim: 1048576 exec/s: 57 rss: 62Mb L: 19/2050 MS: 5 PersAutoDict-CopyPart-CMP-ChangeByte-EraseBytes- DE: &#34;\001\000\000\000&#34;-&#34;\000\000\000\000&#34;-
+#1715	REDUCE cov: 94 ft: 116 corp: 16/4117b lim: 1048576 exec/s: 65 rss: 62Mb L: 17/2050 MS: 1 EraseBytes-
+#1891	REDUCE cov: 94 ft: 116 corp: 16/4115b lim: 1048576 exec/s: 72 rss: 62Mb L: 34/2050 MS: 1 EraseBytes-
+#2048	pulse  cov: 94 ft: 116 corp: 16/4115b lim: 1048576 exec/s: 78 rss: 62Mb
+#2087	REDUCE cov: 94 ft: 116 corp: 16/4092b lim: 1048576 exec/s: 80 rss: 62Mb L: 54/2050 MS: 1 EraseBytes-
+#2088	REDUCE cov: 94 ft: 116 corp: 16/4071b lim: 1048576 exec/s: 80 rss: 62Mb L: 33/2050 MS: 1 EraseBytes-
+#2388	REDUCE cov: 94 ft: 116 corp: 16/4066b lim: 1048576 exec/s: 88 rss: 62Mb L: 17/2050 MS: 1 EraseBytes-
+#2412	REDUCE cov: 94 ft: 116 corp: 16/4063b lim: 1048576 exec/s: 89 rss: 62Mb L: 30/2050 MS: 4 ChangeBinInt-CMP-ShuffleBytes-EraseBytes- DE: &#34;\000\000&#34;-
+#2733	REDUCE cov: 94 ft: 116 corp: 16/4062b lim: 1048576 exec/s: 101 rss: 62Mb L: 16/2050 MS: 1 EraseBytes-
+#3163	DONE   cov: 94 ft: 116 corp: 16/4062b lim: 1048576 exec/s: 87 rss: 62Mb
+###### Recommended dictionary. ######
+&#34;q\000\000\000\000\000\000\000&#34; # Uses: 60
+&#34;\001\000\000\000&#34; # Uses: 35
+&#34;\003\000\000\000\000\000\000\000&#34; # Uses: 33
+&#34;\000\000\000\000&#34; # Uses: 34
+&#34;\000\000&#34; # Uses: 8
+###### End of recommended dictionary. ######
+Done 3163 runs in 36 second(s)
+stat::number_of_executed_units: 3163
+stat::average_exec_per_sec:     87
+stat::new_units_added:          22
+stat::slowest_unit_time_sec:    0
+stat::peak_rss_mb:              62
 
 </pre>
 

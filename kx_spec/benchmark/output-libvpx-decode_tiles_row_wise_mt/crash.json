@@ -16,7 +16,7 @@
         "target_binary": "/target_binary",
         "reproducer": "/artifacts",
         "run_log": "run.log",
-        "source_code": "#include <fuzzer/FuzzedDataProvider.h>\\n#include <string>\\n#include <vector>\\n#include <cstdint>\\n#include <cstddef>\\n#include <cstdlib>\\n#include <cstring>\\n#include <iostream>\\n#include <sstream>\\n#include <algorithm>\\n#include <iterator>\\n#include <cctype>\\n\\nextern \"C\" { \\n#include \"vp9/decoder/vp9_decoder.h\"\\n#include \"vpx/vpx_codec.h\"\\n#include \"vpx/vpx_image.h\"\\n#include \"vpx/vpx_frame_buffer.h\"\\n#include \"vpx/vpx_decoder.h\"\\n#include \"vpx_util/vpx_thread.h\"\\n#include \"vpx_ports/mem_ops.h\"\\n\\n// Forward declaration of the function to avoid undeclared identifier error\\nconst uint8_t *decode_tiles_row_wise_mt(VP9Decoder *pbi, const uint8_t *data_start, const uint8_t *data_end);\\n}\\n\\nextern \"C\" int LLVMFuzzerInitialize(int *argc, char ***argv) {\\n    return 0;\\n}\\n\\nextern \"C\" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {\\n  FuzzedDataProvider fuzzed_data(data, size);\\n\\n  VP9Decoder *pbi = new VP9Decoder();\\n  memset(pbi, 0, sizeof(VP9Decoder));\\n\\n  std::vector<uint8_t> consumed_data = fuzzed_data.ConsumeBytes<uint8_t>(size);\\n  const uint8_t *data_start = consumed_data.data();\\n  const uint8_t *data_end = data_start + consumed_data.size();\\n\\n  const uint8_t *result = decode_tiles_row_wise_mt(pbi, data_start, data_end);\\n\\n  delete pbi;\\n\\n  return 0;\\n}",
+        "source_code": "#include <fuzzer/FuzzedDataProvider.h>\\n#include <cstdint>\\n#include <cstddef>\\n#include <cstdlib>\\n#include <cstring>\\n#include <vector>\\n\\n// Include necessary header files\\nextern \"C\" {\\n#include \"/src/libvpx/vp9/decoder/vp9_decoder.h\"\\n#include \"/src/libvpx/vp9/common/vp9_common.h\"\\n#include \"/src/libvpx/vp9/decoder/vp9_job_queue.h\"\\n#include \"/src/libvpx/vpx/vpx_codec.h\"\\n#include \"/src/libvpx/vpx_mem/vpx_mem.h\"\\n}\\n\\n// Forward declaration of the target function\\nextern \"C\" const uint8_t *decode_tiles_row_wise_mt(VP9Decoder *pbi, const uint8_t *data, const uint8_t *data_end);\\n\\nextern \"C\" int LLVMFuzzerInitialize(int *argc, char ***argv) {\\n    // Initialize the library or any resources within decode_tiles_row_wise_mt within libvpx needed for the fuzzing process here.\\n    // TODO: Initialize any necessary resources or state.\\n    return 0;\\n}\\n\\nextern \"C\" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {\\n\\n    // Create a FuzzedDataProvider instance to provide data to the function\\n    FuzzedDataProvider fuzzed_data(data, size);\\n\\n    // Allocate and initialize a VP9Decoder structure\\n    VP9Decoder *pbi = static_cast<VP9Decoder *>(malloc(sizeof(VP9Decoder)));\\n    if (!pbi) {\\n        return 0; // Exit if memory allocation fails\\n    }\\n    memset(pbi, 0, sizeof(VP9Decoder));\\n\\n    // Allocate a buffer for data and data_end\\n    size_t data_size = fuzzed_data.ConsumeIntegralInRange<size_t>(1, size);\\n    std::vector<uint8_t> data_buffer = fuzzed_data.ConsumeBytes<uint8_t>(data_size);\\n    const uint8_t *data_ptr = data_buffer.data();\\n    const uint8_t *data_end_ptr = data_ptr + data_size;\\n\\n    // Call the target function\\n    const uint8_t *result = decode_tiles_row_wise_mt(pbi, data_ptr, data_end_ptr);\\n\\n    // Clean up allocated resources\\n    free(pbi);\\n\\n    return 0;\\n}",
         "model": ""
     },
 
@@ -35,7 +35,64 @@
         "target_binary": "/target_binary",
         "reproducer": "/artifacts",
         "run_log": "run.log",
-        "source_code": "#include <fuzzer/FuzzedDataProvider.h>\\n#include <string>\\n#include <vector>\\n#include <cstdint>\\n#include <cstddef>\\n#include <cstdlib>\\n#include <cstring>\\n#include <iostream>\\n#include <sstream>\\n#include <algorithm>\\n#include <iterator>\\n#include <cctype>\\n\\nextern \"C\" { \\n#include \"vp9/decoder/vp9_decoder.h\"\\n#include \"vpx/vpx_codec.h\"\\n#include \"vpx/vpx_image.h\"\\n#include \"vpx/vpx_frame_buffer.h\"\\n#include \"vpx/vpx_decoder.h\"\\n#include \"vpx_util/vpx_thread.h\"\\n#include \"vpx_ports/mem_ops.h\"\\n\\n// Define the function prototype if it is not declared in the included headers\\nconst uint8_t *decode_tiles_row_wise_mt(VP9Decoder *pbi, const uint8_t *data_start, const uint8_t *data_end);\\n}\\n\\nextern \"C\" int LLVMFuzzerInitialize(int *argc, char ***argv) {\\n    // Initialize the library or any resources within decode_tiles_row_wise_mt within libvpx needed for the fuzzing process here.\\n    // No specific initialization required for this fuzzing task.\\n    return 0;\\n}\\n\\nextern \"C\" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {\\n\\n  // Initialize FuzzedDataProvider\\n  FuzzedDataProvider fuzzed_data(data, size);\\n\\n  // Generate fuzzed inputs for the function parameters\\n  VP9Decoder *pbi = new VP9Decoder();\\n  std::memset(pbi, 0, sizeof(VP9Decoder)); // Proper Initialization\\n\\n  const uint8_t *data_start = data;\\n  const uint8_t *data_end = data + size;\\n\\n  // Call the function with fuzzed inputs\\n  if (pbi != nullptr && data_start != nullptr && data_end != nullptr && data_end >= data_start) {\\n      const uint8_t *result = decode_tiles_row_wise_mt(pbi, data_start, data_end);\\n  }\\n\\n  // Clean up\\n  delete pbi;\\n\\n  return 0;\\n}",
+        "source_code": "#include <fuzzer/FuzzedDataProvider.h>\\n#include <cstdint>\\n#include <cstddef>\\n#include <cstdlib>\\n#include <cstring>\\n#include <vector>\\n\\nextern \"C\" {\\n#include \"/src/libvpx/vp9/decoder/vp9_decoder.h\"\\n#include \"/src/libvpx/vp9/common/vp9_common.h\"\\n#include \"/src/libvpx/vp9/decoder/vp9_job_queue.h\"\\n#include \"/src/libvpx/vpx/vpx_codec.h\"\\n#include \"/src/libvpx/vpx_mem/vpx_mem.h\"\\n\\n// Ensure the declaration of the function `decode_tiles_row_wise_mt` is included\\nconst uint8_t *decode_tiles_row_wise_mt(VP9Decoder *pbi, const uint8_t *data, const uint8_t *data_end);\\n}\\n\\nextern \"C\" int LLVMFuzzerInitialize(int *argc, char ***argv) {\\n    return 0;\\n}\\n\\nextern \"C\" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {\\n    FuzzedDataProvider fuzzed_data(data, size);\\n\\n    VP9Decoder *pbi = static_cast<VP9Decoder *>(malloc(sizeof(VP9Decoder)));\\n    if (!pbi) {\\n        return 0;\\n    }\\n    memset(pbi, 0, sizeof(VP9Decoder));\\n\\n    size_t data_size = fuzzed_data.ConsumeIntegralInRange<size_t>(1, size);\\n    std::vector<uint8_t> consumed_data = fuzzed_data.ConsumeBytes<uint8_t>(data_size);\\n    const uint8_t *data_ptr = consumed_data.data();\\n    const uint8_t *data_end_ptr = data_ptr + data_size;\\n\\n    // Call the required function `decode_tiles_row_wise_mt`\\n    const uint8_t *result = decode_tiles_row_wise_mt(pbi, data_ptr, data_end_ptr);\\n\\n    free(pbi);\\n\\n    return 0;\\n}",
+        "model": ""
+    },
+
+    {
+        "benchmark": "output-libvpx-decode_tiles_row_wise_mt",
+        "sample": "03",
+        "status": "Done",
+        "compiles": "False",
+        "crashes": "False",
+        "crash_reason": "-",
+        "bug": "True",
+        "coverage": "0.00",
+        "coverage_diff": "0.0",
+        "coverage_report": "#",
+        "stacktrace": "/stacktrace",
+        "target_binary": "/target_binary",
+        "reproducer": "/artifacts",
+        "run_log": "run.log",
+        "source_code": "#include <fuzzer/FuzzedDataProvider.h>\\n#include <cstdint>\\n#include <cstddef>\\n#include <cstdlib>\\n#include <cstring>\\n\\nextern \"C\" {\\n#include \"/src/libvpx/vp9/decoder/vp9_decoder.h\"\\n#include \"/src/libvpx/vp9/common/vp9_common.h\"\\n#include \"/src/libvpx/vp9/decoder/vp9_job_queue.h\"\\n#include \"/src/libvpx/vpx/vpx_codec.h\"\\n#include \"/src/libvpx/vpx_mem/vpx_mem.h\"\\n#include \"/src/libvpx/vp9/decoder/vp9_decodeframe.h\"\\n}\\n\\nextern \"C\" int LLVMFuzzerInitialize(int *argc, char ***argv) {\\n    return 0;\\n}\\n\\nextern \"C\" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {\\n    FuzzedDataProvider fuzzed_data(data, size);\\n\\n    VP9Decoder *pbi = static_cast<VP9Decoder *>(malloc(sizeof(VP9Decoder)));\\n    if (!pbi) {\\n        return 0;\\n    }\\n    memset(pbi, 0, sizeof(VP9Decoder));\\n\\n    size_t data_size = fuzzed_data.ConsumeIntegralInRange<size_t>(1, size);\\n    const uint8_t *data_ptr = fuzzed_data.ConsumeBytes<uint8_t>(data_size).data();\\n    const uint8_t *data_end_ptr = data_ptr + data_size;\\n\\n    // Initialize the decoder context\\n    const uint8_t *data_ptr_copy = data_ptr;\\n    if (vp9_receive_compressed_data(pbi, data_size, &data_ptr_copy) == 0) {\\n        vp9_decode_frame(pbi, data_ptr, data_end_ptr, 0);\\n        \\n        // Call the target function\\n        // Correct function name is decode_tiles_row_wise_mt\\n        const uint8_t *result = decode_tiles_row_wise_mt(pbi, data_ptr, data_end_ptr);\\n        (void)result; // Suppress unused variable warning\\n    }\\n\\n    free(pbi);\\n\\n    return 0;\\n}",
+        "model": ""
+    },
+
+    {
+        "benchmark": "output-libvpx-decode_tiles_row_wise_mt",
+        "sample": "04",
+        "status": "Done",
+        "compiles": "False",
+        "crashes": "False",
+        "crash_reason": "-",
+        "bug": "True",
+        "coverage": "0.00",
+        "coverage_diff": "0.0",
+        "coverage_report": "#",
+        "stacktrace": "/stacktrace",
+        "target_binary": "/target_binary",
+        "reproducer": "/artifacts",
+        "run_log": "run.log",
+        "source_code": "#include <fuzzer/FuzzedDataProvider.h>\\n#include <cstdint>\\n#include <cstddef>\\n#include <cstdlib>\\n#include <cstring>\\n\\nextern \"C\" {\\n#include \"/src/libvpx/vp9/decoder/vp9_decoder.h\"\\n#include \"/src/libvpx/vp9/common/vp9_common.h\"\\n#include \"/src/libvpx/vp9/decoder/vp9_job_queue.h\"\\n#include \"/src/libvpx/vpx/vpx_codec.h\"\\n#include \"/src/libvpx/vpx_mem/vpx_mem.h\"\\n}\\n\\nextern \"C\" int LLVMFuzzerInitialize(int *argc, char ***argv) {\\n    return 0;\\n}\\n\\nextern \"C\" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {\\n    FuzzedDataProvider fuzzed_data(data, size);\\n\\n    VP9Decoder *pbi = static_cast<VP9Decoder *>(malloc(sizeof(VP9Decoder)));\\n    if (!pbi) {\\n        return 0;\\n    }\\n    memset(pbi, 0, sizeof(VP9Decoder));\\n\\n    size_t data_size = fuzzed_data.ConsumeIntegralInRange<size_t>(1, size);\\n    const uint8_t *data_ptr = fuzzed_data.ConsumeBytes<uint8_t>(data_size).data();\\n    const uint8_t *data_end_ptr = data_ptr + data_size;\\n\\n    // Initialize the decoder\\n    BufferPool *pool = static_cast<BufferPool *>(malloc(sizeof(BufferPool)));\\n    if (!pool) {\\n        free(pbi);\\n        return 0;\\n    }\\n    memset(pool, 0, sizeof(BufferPool));\\n\\n    pbi = vp9_decoder_create(pool);\\n    if (!pbi) {\\n        free(pool);\\n        return 0;\\n    }\\n\\n    // Decode the data using the target function\\n    const uint8_t *result = vp9_receive_compressed_data(pbi, data_size, data_ptr, 0);\\n\\n    // Call the required function\\n    const uint8_t *tiles_result = vp9_decode_frame(pbi, data_ptr, data_end_ptr, NULL);\\n\\n    // Clean up\\n    vp9_decoder_remove(pbi);\\n    free(pool);\\n\\n    return 0;\\n}",
+        "model": ""
+    },
+
+    {
+        "benchmark": "output-libvpx-decode_tiles_row_wise_mt",
+        "sample": "05",
+        "status": "Done",
+        "compiles": "False",
+        "crashes": "False",
+        "crash_reason": "-",
+        "bug": "True",
+        "coverage": "0.00",
+        "coverage_diff": "0.0",
+        "coverage_report": "#",
+        "stacktrace": "/stacktrace",
+        "target_binary": "/target_binary",
+        "reproducer": "/artifacts",
+        "run_log": "run.log",
+        "source_code": "#include <fuzzer/FuzzedDataProvider.h>\\n#include <cstdint>\\n#include <cstddef>\\n#include <cstdlib>\\n#include <cstring>\\n#include <vector>\\n\\nextern \"C\" {\\n#include \"/src/libvpx/vp9/decoder/vp9_decoder.h\"\\n#include \"/src/libvpx/vp9/common/vp9_common.h\"\\n#include \"/src/libvpx/vp9/decoder/vp9_job_queue.h\"\\n#include \"/src/libvpx/vpx/vpx_codec.h\"\\n#include \"/src/libvpx/vpx_mem/vpx_mem.h\"\\n\\n// Declare the function if it's not declared in the headers\\nconst uint8_t *decode_tiles_row_wise_mt(VP9Decoder *pbi, const uint8_t *data_ptr, const uint8_t *data_end_ptr);\\n}\\n\\nextern \"C\" int LLVMFuzzerInitialize(int *argc, char ***argv) {\\n    return 0;\\n}\\n\\nextern \"C\" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {\\n    FuzzedDataProvider fuzzed_data(data, size);\\n\\n    VP9Decoder *pbi = static_cast<VP9Decoder *>(malloc(sizeof(VP9Decoder)));\\n    if (!pbi) {\\n        return 0;\\n    }\\n    memset(pbi, 0, sizeof(VP9Decoder));\\n\\n    size_t data_size = fuzzed_data.ConsumeIntegralInRange<size_t>(1, size);\\n    std::vector<uint8_t> consumed_data = fuzzed_data.ConsumeBytes<uint8_t>(data_size);\\n    const uint8_t *data_ptr = consumed_data.data();\\n    const uint8_t *data_end_ptr = data_ptr + data_size;\\n\\n    const uint8_t *result = decode_tiles_row_wise_mt(pbi, data_ptr, data_end_ptr);\\n\\n    free(pbi);\\n\\n    return 0;\\n}",
         "model": ""
     }
 

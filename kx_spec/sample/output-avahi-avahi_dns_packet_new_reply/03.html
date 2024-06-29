@@ -1,0 +1,410 @@
+<!doctype html>
+
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Experiment results</title>
+<style>
+* {
+    box-sizing: border-box;
+}
+
+html {
+    line-height: 1.15;
+}
+
+body {
+    font-family: sans-serif;
+    font-size: 16px;
+}
+
+table {
+    border-collapse: collapse;
+    border-spacing: 0;
+}
+
+td, th {
+    border-right: 1px #dedede solid;
+    border-bottom: 1px #dedede solid;
+    padding: 5px;
+    text-align: left;
+}
+td:first-child, th:first-child {
+    border-left: 1px #dedede solid;
+}
+th {
+    border-top: 1px #dedede solid;
+}
+
+tbody tr:nth-child(odd) {
+    background-color: #f4f5ff;
+}
+</style>
+<body>
+    LLM: 
+    
+<h1>output-avahi-avahi_dns_packet_new_reply / 03</h1>
+Bug: True
+<br>
+Crash reason: NO_SEMANTIC_ERR
+<br>
+<br>
+
+
+
+
+<h3>Final code</h3>
+
+<pre>
+#include &lt;fuzzer/FuzzedDataProvider.h&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+#include &lt;cstdint&gt;
+#include &lt;cstddef&gt;
+#include &lt;cstdlib&gt;
+#include &lt;cstring&gt;
+#include &lt;iostream&gt;
+#include &lt;sstream&gt;
+#include &lt;algorithm&gt;
+#include &lt;iterator&gt;
+#include &lt;cctype&gt;
+
+extern &#34;C&#34; {
+#include &#34;avahi-common/address.h&#34;
+#include &#34;avahi-common/malloc.h&#34;
+#include &#34;avahi-core/dns.h&#34;
+#include &#34;avahi-core/log.h&#34;
+#include &#34;avahi-core/rr.h&#34;
+#include &#34;avahi-core/hashmap.h&#34;
+#include &#34;avahi-common/strlst.h&#34;
+}
+
+extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    // Initialize the library or any resources within avahi_dns_packet_new_reply needed for the fuzzing process here.
+    return 0;
+}
+
+extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    FuzzedDataProvider dataProvider(data, size);
+
+    // Generate a random AvahiDnsPacket structure
+    AvahiDnsPacket packet;
+    packet.rindex = dataProvider.ConsumeIntegral&lt;unsigned&gt;();
+    packet.data = static_cast&lt;uint8_t*&gt;(avahi_malloc(dataProvider.remaining_bytes()));
+    if (packet.data == nullptr) {
+        return 0;
+    }
+    dataProvider.ConsumeData(packet.data, dataProvider.remaining_bytes());
+
+    // Generate random values for the other parameters
+    unsigned mtu = dataProvider.ConsumeIntegralInRange&lt;unsigned&gt;(512, 1500);
+    int copy_queries = dataProvider.ConsumeIntegral&lt;int&gt;();
+    int aa = dataProvider.ConsumeIntegral&lt;int&gt;();
+
+    // Call the function with the generated parameters
+    AvahiDnsPacket *new_packet = avahi_dns_packet_new_reply(&amp;packet, mtu, copy_queries, aa);
+
+    // Clean up if necessary
+    if (new_packet) {
+        avahi_dns_packet_free(new_packet);
+    }
+
+    avahi_free(packet.data);
+
+    return 0;
+}
+</pre>
+
+
+<h3>Fixer prompt #1</h3>
+<pre>
+
+Given the following C++ fuzz harness and its build error message, fix the code to make it build for fuzzing.
+
+If there is undeclared identifier or unknown type name error, fix it by finding and including the related libraries.
+
+You MUST wrap the headers with &lt;code&gt;extern &#34;C&#34;&lt;/code&gt; if they are C headers, especially the headers are from the project.
+
+Note that some code may need to be wrapped with &lt;code&gt;extern &#34;C&#34;&lt;/code&gt; as their source is C program.
+
+MUST RETURN THE FULL CODE, INCLUDING UNCHANGED PARTS.
+EXTREMELY IMPORTANT: AVOID USING &lt;code&gt;goto&lt;/code&gt;. If you have to write code using &lt;code&gt;goto&lt;/code&gt;, you MUST MUST also declare all variables BEFORE the &lt;code&gt;goto&lt;/code&gt;. Never introduce new variables after the &lt;code&gt;goto&lt;/code&gt;.
+
+Below is the code needs to be built:
+&lt;code&gt;
+#include &lt;fuzzer/FuzzedDataProvider.h&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+#include &lt;cstdint&gt;
+#include &lt;cstddef&gt;
+#include &lt;cstdlib&gt;
+#include &lt;cstring&gt;
+#include &lt;iostream&gt;
+#include &lt;sstream&gt;
+#include &lt;algorithm&gt;
+#include &lt;iterator&gt;
+#include &lt;cctype&gt;
+
+extern &#34;C&#34; {
+#include &#34;avahi-common/address.h&#34;
+#include &#34;avahi-common/malloc.h&#34;
+#include &#34;avahi-core/dns.h&#34;
+#include &#34;avahi-core/log.h&#34;
+#include &#34;avahi-core/rr.h&#34;
+#include &#34;avahi-core/hashmap.h&#34;
+#include &#34;avahi-common/strlst.h&#34;
+}
+
+extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    // Initialize the library or any resources within avahi_dns_packet_new_reply needed for the fuzzing process here.
+    return 0;
+}
+
+extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    FuzzedDataProvider dataProvider(data, size);
+
+    // Generate a random AvahiDnsPacket structure
+    AvahiDnsPacket packet;
+    packet.rindex = dataProvider.ConsumeIntegral&lt;unsigned&gt;();
+    packet.fields = avahi_malloc(AVAHI_DNS_PACKET_HEADER_SIZE);
+    if (packet.fields == nullptr) {
+        return 0;
+    }
+    dataProvider.ConsumeData(packet.fields, AVAHI_DNS_PACKET_HEADER_SIZE);
+    packet.data = avahi_malloc(dataProvider.remaining_bytes());
+    if (packet.data == nullptr) {
+        avahi_free(packet.fields);
+        return 0;
+    }
+    dataProvider.ConsumeData(packet.data, dataProvider.remaining_bytes());
+
+    // Generate random values for the other parameters
+    unsigned mtu = dataProvider.ConsumeIntegralInRange&lt;unsigned&gt;(512, 1500);
+    int copy_queries = dataProvider.ConsumeIntegral&lt;int&gt;();
+    int aa = dataProvider.ConsumeIntegral&lt;int&gt;();
+
+    // Call the function with the generated parameters
+    AvahiDnsPacket *new_packet = avahi_dns_packet_new_reply(&amp;packet, mtu, copy_queries, aa);
+
+    // Clean up if necessary
+    if (new_packet) {
+        avahi_dns_packet_free(new_packet);
+    }
+
+    avahi_free(packet.fields);
+    avahi_free(packet.data);
+
+    return 0;
+}
+&lt;/code&gt;
+
+The code has the following build issues:
+&lt;error&gt;
+fuzz/fuzz-consume-record.cpp:35:12: error: no member named &#39;fields&#39; in &#39;AvahiDnsPacket&#39;
+   35 |     packet.fields = avahi_malloc(AVAHI_DNS_PACKET_HEADER_SIZE);
+      |     ~~~~~~ ^
+fuzz/fuzz-consume-record.cpp:36:16: error: no member named &#39;fields&#39; in &#39;AvahiDnsPacket&#39;
+   36 |     if (packet.fields == nullptr) {
+      |         ~~~~~~ ^
+fuzz/fuzz-consume-record.cpp:39:37: error: no member named &#39;fields&#39; in &#39;AvahiDnsPacket&#39;
+   39 |     dataProvider.ConsumeData(packet.fields, AVAHI_DNS_PACKET_HEADER_SIZE);
+      |                              ~~~~~~ ^
+fuzz/fuzz-consume-record.cpp:40:19: error: assigning to &#39;uint8_t *&#39; (aka &#39;unsigned char *&#39;) from incompatible type &#39;void *&#39;
+   40 |     packet.data = avahi_malloc(dataProvider.remaining_bytes());
+      |                   ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+fuzz/fuzz-consume-record.cpp:42:27: error: no member named &#39;fields&#39; in &#39;AvahiDnsPacket&#39;
+   42 |         avahi_free(packet.fields);
+      |                    ~~~~~~ ^
+fuzz/fuzz-consume-record.cpp:60:23: error: no member named &#39;fields&#39; in &#39;AvahiDnsPacket&#39;
+   60 |     avahi_free(packet.fields);
+      |                ~~~~~~ ^
+&lt;/error&gt;
+
+Fix code:
+1. Consider possible solutions for the issues listed above.
+2. Choose a solution that can maximize fuzzing result, which is utilizing the function under test and feeding it not null input.
+3. Apply the solutions to the original code.
+It&#39;s important to show the complete code, not only the fixed line.
+&lt;solution&gt;
+</pre>
+
+
+
+<h3>Code #1</h3>
+
+<pre>
+Here&#39;s the full fixed code with the necessary changes to address the build issues:
+
+```cpp
+#include &lt;fuzzer/FuzzedDataProvider.h&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+#include &lt;cstdint&gt;
+#include &lt;cstddef&gt;
+#include &lt;cstdlib&gt;
+#include &lt;cstring&gt;
+#include &lt;iostream&gt;
+#include &lt;sstream&gt;
+#include &lt;algorithm&gt;
+#include &lt;iterator&gt;
+#include &lt;cctype&gt;
+
+extern &#34;C&#34; {
+#include &#34;avahi-common/address.h&#34;
+#include &#34;avahi-common/malloc.h&#34;
+#include &#34;avahi-core/dns.h&#34;
+#include &#34;avahi-core/log.h&#34;
+#include &#34;avahi-core/rr.h&#34;
+#include &#34;avahi-core/hashmap.h&#34;
+#include &#34;avahi-common/strlst.h&#34;
+}
+
+extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    // Initialize the library or any resources within avahi_dns_packet_new_reply needed for the fuzzing process here.
+    return 0;
+}
+
+extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    FuzzedDataProvider dataProvider(data, size);
+
+    // Generate a random AvahiDnsPacket structure
+    AvahiDnsPacket packet;
+    packet.rindex = dataProvider.ConsumeIntegral&lt;unsigned&gt;();
+    packet.data = static_cast&lt;uint8_t*&gt;(avahi_malloc(dataProvider.remaining_bytes()));
+    if (packet.data == nullptr) {
+        return 0;
+    }
+    dataProvider.ConsumeData(packet.data, dataProvider.remaining_bytes());
+
+    // Generate random values for the other parameters
+    unsigned mtu = dataProvider.ConsumeIntegralInRange&lt;unsigned&gt;(512, 1500);
+    int copy_queries = dataProvider.ConsumeIntegral&lt;int&gt;();
+    int aa = dataProvider.ConsumeIntegral&lt;int&gt;();
+
+    // Call the function with the generated parameters
+    AvahiDnsPacket *new_packet = avahi_dns_packet_new_reply(&amp;packet, mtu, copy_queries, aa);
+
+    // Clean up if necessary
+    if (new_packet) {
+        avahi_dns_packet_free(new_packet);
+    }
+
+    avahi_free(packet.data);
+
+    return 0;
+}
+```
+
+### Explanation of Fixes:
+1. **Removed `fields` Member Access**: The original code attempted to access a `fields` member in the `AvahiDnsPacket` struct, which does not exist. The correct member to use is `data`, which is a `uint8_t*`.
+
+2. **Proper Type Casting for `avahi_malloc`**: The return type of `avahi_malloc` is `void*`, which needs to be cast to `uint8_t*` for assignment to `packet.data`.
+
+3. **Removed Unnecessary `fields` Handling**: Since `fields` does not exist in `AvahiDnsPacket`, all related code was removed, focusing only on `data`.
+
+This should resolve the build issues and ensure the code is correctly utilizing the `AvahiDnsPacket` structure and associated functions.
+</pre>
+
+
+<h2>Logs</h2>
+<pre>
+Fixing /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-avahi-avahi_dns_packet_new_reply/fixed_targets/03.c with gpt-4o, attempt 1.
+Successfully built /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-avahi-avahi_dns_packet_new_reply/fixed_targets/03.c with gpt-4o in 1 iterations of fixing.
+Result for avahi-avahi_dns_packet_new_reply-03: crashes=True, coverage=0.0038293216630196935 (7/1828), coverage diff=0.0003447087211306446 (1/2901)
+
+</pre>
+
+<h2>Run logs</h2>
+<pre>
+INFO:__main__:Running: docker run --rm --privileged --shm-size=2g --platform linux/amd64 -e FUZZING_ENGINE=libfuzzer -e SANITIZER=address -e RUN_FUZZER_MODE=interactive -e HELPER=True -v /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-avahi-avahi_dns_packet_new_reply/corpora/03.c:/tmp/fuzz-consume-record_corpus -v /tmp/tmpk31m_hoq/build/out/avahi-avahi_dns_packet_new_reply-03:/out -t gcr.io/oss-fuzz-base/base-runner run_fuzzer fuzz-consume-record -print_final_stats=1 -max_total_time=30 -len_control=0 -timeout=30.
+vm.mmap_rnd_bits = 28
+rm: cannot remove &#39;/tmp/fuzz-consume-record_corpus&#39;: Device or resource busy
+/out/fuzz-consume-record -rss_limit_mb=2560 -timeout=25 -print_final_stats=1 -max_total_time=30 -len_control=0 -timeout=30 /tmp/fuzz-consume-record_corpus &lt; /dev/null
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 3428390129
+INFO: Loaded 1 modules   (1828 inline 8-bit counters): 1828 [0x5653403871b0, 0x5653403878d4), 
+INFO: Loaded 1 PC tables (1828 PCs): 1828 [0x5653403878d8,0x56534038eb18), 
+INFO:        0 files found in /tmp/fuzz-consume-record_corpus
+INFO: -max_len is not provided; libFuzzer will not generate inputs larger than 4096 bytes
+INFO: A corpus is not provided, starting from an empty corpus
+#2	INITED cov: 6 ft: 7 corp: 1/1b exec/s: 0 rss: 30Mb
+#4	NEW    cov: 6 ft: 9 corp: 2/3b lim: 4096 exec/s: 0 rss: 30Mb L: 2/2 MS: 2 ShuffleBytes-InsertByte-
+#14	NEW    cov: 7 ft: 12 corp: 3/7b lim: 4096 exec/s: 0 rss: 30Mb L: 4/4 MS: 5 ShuffleBytes-ChangeByte-InsertByte-CopyPart-CopyPart-
+=================================================================
+[1m[31m==12==ERROR: AddressSanitizer: heap-buffer-overflow on address 0x502000000734 at pc 0x5653402f6a92 bp 0x7ffcf0c57470 sp 0x7ffcf0c57468
+[1m[0m[1m[34mREAD of size 2 at 0x502000000734 thread T0[1m[0m
+SCARINESS: 14 (2-byte-read-heap-buffer-overflow)
+    #0 0x5653402f6a91 in avahi_dns_packet_get_field /src/avahi/avahi-core/dns.c:145:12
+    #1 0x5653402f6a91 in avahi_dns_packet_new_reply /src/avahi/avahi-core/dns.c:100:18
+    #2 0x5653402f5cab in LLVMFuzzerTestOneInput /src/avahi/fuzz/fuzz-consume-record.cpp:47:34
+    #3 0x5653401a84a0 in fuzzer::Fuzzer::ExecuteCallback(unsigned char const*, unsigned long) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:614:13
+    #4 0x5653401a7cc5 in fuzzer::Fuzzer::RunOne(unsigned char const*, unsigned long, bool, fuzzer::InputInfo*, bool, bool*) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:516:7
+    #5 0x5653401a9495 in fuzzer::Fuzzer::MutateAndTestOne() /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:760:19
+    #6 0x5653401aa285 in fuzzer::Fuzzer::Loop(std::__Fuzzer::vector&lt;fuzzer::SizedFile, std::__Fuzzer::allocator&lt;fuzzer::SizedFile&gt;&gt;&amp;) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:905:5
+    #7 0x565340198596 in fuzzer::FuzzerDriver(int*, char***, int (*)(unsigned char const*, unsigned long)) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerDriver.cpp:914:6
+    #8 0x5653401c4ac2 in main /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerMain.cpp:20:10
+    #9 0x7f3e72a77082 in __libc_start_main (/lib/x86_64-linux-gnu/libc.so.6+0x24082) (BuildId: 0702430aef5fa3dda43986563e9ffcc47efbd75e)
+    #10 0x56534018970d in _start (/out/fuzz-consume-record+0x4d70d)
+
+DEDUP_TOKEN: avahi_dns_packet_get_field--avahi_dns_packet_new_reply--LLVMFuzzerTestOneInput
+[1m[32m0x502000000734 is located 2 bytes after 2-byte region [0x502000000730,0x502000000732)
+[1m[0m[1m[35mallocated by thread T0 here:[1m[0m
+    #0 0x5653402b6a3e in malloc /src/llvm-project/compiler-rt/lib/asan/asan_malloc_linux.cpp:69:3
+    #1 0x5653403084e6 in xmalloc /src/avahi/avahi-common/malloc.c:68:15
+    #2 0x5653403084e6 in avahi_malloc /src/avahi/avahi-common/malloc.c:107:16
+    #3 0x5653402f5c62 in LLVMFuzzerTestOneInput /src/avahi/fuzz/fuzz-consume-record.cpp:35:41
+    #4 0x5653401a84a0 in fuzzer::Fuzzer::ExecuteCallback(unsigned char const*, unsigned long) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:614:13
+    #5 0x5653401a7cc5 in fuzzer::Fuzzer::RunOne(unsigned char const*, unsigned long, bool, fuzzer::InputInfo*, bool, bool*) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:516:7
+    #6 0x5653401a9495 in fuzzer::Fuzzer::MutateAndTestOne() /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:760:19
+    #7 0x5653401aa285 in fuzzer::Fuzzer::Loop(std::__Fuzzer::vector&lt;fuzzer::SizedFile, std::__Fuzzer::allocator&lt;fuzzer::SizedFile&gt;&gt;&amp;) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:905:5
+    #8 0x565340198596 in fuzzer::FuzzerDriver(int*, char***, int (*)(unsigned char const*, unsigned long)) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerDriver.cpp:914:6
+    #9 0x5653401c4ac2 in main /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerMain.cpp:20:10
+    #10 0x7f3e72a77082 in __libc_start_main (/lib/x86_64-linux-gnu/libc.so.6+0x24082) (BuildId: 0702430aef5fa3dda43986563e9ffcc47efbd75e)
+
+DEDUP_TOKEN: __interceptor_malloc--xmalloc--avahi_malloc
+SUMMARY: AddressSanitizer: heap-buffer-overflow /src/avahi/avahi-core/dns.c:145:12 in avahi_dns_packet_get_field
+Shadow bytes around the buggy address:
+  0x502000000480: [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[35mfd[1m[0m [1m[35mfd[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[35mfd[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[35mfd[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[35mfd[1m[0m [1m[31mfa[1m[0m
+  0x502000000500: [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[35mfd[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[35mfd[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[35mfd[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[35mfd[1m[0m [1m[31mfa[1m[0m
+  0x502000000580: [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[35mfd[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[35mfd[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[35mfd[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[35mfd[1m[0m [1m[31mfa[1m[0m
+  0x502000000600: [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[0m04[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[0m00[1m[0m [1m[0m04[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[35mfd[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[35mfd[1m[0m [1m[31mfa[1m[0m
+  0x502000000680: [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[35mfd[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[35mfd[1m[0m [1m[35mfd[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[35mfd[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[35mfd[1m[0m [1m[31mfa[1m[0m
+=&gt;0x502000000700: [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[0m06[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m[[1m[0m02[1m[0m][1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m
+  0x502000000780: [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m
+  0x502000000800: [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m
+  0x502000000880: [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m
+  0x502000000900: [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m
+  0x502000000980: [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m
+Shadow byte legend (one shadow byte represents 8 application bytes):
+  Addressable:           [1m[0m00[1m[0m
+  Partially addressable: [1m[0m01[1m[0m [1m[0m02[1m[0m [1m[0m03[1m[0m [1m[0m04[1m[0m [1m[0m05[1m[0m [1m[0m06[1m[0m [1m[0m07[1m[0m 
+  Heap left redzone:       [1m[31mfa[1m[0m
+  Freed heap region:       [1m[35mfd[1m[0m
+  Stack left redzone:      [1m[31mf1[1m[0m
+  Stack mid redzone:       [1m[31mf2[1m[0m
+  Stack right redzone:     [1m[31mf3[1m[0m
+  Stack after return:      [1m[35mf5[1m[0m
+  Stack use after scope:   [1m[35mf8[1m[0m
+  Global redzone:          [1m[31mf9[1m[0m
+  Global init order:       [1m[36mf6[1m[0m
+  Poisoned by user:        [1m[34mf7[1m[0m
+  Container overflow:      [1m[34mfc[1m[0m
+  Array cookie:            [1m[31mac[1m[0m
+  Intra object redzone:    [1m[33mbb[1m[0m
+  ASan internal:           [1m[33mfe[1m[0m
+  Left alloca redzone:     [1m[34mca[1m[0m
+  Right alloca redzone:    [1m[34mcb[1m[0m
+==12==ABORTING
+MS: 4 CopyPart-ChangeBinInt-ChangeBit-CrossOver-; base unit: 011c945f30ce2cbafc452f39840f025693339c42
+0x31,0xa,0xd9,0x31,0x53,0x31,
+1\012\3311S1
+artifact_prefix=&#39;./&#39;; Test unit written to ./crash-28d3b29272b625bb3561acb2490c19bfa205a25c
+Base64: MQrZMVMx
+stat::number_of_executed_units: 18
+stat::average_exec_per_sec:     18
+stat::new_units_added:          2
+stat::slowest_unit_time_sec:    0
+stat::peak_rss_mb:              31
+
+</pre>
+
+</body>

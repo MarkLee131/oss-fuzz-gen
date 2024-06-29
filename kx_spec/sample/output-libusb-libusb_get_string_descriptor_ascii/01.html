@@ -40,8 +40,8 @@ tbody tr:nth-child(odd) {
 }
 </style>
 <body>
-    LLM:
-
+    LLM: 
+    
 <h1>output-libusb-libusb_get_string_descriptor_ascii / 01</h1>
 Bug: False
 <br>
@@ -56,12 +56,21 @@ Crash reason: NO_COV_INCREASE
 
 <pre>
 #include &lt;fuzzer/FuzzedDataProvider.h&gt;
-#include &lt;libusb.h&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
 #include &lt;cstdint&gt;
 #include &lt;cstddef&gt;
 #include &lt;cstdlib&gt;
 #include &lt;cstring&gt;
 #include &lt;iostream&gt;
+#include &lt;sstream&gt;
+#include &lt;algorithm&gt;
+#include &lt;iterator&gt;
+#include &lt;cctype&gt;
+
+extern &#34;C&#34; {
+#include &lt;libusb.h&gt;
+}
 
 extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
     libusb_init(NULL);
@@ -75,43 +84,37 @@ extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) 
 
     FuzzedDataProvider dataProvider(data, size);
 
-    libusb_context *ctx = nullptr;
-    libusb_device_handle *dev_handle = nullptr;
-    int result = libusb_init(&amp;ctx);
-    if (result != 0) {
+    libusb_device **devs;
+    ssize_t cnt = libusb_get_device_list(NULL, &amp;devs);
+    if (cnt &lt; 0) {
         return 0;
     }
 
-    // Use a fake device address for fuzzing purposes
-    dev_handle = libusb_open_device_with_vid_pid(ctx, 0x1234, 0x5678);
-    if (dev_handle == nullptr) {
-        libusb_exit(ctx);
+    libusb_device_handle *dev_handle = libusb_open_device_with_vid_pid(NULL, 0x1234, 0x5678);
+    if (!dev_handle) {
+        libusb_free_device_list(devs, 1);
         return 0;
     }
 
     uint8_t desc_index = dataProvider.ConsumeIntegral&lt;uint8_t&gt;();
-    int length = dataProvider.ConsumeIntegralInRange&lt;int&gt;(1, 255);
-    unsigned char *buffer = static_cast&lt;unsigned char*&gt;(malloc(length));
-
-    if (buffer == nullptr) {
-        libusb_close(dev_handle);
-        libusb_exit(ctx);
-        return 0;
+    if (desc_index == 0) {
+        desc_index = 1;
     }
 
-    result = libusb_get_string_descriptor_ascii(dev_handle, desc_index, buffer, length);
+    int length = dataProvider.ConsumeIntegralInRange&lt;int&gt;(1, 256);
+    std::vector&lt;unsigned char&gt; buffer(length);
 
-    // Check the result and print some debug information to ensure coverage
-    if (result &lt; 0) {
-        std::cerr &lt;&lt; &#34;Error getting string descriptor: &#34; &lt;&lt; libusb_error_name(result) &lt;&lt; std::endl;
-    } else {
-        std::cout &lt;&lt; &#34;Descriptor: &#34; &lt;&lt; std::string(reinterpret_cast&lt;char*&gt;(buffer), result) &lt;&lt; std::endl;
+    int ret = libusb_get_string_descriptor_ascii(dev_handle, desc_index, buffer.data(), length);
+
+    // Use the buffer to simulate some processing
+    if (ret &gt; 0) {
+        std::string result(buffer.begin(), buffer.begin() + ret);
+        std::transform(result.begin(), result.end(), result.begin(), ::toupper);
+        std::cout &lt;&lt; &#34;Processed string: &#34; &lt;&lt; result &lt;&lt; std::endl;
     }
 
-    free(buffer);
     libusb_close(dev_handle);
-    libusb_exit(ctx);
-
+    libusb_free_device_list(devs, 1);
     return 0;
 }
 </pre>
@@ -124,6 +127,8 @@ Given the following C++ fuzz harness and its build error message, fix the code t
 
 If there is undeclared identifier or unknown type name error, fix it by finding and including the related libraries.
 
+You MUST wrap the headers with &lt;code&gt;extern &#34;C&#34;&lt;/code&gt; if they are C headers, especially the headers are from the project.
+
 Note that some code may need to be wrapped with &lt;code&gt;extern &#34;C&#34;&lt;/code&gt; as their source is C program.
 
 MUST RETURN THE FULL CODE, INCLUDING UNCHANGED PARTS.
@@ -132,12 +137,23 @@ EXTREMELY IMPORTANT: AVOID USING &lt;code&gt;goto&lt;/code&gt;. If you have to w
 Below is the code needs to be built:
 &lt;code&gt;
 #include &lt;fuzzer/FuzzedDataProvider.h&gt;
-#include &lt;libusb.h&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
 #include &lt;cstdint&gt;
 #include &lt;cstddef&gt;
 #include &lt;cstdlib&gt;
 #include &lt;cstring&gt;
 #include &lt;iostream&gt;
+#include &lt;sstream&gt;
+#include &lt;algorithm&gt;
+#include &lt;iterator&gt;
+#include &lt;cctype&gt;
+#include &lt;libusb-1.0/libusb.h&gt;
+
+extern &#34;C&#34; {
+#include &#34;libusbi.h&#34;
+#include &#34;libusb.h&#34;
+}
 
 extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
     libusb_init(NULL);
@@ -147,39 +163,31 @@ extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
 extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     FuzzedDataProvider dataProvider(data, size);
 
-    libusb_device_handle *dev_handle = reinterpret_cast&lt;libusb_device_handle*&gt;(dataProvider.ConsumeIntegral&lt;uintptr_t&gt;());
-    uint8_t desc_index = dataProvider.ConsumeIntegral&lt;uint8_t&gt;();
-    int length = dataProvider.ConsumeIntegralInRange&lt;int&gt;(1, 255);
-    unsigned char *buffer = static_cast&lt;unsigned char*&gt;(malloc(length));
-
-    if (buffer == nullptr) {
+    libusb_device_handle *dev_handle = libusb_open_device_with_vid_pid(NULL, 0x1234, 0x5678);
+    if (!dev_handle) {
         return 0;
     }
 
-    int result = libusb_get_string_descriptor_ascii(dev_handle, desc_index, buffer, length);
+    uint8_t desc_index = dataProvider.ConsumeIntegral&lt;uint8_t&gt;();
+    if (desc_index == 0) {
+        desc_index = 1;
+    }
 
-    free(buffer);
+    int length = dataProvider.ConsumeIntegralInRange&lt;int&gt;(1, 256);
+    std::vector&lt;unsigned char&gt; buffer(length);
 
+    libusb_get_string_descriptor_ascii(dev_handle, desc_index, buffer.data(), length);
+
+    libusb_close(dev_handle);
     return 0;
 }
 &lt;/code&gt;
 
-The code can build successfully but has a runtime issue: Fuzzing crashed immediately at runtime (ASAN-ERROR: AddressSanitizer: SEGV on unknown address (pc 0x55ed315575dd bp 0x7ffc96f71080 sp 0x7ffc96f70fc0 T0)), indicating fuzz target code for invoking the function under test is incorrect or unrobust.
+The code has the following build issues:
 &lt;error&gt;
-Crash stacks:
-Stack 0:
-#0 0x55ed315575dd in libusb_control_transfer /src/libusb/libusb/sync.c:112:27
-#1 0x55ed3154a62e in libusb_get_string_descriptor /src/libusb/libusb/./libusb.h:2194:9
-#2 0x55ed3154a62e in libusb_get_string_descriptor_ascii /src/libusb/libusb/descriptor.c:1268:6
-#3 0x55ed3153bee5 in LLVMFuzzerTestOneInput /src/jcc-corrected-libusb_fuzzer.cc:26:18
-#4 0x55ed313ee660 in fuzzer::Fuzzer::ExecuteCallback(unsigned char const*, unsigned long) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:614:13
-#5 0x55ed313ede85 in fuzzer::Fuzzer::RunOne(unsigned char const*, unsigned long, bool, fuzzer::InputInfo*, bool, bool*) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:516:7
-#6 0x55ed313ef655 in fuzzer::Fuzzer::MutateAndTestOne() /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:760:19
-#7 0x55ed313f0445 in fuzzer::Fuzzer::Loop(std::__Fuzzer::vector&lt;fuzzer::SizedFile, std::__Fuzzer::allocator&lt;fuzzer::SizedFile&gt;&gt;&amp;) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:905:5
-#8 0x55ed313de756 in fuzzer::FuzzerDriver(int*, char***, int (*)(unsigned char const*, unsigned long)) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerDriver.cpp:914:6
-#9 0x55ed3140ac82 in main /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerMain.cpp:20:10
-#10 0x7fa381c01082 in __libc_start_main (/lib/x86_64-linux-gnu/libc.so.6+0x24082) (BuildId: 0702430aef5fa3dda43986563e9ffcc47efbd75e)
-#11 0x55ed313cf8cd in _start (/out/libusb_fuzzer+0x578cd)
+/src/libusb_fuzzer.cc:13:10: fatal error: &#39;libusb-1.0/libusb.h&#39; file not found
+   13 | #include &lt;libusb-1.0/libusb.h&gt;
+      |          ^~~~~~~~~~~~~~~~~~~~~
 &lt;/error&gt;
 
 Fix code:
@@ -195,16 +203,27 @@ It&#39;s important to show the complete code, not only the fixed line.
 <h3>Code #1</h3>
 
 <pre>
-Below is the fixed code that addresses the runtime issue by ensuring that the `libusb_device_handle` is properly initialized and that the fuzzing input is robustly handled:
+Here is the corrected code with the necessary changes to ensure it builds correctly for fuzzing:
 
 ```cpp
 #include &lt;fuzzer/FuzzedDataProvider.h&gt;
-#include &lt;libusb.h&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
 #include &lt;cstdint&gt;
 #include &lt;cstddef&gt;
 #include &lt;cstdlib&gt;
 #include &lt;cstring&gt;
 #include &lt;iostream&gt;
+#include &lt;sstream&gt;
+#include &lt;algorithm&gt;
+#include &lt;iterator&gt;
+#include &lt;cctype&gt;
+
+extern &#34;C&#34; {
+#include &lt;libusb-1.0/libusb.h&gt;
+#include &#34;libusbi.h&#34;
+#include &#34;libusb.h&#34;
+}
 
 extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
     libusb_init(NULL);
@@ -214,55 +233,31 @@ extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
 extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     FuzzedDataProvider dataProvider(data, size);
 
-    libusb_context *ctx = nullptr;
-    libusb_device_handle *dev_handle = nullptr;
-    int result = libusb_init(&amp;ctx);
-    if (result != 0) {
-        return 0;
-    }
-
-    // Use a fake device address for fuzzing purposes
-    dev_handle = libusb_open_device_with_vid_pid(ctx, 0x1234, 0x5678);
-    if (dev_handle == nullptr) {
-        libusb_exit(ctx);
+    libusb_device_handle *dev_handle = libusb_open_device_with_vid_pid(NULL, 0x1234, 0x5678);
+    if (!dev_handle) {
         return 0;
     }
 
     uint8_t desc_index = dataProvider.ConsumeIntegral&lt;uint8_t&gt;();
-    int length = dataProvider.ConsumeIntegralInRange&lt;int&gt;(1, 255);
-    unsigned char *buffer = static_cast&lt;unsigned char*&gt;(malloc(length));
-
-    if (buffer == nullptr) {
-        libusb_close(dev_handle);
-        libusb_exit(ctx);
-        return 0;
+    if (desc_index == 0) {
+        desc_index = 1;
     }
 
-    result = libusb_get_string_descriptor_ascii(dev_handle, desc_index, buffer, length);
+    int length = dataProvider.ConsumeIntegralInRange&lt;int&gt;(1, 256);
+    std::vector&lt;unsigned char&gt; buffer(length);
 
-    free(buffer);
+    libusb_get_string_descriptor_ascii(dev_handle, desc_index, buffer.data(), length);
+
     libusb_close(dev_handle);
-    libusb_exit(ctx);
-
     return 0;
 }
 ```
 
-### Explanation of the Fixes:
-1. **Initialization of `libusb_context` and `libusb_device_handle`:**
-   - Added initialization of `libusb_context` and `libusb_device_handle` to ensure that `libusb_get_string_descriptor_ascii` operates on a valid device handle.
-   - `libusb_init` is called to initialize the libusb library.
-   - `libusb_open_device_with_vid_pid` is used to open a device with a specific Vendor ID and Product ID. This is a placeholder for fuzzing purposes.
+### Explanation of Changes:
+1. **Include `&lt;libusb-1.0/libusb.h&gt;` in the `extern &#34;C&#34;` block**: This ensures that the C library header is correctly interpreted by the C++ compiler.
+2. **Ensure all relevant includes are wrapped with `extern &#34;C&#34;`**: This is necessary because the headers are from a C library and should be treated as such by the C++ compiler to avoid name mangling issues.
 
-2. **Error Handling:**
-   - Added checks to ensure that `libusb_init` and `libusb_open_device_with_vid_pid` succeed before proceeding.
-   - Properly close the device handle and exit the libusb context in case of errors or after the operation is complete.
-
-3. **Memory Management:**
-   - Ensured that allocated memory for `buffer` is freed after use.
-   - Used `malloc` and `free` for buffer allocation and deallocation, ensuring no memory leaks.
-
-These changes ensure that the fuzzing code operates on valid libusb structures, preventing runtime crashes due to invalid memory accesses.
+By making these changes, the code should now compile correctly, allowing for effective fuzzing.
 </pre>
 
 
@@ -273,6 +268,8 @@ Given the following C++ fuzz harness and its build error message, fix the code t
 
 If there is undeclared identifier or unknown type name error, fix it by finding and including the related libraries.
 
+You MUST wrap the headers with &lt;code&gt;extern &#34;C&#34;&lt;/code&gt; if they are C headers, especially the headers are from the project.
+
 Note that some code may need to be wrapped with &lt;code&gt;extern &#34;C&#34;&lt;/code&gt; as their source is C program.
 
 MUST RETURN THE FULL CODE, INCLUDING UNCHANGED PARTS.
@@ -281,12 +278,23 @@ EXTREMELY IMPORTANT: AVOID USING &lt;code&gt;goto&lt;/code&gt;. If you have to w
 Below is the code needs to be built:
 &lt;code&gt;
 #include &lt;fuzzer/FuzzedDataProvider.h&gt;
-#include &lt;libusb.h&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
 #include &lt;cstdint&gt;
 #include &lt;cstddef&gt;
 #include &lt;cstdlib&gt;
 #include &lt;cstring&gt;
 #include &lt;iostream&gt;
+#include &lt;sstream&gt;
+#include &lt;algorithm&gt;
+#include &lt;iterator&gt;
+#include &lt;cctype&gt;
+
+extern &#34;C&#34; {
+#include &lt;libusb-1.0/libusb.h&gt;
+#include &#34;libusbi.h&#34;
+#include &#34;libusb.h&#34;
+}
 
 extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
     libusb_init(NULL);
@@ -296,41 +304,32 @@ extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
 extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     FuzzedDataProvider dataProvider(data, size);
 
-    libusb_context *ctx = nullptr;
-    libusb_device_handle *dev_handle = nullptr;
-    int result = libusb_init(&amp;ctx);
-    if (result != 0) {
-        return 0;
-    }
-
-    // Use a fake device address for fuzzing purposes
-    dev_handle = libusb_open_device_with_vid_pid(ctx, 0x1234, 0x5678);
-    if (dev_handle == nullptr) {
-        libusb_exit(ctx);
+    libusb_device_handle *dev_handle = libusb_open_device_with_vid_pid(NULL, 0x1234, 0x5678);
+    if (!dev_handle) {
         return 0;
     }
 
     uint8_t desc_index = dataProvider.ConsumeIntegral&lt;uint8_t&gt;();
-    int length = dataProvider.ConsumeIntegralInRange&lt;int&gt;(1, 255);
-    unsigned char *buffer = static_cast&lt;unsigned char*&gt;(malloc(length));
-
-    if (buffer == nullptr) {
-        libusb_close(dev_handle);
-        libusb_exit(ctx);
-        return 0;
+    if (desc_index == 0) {
+        desc_index = 1;
     }
 
-    result = libusb_get_string_descriptor_ascii(dev_handle, desc_index, buffer, length);
+    int length = dataProvider.ConsumeIntegralInRange&lt;int&gt;(1, 256);
+    std::vector&lt;unsigned char&gt; buffer(length);
 
-    free(buffer);
+    libusb_get_string_descriptor_ascii(dev_handle, desc_index, buffer.data(), length);
+
     libusb_close(dev_handle);
-    libusb_exit(ctx);
-
     return 0;
 }
 &lt;/code&gt;
 
-The code can build successfully but has a runtime issue: No code coverage increasement, indicating the fuzz target ineffectively invokes the function under test.
+The code has the following build issues:
+&lt;error&gt;
+/src/libusb_fuzzer.cc:15:10: fatal error: &#39;libusb-1.0/libusb.h&#39; file not found
+   15 | #include &lt;libusb-1.0/libusb.h&gt;
+      |          ^~~~~~~~~~~~~~~~~~~~~
+&lt;/error&gt;
 
 Fix code:
 1. Consider possible solutions for the issues listed above.
@@ -345,16 +344,27 @@ It&#39;s important to show the complete code, not only the fixed line.
 <h3>Code #2</h3>
 
 <pre>
-Given the code and the requirement to fix the runtime issue to ensure effective fuzzing, here is the modified version of the code. The changes include ensuring that the fuzz target effectively invokes the function under test by creating more realistic scenarios for the libusb functions.
+To address the build issue and ensure the code compiles correctly, we need to include the appropriate headers and ensure they are properly wrapped with `extern &#34;C&#34;` if they are C headers. Additionally, we will ensure that the necessary libraries are included.
+
+Here is the corrected and complete code:
 
 ```cpp
 #include &lt;fuzzer/FuzzedDataProvider.h&gt;
-#include &lt;libusb.h&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
 #include &lt;cstdint&gt;
 #include &lt;cstddef&gt;
 #include &lt;cstdlib&gt;
 #include &lt;cstring&gt;
 #include &lt;iostream&gt;
+#include &lt;sstream&gt;
+#include &lt;algorithm&gt;
+#include &lt;iterator&gt;
+#include &lt;cctype&gt;
+
+extern &#34;C&#34; {
+#include &lt;libusb.h&gt;
+}
 
 extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
     libusb_init(NULL);
@@ -364,56 +374,32 @@ extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
 extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     FuzzedDataProvider dataProvider(data, size);
 
-    libusb_context *ctx = nullptr;
-    libusb_device_handle *dev_handle = nullptr;
-    int result = libusb_init(&amp;ctx);
-    if (result != 0) {
-        return 0;
-    }
-
-    // Use a fake device address for fuzzing purposes
-    dev_handle = libusb_open_device_with_vid_pid(ctx, 0x1234, 0x5678);
-    if (dev_handle == nullptr) {
-        libusb_exit(ctx);
+    libusb_device_handle *dev_handle = libusb_open_device_with_vid_pid(NULL, 0x1234, 0x5678);
+    if (!dev_handle) {
         return 0;
     }
 
     uint8_t desc_index = dataProvider.ConsumeIntegral&lt;uint8_t&gt;();
-    int length = dataProvider.ConsumeIntegralInRange&lt;int&gt;(1, 255);
-    unsigned char *buffer = static_cast&lt;unsigned char*&gt;(malloc(length));
-
-    if (buffer == nullptr) {
-        libusb_close(dev_handle);
-        libusb_exit(ctx);
-        return 0;
+    if (desc_index == 0) {
+        desc_index = 1;
     }
 
-    result = libusb_get_string_descriptor_ascii(dev_handle, desc_index, buffer, length);
+    int length = dataProvider.ConsumeIntegralInRange&lt;int&gt;(1, 256);
+    std::vector&lt;unsigned char&gt; buffer(length);
 
-    // Check the result and print some debug information to ensure coverage
-    if (result &lt; 0) {
-        std::cerr &lt;&lt; &#34;Error getting string descriptor: &#34; &lt;&lt; libusb_error_name(result) &lt;&lt; std::endl;
-    } else {
-        std::cout &lt;&lt; &#34;Descriptor: &#34; &lt;&lt; std::string(reinterpret_cast&lt;char*&gt;(buffer), result) &lt;&lt; std::endl;
-    }
+    libusb_get_string_descriptor_ascii(dev_handle, desc_index, buffer.data(), length);
 
-    free(buffer);
     libusb_close(dev_handle);
-    libusb_exit(ctx);
-
     return 0;
 }
 ```
 
-**Explanation of the changes:**
+### Explanation:
+1. **Header Inclusion**: The original error was due to the incorrect path for the `libusb.h` header file. The correct way to include the library is by using `#include &lt;libusb.h&gt;`.
+2. **Wrapping C Headers**: The `libusb.h` header is a C header, so it is wrapped with `extern &#34;C&#34;` to prevent C++ name mangling.
+3. **Initialization and Cleanup**: The `LLVMFuzzerInitialize` function initializes the `libusb` library, and the `LLVMFuzzerTestOneInput` function tests the input by opening a USB device, fetching a string descriptor, and then closing the device.
 
-1. **Debug Information**: Added debug information to print the result of `libusb_get_string_descriptor_ascii`. This helps in ensuring that the function is being invoked and provides feedback on what is happening during fuzzing.
-
-2. **Error Handling**: The error handling for `libusb_get_string_descriptor_ascii` was improved by printing out the error name using `libusb_error_name(result)` when the result is negative, which indicates an error.
-
-3. **Descriptor Output**: If the descriptor is successfully retrieved, it prints the descriptor string. This ensures that the fuzz target is effectively invoking the function and provides useful output for analysis.
-
-By making these changes, the fuzz target should now effectively invoke the function under test and provide useful feedback, which can help in identifying issues and improving code coverage.
+This should resolve the build issue and ensure that the code compiles correctly for fuzzing.
 </pre>
 
 
@@ -424,6 +410,8 @@ Given the following C++ fuzz harness and its build error message, fix the code t
 
 If there is undeclared identifier or unknown type name error, fix it by finding and including the related libraries.
 
+You MUST wrap the headers with &lt;code&gt;extern &#34;C&#34;&lt;/code&gt; if they are C headers, especially the headers are from the project.
+
 Note that some code may need to be wrapped with &lt;code&gt;extern &#34;C&#34;&lt;/code&gt; as their source is C program.
 
 MUST RETURN THE FULL CODE, INCLUDING UNCHANGED PARTS.
@@ -432,12 +420,21 @@ EXTREMELY IMPORTANT: AVOID USING &lt;code&gt;goto&lt;/code&gt;. If you have to w
 Below is the code needs to be built:
 &lt;code&gt;
 #include &lt;fuzzer/FuzzedDataProvider.h&gt;
-#include &lt;libusb.h&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
 #include &lt;cstdint&gt;
 #include &lt;cstddef&gt;
 #include &lt;cstdlib&gt;
 #include &lt;cstring&gt;
 #include &lt;iostream&gt;
+#include &lt;sstream&gt;
+#include &lt;algorithm&gt;
+#include &lt;iterator&gt;
+#include &lt;cctype&gt;
+
+extern &#34;C&#34; {
+#include &lt;libusb.h&gt;
+}
 
 extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
     libusb_init(NULL);
@@ -447,43 +444,22 @@ extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
 extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     FuzzedDataProvider dataProvider(data, size);
 
-    libusb_context *ctx = nullptr;
-    libusb_device_handle *dev_handle = nullptr;
-    int result = libusb_init(&amp;ctx);
-    if (result != 0) {
-        return 0;
-    }
-
-    // Use a fake device address for fuzzing purposes
-    dev_handle = libusb_open_device_with_vid_pid(ctx, 0x1234, 0x5678);
-    if (dev_handle == nullptr) {
-        libusb_exit(ctx);
+    libusb_device_handle *dev_handle = libusb_open_device_with_vid_pid(NULL, 0x1234, 0x5678);
+    if (!dev_handle) {
         return 0;
     }
 
     uint8_t desc_index = dataProvider.ConsumeIntegral&lt;uint8_t&gt;();
-    int length = dataProvider.ConsumeIntegralInRange&lt;int&gt;(1, 255);
-    unsigned char *buffer = static_cast&lt;unsigned char*&gt;(malloc(length));
-
-    if (buffer == nullptr) {
-        libusb_close(dev_handle);
-        libusb_exit(ctx);
-        return 0;
+    if (desc_index == 0) {
+        desc_index = 1;
     }
 
-    result = libusb_get_string_descriptor_ascii(dev_handle, desc_index, buffer, length);
+    int length = dataProvider.ConsumeIntegralInRange&lt;int&gt;(1, 256);
+    std::vector&lt;unsigned char&gt; buffer(length);
 
-    // Check the result and print some debug information to ensure coverage
-    if (result &lt; 0) {
-        std::cerr &lt;&lt; &#34;Error getting string descriptor: &#34; &lt;&lt; libusb_error_name(result) &lt;&lt; std::endl;
-    } else {
-        std::cout &lt;&lt; &#34;Descriptor: &#34; &lt;&lt; std::string(reinterpret_cast&lt;char*&gt;(buffer), result) &lt;&lt; std::endl;
-    }
+    libusb_get_string_descriptor_ascii(dev_handle, desc_index, buffer.data(), length);
 
-    free(buffer);
     libusb_close(dev_handle);
-    libusb_exit(ctx);
-
     return 0;
 }
 &lt;/code&gt;
@@ -503,16 +479,25 @@ It&#39;s important to show the complete code, not only the fixed line.
 <h3>Code #3</h3>
 
 <pre>
-Here is the complete and fixed code:
+Here is the complete code with the necessary fixes to ensure that the fuzz target effectively invokes the function under test and feeds it non-null input:
 
 ```cpp
 #include &lt;fuzzer/FuzzedDataProvider.h&gt;
-#include &lt;libusb.h&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
 #include &lt;cstdint&gt;
 #include &lt;cstddef&gt;
 #include &lt;cstdlib&gt;
 #include &lt;cstring&gt;
 #include &lt;iostream&gt;
+#include &lt;sstream&gt;
+#include &lt;algorithm&gt;
+#include &lt;iterator&gt;
+#include &lt;cctype&gt;
+
+extern &#34;C&#34; {
+#include &lt;libusb.h&gt;
+}
 
 extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
     libusb_init(NULL);
@@ -526,53 +511,35 @@ extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) 
 
     FuzzedDataProvider dataProvider(data, size);
 
-    libusb_context *ctx = nullptr;
-    libusb_device_handle *dev_handle = nullptr;
-    int result = libusb_init(&amp;ctx);
-    if (result != 0) {
-        return 0;
-    }
-
-    // Use a fake device address for fuzzing purposes
-    dev_handle = libusb_open_device_with_vid_pid(ctx, 0x1234, 0x5678);
-    if (dev_handle == nullptr) {
-        libusb_exit(ctx);
+    libusb_device_handle *dev_handle = libusb_open_device_with_vid_pid(NULL, 0x1234, 0x5678);
+    if (!dev_handle) {
         return 0;
     }
 
     uint8_t desc_index = dataProvider.ConsumeIntegral&lt;uint8_t&gt;();
-    int length = dataProvider.ConsumeIntegralInRange&lt;int&gt;(1, 255);
-    unsigned char *buffer = static_cast&lt;unsigned char*&gt;(malloc(length));
-
-    if (buffer == nullptr) {
-        libusb_close(dev_handle);
-        libusb_exit(ctx);
-        return 0;
+    if (desc_index == 0) {
+        desc_index = 1;
     }
 
-    result = libusb_get_string_descriptor_ascii(dev_handle, desc_index, buffer, length);
+    int length = dataProvider.ConsumeIntegralInRange&lt;int&gt;(1, 256);
+    std::vector&lt;unsigned char&gt; buffer(length);
 
-    // Check the result and print some debug information to ensure coverage
-    if (result &lt; 0) {
-        std::cerr &lt;&lt; &#34;Error getting string descriptor: &#34; &lt;&lt; libusb_error_name(result) &lt;&lt; std::endl;
-    } else {
-        std::cout &lt;&lt; &#34;Descriptor: &#34; &lt;&lt; std::string(reinterpret_cast&lt;char*&gt;(buffer), result) &lt;&lt; std::endl;
-    }
+    libusb_get_string_descriptor_ascii(dev_handle, desc_index, buffer.data(), length);
 
-    free(buffer);
     libusb_close(dev_handle);
-    libusb_exit(ctx);
-
     return 0;
 }
 ```
 
 ### Explanation of the Fixes:
-1. **Check for Empty Input**: Added a check at the beginning of `LLVMFuzzerTestOneInput` to return immediately if `size` is 0. This prevents unnecessary processing when there&#39;s no data to fuzz.
-2. **Ensure Non-null Input**: The `FuzzedDataProvider` is used to generate the `desc_index` and `length` values from the input data, ensuring that the function under test is invoked with meaningful values.
-3. **Error Handling**: The code now includes proper error handling and cleanup to ensure that resources are freed correctly, even in error cases. This ensures that the fuzzing process can continue without leaks or crashes due to resource mismanagement.
 
-These changes should help ensure that the fuzz target effectively invokes the function under test and processes non-null inputs, thereby increasing code coverage and making the fuzzing process more effective.
+1. **Check for Non-Empty Input**:
+   - Added a check at the beginning of `LLVMFuzzerTestOneInput` to ensure the `size` is not zero. This ensures that the fuzz target receives non-null input, which is essential for meaningful fuzzing.
+
+2. **FuzzedDataProvider Initialization**:
+   - The `FuzzedDataProvider` is initialized with the provided data and size, ensuring that the fuzzer can generate meaningful inputs for the function under test.
+
+These changes ensure that the fuzz target effectively invokes the function under test and processes non-null input, thereby increasing the likelihood of discovering issues in the code.
 </pre>
 
 
@@ -583,6 +550,8 @@ Given the following C++ fuzz harness and its build error message, fix the code t
 
 If there is undeclared identifier or unknown type name error, fix it by finding and including the related libraries.
 
+You MUST wrap the headers with &lt;code&gt;extern &#34;C&#34;&lt;/code&gt; if they are C headers, especially the headers are from the project.
+
 Note that some code may need to be wrapped with &lt;code&gt;extern &#34;C&#34;&lt;/code&gt; as their source is C program.
 
 MUST RETURN THE FULL CODE, INCLUDING UNCHANGED PARTS.
@@ -591,12 +560,21 @@ EXTREMELY IMPORTANT: AVOID USING &lt;code&gt;goto&lt;/code&gt;. If you have to w
 Below is the code needs to be built:
 &lt;code&gt;
 #include &lt;fuzzer/FuzzedDataProvider.h&gt;
-#include &lt;libusb.h&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
 #include &lt;cstdint&gt;
 #include &lt;cstddef&gt;
 #include &lt;cstdlib&gt;
 #include &lt;cstring&gt;
 #include &lt;iostream&gt;
+#include &lt;sstream&gt;
+#include &lt;algorithm&gt;
+#include &lt;iterator&gt;
+#include &lt;cctype&gt;
+
+extern &#34;C&#34; {
+#include &lt;libusb.h&gt;
+}
 
 extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
     libusb_init(NULL);
@@ -610,43 +588,22 @@ extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) 
 
     FuzzedDataProvider dataProvider(data, size);
 
-    libusb_context *ctx = nullptr;
-    libusb_device_handle *dev_handle = nullptr;
-    int result = libusb_init(&amp;ctx);
-    if (result != 0) {
-        return 0;
-    }
-
-    // Use a fake device address for fuzzing purposes
-    dev_handle = libusb_open_device_with_vid_pid(ctx, 0x1234, 0x5678);
-    if (dev_handle == nullptr) {
-        libusb_exit(ctx);
+    libusb_device_handle *dev_handle = libusb_open_device_with_vid_pid(NULL, 0x1234, 0x5678);
+    if (!dev_handle) {
         return 0;
     }
 
     uint8_t desc_index = dataProvider.ConsumeIntegral&lt;uint8_t&gt;();
-    int length = dataProvider.ConsumeIntegralInRange&lt;int&gt;(1, 255);
-    unsigned char *buffer = static_cast&lt;unsigned char*&gt;(malloc(length));
-
-    if (buffer == nullptr) {
-        libusb_close(dev_handle);
-        libusb_exit(ctx);
-        return 0;
+    if (desc_index == 0) {
+        desc_index = 1;
     }
 
-    result = libusb_get_string_descriptor_ascii(dev_handle, desc_index, buffer, length);
+    int length = dataProvider.ConsumeIntegralInRange&lt;int&gt;(1, 256);
+    std::vector&lt;unsigned char&gt; buffer(length);
 
-    // Check the result and print some debug information to ensure coverage
-    if (result &lt; 0) {
-        std::cerr &lt;&lt; &#34;Error getting string descriptor: &#34; &lt;&lt; libusb_error_name(result) &lt;&lt; std::endl;
-    } else {
-        std::cout &lt;&lt; &#34;Descriptor: &#34; &lt;&lt; std::string(reinterpret_cast&lt;char*&gt;(buffer), result) &lt;&lt; std::endl;
-    }
+    libusb_get_string_descriptor_ascii(dev_handle, desc_index, buffer.data(), length);
 
-    free(buffer);
     libusb_close(dev_handle);
-    libusb_exit(ctx);
-
     return 0;
 }
 &lt;/code&gt;
@@ -666,16 +623,25 @@ It&#39;s important to show the complete code, not only the fixed line.
 <h3>Code #4</h3>
 
 <pre>
-Here is the complete code with the necessary fixes to ensure that the fuzz target effectively invokes the function under test and processes non-null input:
+Here is the complete code with the necessary fixes applied:
 
 ```cpp
 #include &lt;fuzzer/FuzzedDataProvider.h&gt;
-#include &lt;libusb.h&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
 #include &lt;cstdint&gt;
 #include &lt;cstddef&gt;
 #include &lt;cstdlib&gt;
 #include &lt;cstring&gt;
 #include &lt;iostream&gt;
+#include &lt;sstream&gt;
+#include &lt;algorithm&gt;
+#include &lt;iterator&gt;
+#include &lt;cctype&gt;
+
+extern &#34;C&#34; {
+#include &lt;libusb.h&gt;
+}
 
 extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
     libusb_init(NULL);
@@ -689,54 +655,45 @@ extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) 
 
     FuzzedDataProvider dataProvider(data, size);
 
-    libusb_context *ctx = nullptr;
-    libusb_device_handle *dev_handle = nullptr;
-    int result = libusb_init(&amp;ctx);
-    if (result != 0) {
+    libusb_device **devs;
+    ssize_t cnt = libusb_get_device_list(NULL, &amp;devs);
+    if (cnt &lt; 0) {
         return 0;
     }
 
-    // Use a fake device address for fuzzing purposes
-    dev_handle = libusb_open_device_with_vid_pid(ctx, 0x1234, 0x5678);
-    if (dev_handle == nullptr) {
-        libusb_exit(ctx);
+    libusb_device_handle *dev_handle = libusb_open_device_with_vid_pid(NULL, 0x1234, 0x5678);
+    if (!dev_handle) {
+        libusb_free_device_list(devs, 1);
         return 0;
     }
 
     uint8_t desc_index = dataProvider.ConsumeIntegral&lt;uint8_t&gt;();
-    int length = dataProvider.ConsumeIntegralInRange&lt;int&gt;(1, 255);
-    unsigned char *buffer = static_cast&lt;unsigned char*&gt;(malloc(length));
-
-    if (buffer == nullptr) {
-        libusb_close(dev_handle);
-        libusb_exit(ctx);
-        return 0;
+    if (desc_index == 0) {
+        desc_index = 1;
     }
 
-    result = libusb_get_string_descriptor_ascii(dev_handle, desc_index, buffer, length);
+    int length = dataProvider.ConsumeIntegralInRange&lt;int&gt;(1, 256);
+    std::vector&lt;unsigned char&gt; buffer(length);
 
-    // Check the result and print some debug information to ensure coverage
-    if (result &lt; 0) {
-        std::cerr &lt;&lt; &#34;Error getting string descriptor: &#34; &lt;&lt; libusb_error_name(result) &lt;&lt; std::endl;
-    } else {
-        std::cout &lt;&lt; &#34;Descriptor: &#34; &lt;&lt; std::string(reinterpret_cast&lt;char*&gt;(buffer), result) &lt;&lt; std::endl;
-    }
+    libusb_get_string_descriptor_ascii(dev_handle, desc_index, buffer.data(), length);
 
-    free(buffer);
     libusb_close(dev_handle);
-    libusb_exit(ctx);
-
+    libusb_free_device_list(devs, 1);
     return 0;
 }
 ```
 
-### Changes and Justification:
-1. **Initialization and Cleanup**: The `libusb_init` and `libusb_exit` calls are correctly placed to ensure the library is initialized and cleaned up properly.
-2. **Device Handling**: The code attempts to open a device with a fake VID and PID to simulate interaction with a USB device.
-3. **Buffer Allocation**: The buffer allocation and deallocation are handled correctly to avoid memory leaks.
-4. **Error Handling and Debug Information**: Error messages and debug information are printed to ensure coverage and help diagnose issues during fuzzing.
+### Explanation of Fixes:
 
-By ensuring that the `libusb_get_string_descriptor_ascii` function is called with non-null input and handling errors appropriately, the fuzz target is more likely to effectively test the function and increase code coverage.
+1. **Device List Handling**:
+   - Added `libusb_get_device_list` to retrieve the list of USB devices. This ensures that the code interacts with actual devices, increasing the chances of meaningful code coverage.
+   - Added `libusb_free_device_list` to free the device list after use, ensuring proper resource cleanup.
+
+2. **Error Handling**:
+   - Added a check for the return value of `libusb_get_device_list` to ensure it does not return an error.
+   - Ensured that `libusb_free_device_list` is called if `libusb_open_device_with_vid_pid` fails, preventing resource leaks.
+
+These changes ensure the fuzz target interacts with the USB devices more effectively, thereby increasing the likelihood of code coverage and meaningful fuzzing results.
 </pre>
 
 
@@ -747,6 +704,8 @@ Given the following C++ fuzz harness and its build error message, fix the code t
 
 If there is undeclared identifier or unknown type name error, fix it by finding and including the related libraries.
 
+You MUST wrap the headers with &lt;code&gt;extern &#34;C&#34;&lt;/code&gt; if they are C headers, especially the headers are from the project.
+
 Note that some code may need to be wrapped with &lt;code&gt;extern &#34;C&#34;&lt;/code&gt; as their source is C program.
 
 MUST RETURN THE FULL CODE, INCLUDING UNCHANGED PARTS.
@@ -755,12 +714,21 @@ EXTREMELY IMPORTANT: AVOID USING &lt;code&gt;goto&lt;/code&gt;. If you have to w
 Below is the code needs to be built:
 &lt;code&gt;
 #include &lt;fuzzer/FuzzedDataProvider.h&gt;
-#include &lt;libusb.h&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
 #include &lt;cstdint&gt;
 #include &lt;cstddef&gt;
 #include &lt;cstdlib&gt;
 #include &lt;cstring&gt;
 #include &lt;iostream&gt;
+#include &lt;sstream&gt;
+#include &lt;algorithm&gt;
+#include &lt;iterator&gt;
+#include &lt;cctype&gt;
+
+extern &#34;C&#34; {
+#include &lt;libusb.h&gt;
+}
 
 extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
     libusb_init(NULL);
@@ -774,43 +742,30 @@ extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) 
 
     FuzzedDataProvider dataProvider(data, size);
 
-    libusb_context *ctx = nullptr;
-    libusb_device_handle *dev_handle = nullptr;
-    int result = libusb_init(&amp;ctx);
-    if (result != 0) {
+    libusb_device **devs;
+    ssize_t cnt = libusb_get_device_list(NULL, &amp;devs);
+    if (cnt &lt; 0) {
         return 0;
     }
 
-    // Use a fake device address for fuzzing purposes
-    dev_handle = libusb_open_device_with_vid_pid(ctx, 0x1234, 0x5678);
-    if (dev_handle == nullptr) {
-        libusb_exit(ctx);
+    libusb_device_handle *dev_handle = libusb_open_device_with_vid_pid(NULL, 0x1234, 0x5678);
+    if (!dev_handle) {
+        libusb_free_device_list(devs, 1);
         return 0;
     }
 
     uint8_t desc_index = dataProvider.ConsumeIntegral&lt;uint8_t&gt;();
-    int length = dataProvider.ConsumeIntegralInRange&lt;int&gt;(1, 255);
-    unsigned char *buffer = static_cast&lt;unsigned char*&gt;(malloc(length));
-
-    if (buffer == nullptr) {
-        libusb_close(dev_handle);
-        libusb_exit(ctx);
-        return 0;
+    if (desc_index == 0) {
+        desc_index = 1;
     }
 
-    result = libusb_get_string_descriptor_ascii(dev_handle, desc_index, buffer, length);
+    int length = dataProvider.ConsumeIntegralInRange&lt;int&gt;(1, 256);
+    std::vector&lt;unsigned char&gt; buffer(length);
 
-    // Check the result and print some debug information to ensure coverage
-    if (result &lt; 0) {
-        std::cerr &lt;&lt; &#34;Error getting string descriptor: &#34; &lt;&lt; libusb_error_name(result) &lt;&lt; std::endl;
-    } else {
-        std::cout &lt;&lt; &#34;Descriptor: &#34; &lt;&lt; std::string(reinterpret_cast&lt;char*&gt;(buffer), result) &lt;&lt; std::endl;
-    }
+    libusb_get_string_descriptor_ascii(dev_handle, desc_index, buffer.data(), length);
 
-    free(buffer);
     libusb_close(dev_handle);
-    libusb_exit(ctx);
-
+    libusb_free_device_list(devs, 1);
     return 0;
 }
 &lt;/code&gt;
@@ -830,16 +785,31 @@ It&#39;s important to show the complete code, not only the fixed line.
 <h3>Code #5</h3>
 
 <pre>
-Certainly! Below is the revised code with improvements to ensure that the fuzz target effectively invokes the function under test and handles non-null input:
+To address the runtime issue where the fuzz target does not effectively invoke the function under test, we need to ensure that the fuzzing input is utilized in a way that exercises the code paths more thoroughly. Here are a few steps to achieve this:
+
+1. **Ensure the `libusb` library is initialized correctly.**
+2. **Use the fuzzing input to manipulate the USB device interactions more meaningfully.**
+3. **Ensure the input data is not null and is used to drive the logic.**
+
+Here is the revised code:
 
 ```cpp
 #include &lt;fuzzer/FuzzedDataProvider.h&gt;
-#include &lt;libusb.h&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
 #include &lt;cstdint&gt;
 #include &lt;cstddef&gt;
 #include &lt;cstdlib&gt;
 #include &lt;cstring&gt;
 #include &lt;iostream&gt;
+#include &lt;sstream&gt;
+#include &lt;algorithm&gt;
+#include &lt;iterator&gt;
+#include &lt;cctype&gt;
+
+extern &#34;C&#34; {
+#include &lt;libusb.h&gt;
+}
 
 extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
     libusb_init(NULL);
@@ -853,55 +823,51 @@ extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) 
 
     FuzzedDataProvider dataProvider(data, size);
 
-    libusb_context *ctx = nullptr;
-    libusb_device_handle *dev_handle = nullptr;
-    int result = libusb_init(&amp;ctx);
-    if (result != 0) {
+    libusb_device **devs;
+    ssize_t cnt = libusb_get_device_list(NULL, &amp;devs);
+    if (cnt &lt; 0) {
         return 0;
     }
 
-    // Use a fake device address for fuzzing purposes
-    dev_handle = libusb_open_device_with_vid_pid(ctx, 0x1234, 0x5678);
-    if (dev_handle == nullptr) {
-        libusb_exit(ctx);
+    libusb_device_handle *dev_handle = libusb_open_device_with_vid_pid(NULL, 0x1234, 0x5678);
+    if (!dev_handle) {
+        libusb_free_device_list(devs, 1);
         return 0;
     }
 
     uint8_t desc_index = dataProvider.ConsumeIntegral&lt;uint8_t&gt;();
-    int length = dataProvider.ConsumeIntegralInRange&lt;int&gt;(1, 255);
-    unsigned char *buffer = static_cast&lt;unsigned char*&gt;(malloc(length));
-
-    if (buffer == nullptr) {
-        libusb_close(dev_handle);
-        libusb_exit(ctx);
-        return 0;
+    if (desc_index == 0) {
+        desc_index = 1;
     }
 
-    result = libusb_get_string_descriptor_ascii(dev_handle, desc_index, buffer, length);
+    int length = dataProvider.ConsumeIntegralInRange&lt;int&gt;(1, 256);
+    std::vector&lt;unsigned char&gt; buffer(length);
 
-    // Check the result and print some debug information to ensure coverage
-    if (result &lt; 0) {
-        std::cerr &lt;&lt; &#34;Error getting string descriptor: &#34; &lt;&lt; libusb_error_name(result) &lt;&lt; std::endl;
-    } else {
-        std::cout &lt;&lt; &#34;Descriptor: &#34; &lt;&lt; std::string(reinterpret_cast&lt;char*&gt;(buffer), result) &lt;&lt; std::endl;
+    int ret = libusb_get_string_descriptor_ascii(dev_handle, desc_index, buffer.data(), length);
+
+    // Use the buffer to simulate some processing
+    if (ret &gt; 0) {
+        std::string result(buffer.begin(), buffer.begin() + ret);
+        std::transform(result.begin(), result.end(), result.begin(), ::toupper);
+        std::cout &lt;&lt; &#34;Processed string: &#34; &lt;&lt; result &lt;&lt; std::endl;
     }
 
-    free(buffer);
     libusb_close(dev_handle);
-    libusb_exit(ctx);
-
+    libusb_free_device_list(devs, 1);
     return 0;
 }
 ```
 
-### Explanation of Fixes:
-1. **Initialization Check**: Ensured `libusb_init` is called in `LLVMFuzzerInitialize` to initialize the library.
-2. **Non-null Input Handling**: Added checks to ensure that the input data size is not zero before proceeding.
-3. **FuzzedDataProvider Usage**: Used `FuzzedDataProvider` to consume integral values for `desc_index` and `length` to ensure varied inputs.
-4. **Memory Allocation Check**: Added a check to ensure that the `malloc` call for `buffer` does not return `nullptr`.
-5. **Error Handling**: Improved error handling by printing debug information when `libusb_get_string_descriptor_ascii` fails.
+### Explanation:
+1. **Initialization**: The `libusb_init(NULL);` call ensures the library is initialized.
+2. **Device List**: `libusb_get_device_list(NULL, &amp;devs);` retrieves the list of USB devices.
+3. **Device Handle**: `libusb_open_device_with_vid_pid(NULL, 0x1234, 0x5678);` attempts to open a specific device. This step is crucial as it ensures we are working with a valid device handle.
+4. **Descriptor Index**: The `desc_index` is derived from the fuzzing input and adjusted to avoid zero.
+5. **Buffer Length**: The length of the buffer is determined by the fuzzing input.
+6. **String Descriptor**: `libusb_get_string_descriptor_ascii` fetches the string descriptor which is then processed.
+7. **Processing**: The buffer is converted to a string and transformed to uppercase to simulate some processing, ensuring the fuzzing input affects the program&#39;s behavior.
 
-These changes ensure that the fuzz target effectively invokes the function under test and handles various non-null inputs, thereby increasing code coverage and making the fuzzing process more effective.
+This approach ensures that the fuzzing input is effectively utilized to invoke the function under test and drive the logic, thereby increasing code coverage.
 </pre>
 
 
@@ -919,29 +885,28 @@ Warning: Failed to fix semantic error NO_COV_INCREASE in libusb-libusb_get_strin
 
 <h2>Run logs</h2>
 <pre>
-INFO:__main__:Running: docker run --rm --privileged --shm-size=2g --platform linux/amd64 -e FUZZING_ENGINE=libfuzzer -e SANITIZER=address -e RUN_FUZZER_MODE=interactive -e HELPER=True -v /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-libusb-libusb_get_string_descriptor_ascii/corpora/01.cc:/tmp/libusb_fuzzer_corpus -v /tmp/tmp23akpp1i/build/out/libusb-libusb_get_string_descriptor_ascii-01:/out -t gcr.io/oss-fuzz-base/base-runner run_fuzzer libusb_fuzzer -print_final_stats=1 -max_total_time=30 -len_control=0 -timeout=30.
+INFO:__main__:Running: docker run --rm --privileged --shm-size=2g --platform linux/amd64 -e FUZZING_ENGINE=libfuzzer -e SANITIZER=address -e RUN_FUZZER_MODE=interactive -e HELPER=True -v /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-libusb-libusb_get_string_descriptor_ascii/corpora/01.cc:/tmp/libusb_fuzzer_corpus -v /tmp/tmpk31m_hoq/build/out/libusb-libusb_get_string_descriptor_ascii-01:/out -t gcr.io/oss-fuzz-base/base-runner run_fuzzer libusb_fuzzer -print_final_stats=1 -max_total_time=30 -len_control=0 -timeout=30.
 vm.mmap_rnd_bits = 28
 rm: cannot remove &#39;/tmp/libusb_fuzzer_corpus&#39;: Device or resource busy
 /out/libusb_fuzzer -rss_limit_mb=2560 -timeout=25 -print_final_stats=1 -max_total_time=30 -len_control=0 -timeout=30 /tmp/libusb_fuzzer_corpus &lt; /dev/null
 INFO: Running with entropic power schedule (0xFF, 100).
-INFO: Seed: 143768655
-INFO: Loaded 1 modules   (2630 inline 8-bit counters): 2630 [0x56470ffab008, 0x56470ffaba4e),
-INFO: Loaded 1 PC tables (2630 PCs): 2630 [0x56470ffaba50,0x56470ffb5eb0),
+INFO: Seed: 2618065546
+INFO: Loaded 1 modules   (2676 inline 8-bit counters): 2676 [0x5611d30d0008, 0x5611d30d0a7c), 
+INFO: Loaded 1 PC tables (2676 PCs): 2676 [0x5611d30d0a80,0x5611d30db1c0), 
 INFO:        0 files found in /tmp/libusb_fuzzer_corpus
 INFO: -max_len is not provided; libFuzzer will not generate inputs larger than 4096 bytes
 INFO: A corpus is not provided, starting from an empty corpus
-#2	INITED cov: 164 ft: 165 corp: 1/1b exec/s: 0 rss: 33Mb
-#1024	pulse  cov: 164 ft: 165 corp: 1/1b lim: 4096 exec/s: 512 rss: 48Mb
-#2048	pulse  cov: 164 ft: 165 corp: 1/1b lim: 4096 exec/s: 409 rss: 48Mb
-#4096	pulse  cov: 164 ft: 165 corp: 1/1b lim: 4096 exec/s: 409 rss: 48Mb
-#8192	pulse  cov: 164 ft: 165 corp: 1/1b lim: 4096 exec/s: 390 rss: 48Mb
-#11767	DONE   cov: 164 ft: 165 corp: 1/1b lim: 4096 exec/s: 379 rss: 48Mb
-Done 11767 runs in 31 second(s)
-stat::number_of_executed_units: 11767
-stat::average_exec_per_sec:     379
+#2	INITED cov: 37 ft: 38 corp: 1/1b exec/s: 0 rss: 32Mb
+#524288	pulse  cov: 37 ft: 38 corp: 1/1b lim: 4096 exec/s: 174762 rss: 51Mb
+#1048576	pulse  cov: 37 ft: 38 corp: 1/1b lim: 4096 exec/s: 149796 rss: 51Mb
+#2097152	pulse  cov: 37 ft: 38 corp: 1/1b lim: 4096 exec/s: 139810 rss: 51Mb
+#4148502	DONE   cov: 37 ft: 38 corp: 1/1b lim: 4096 exec/s: 133822 rss: 51Mb
+Done 4148502 runs in 31 second(s)
+stat::number_of_executed_units: 4148502
+stat::average_exec_per_sec:     133822
 stat::new_units_added:          0
 stat::slowest_unit_time_sec:    0
-stat::peak_rss_mb:              48
+stat::peak_rss_mb:              51
 
 </pre>
 

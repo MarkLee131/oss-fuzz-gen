@@ -46,7 +46,7 @@ DEBUG: bool = True
 # WARN: Avoid large NUM_SAMPLES in highly parallelized local experiments.
 # It controls the number of LLM responses per prompt, which may exceed your
 # LLM's limit on query-per-second.
-NUM_SAMPLES = 2
+NUM_SAMPLES = 5
 MAX_TOKENS: int = 4096
 RUN_TIMEOUT: int = 30
 TEMPERATURE: float = 0.4
@@ -89,7 +89,7 @@ def generate_spec(benchmark: Benchmark,
         f'{benchmark.function_signature} using {model.name}..')
   model.generate_code(prompt,
                       response_dir=work_dirs.raw_specification_dir,
-                      log_output=debug)
+                      log_output=debug, spec=True)
 
   generated_specs = []
   for file in os.listdir(work_dirs.raw_specification_dir):

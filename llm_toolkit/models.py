@@ -124,7 +124,8 @@ class LLM:
   def generate_code(self,
                     prompt: prompts.Prompt,
                     response_dir: str,
-                    log_output: bool = False) -> None:
+                    log_output: bool = False,
+                    spec: bool = False) -> None:
     """Generates fuzz targets to the |response_dir|."""
 
   @abstractmethod
@@ -225,18 +226,32 @@ class GPT(LLM):
   def generate_code(self,
                     prompt: prompts.Prompt,
                     response_dir: str,
-                    log_output: bool = False) -> None:
+                    log_output: bool = False,
+                    spec = False) -> None:
     """Generates code with OpenAI's API."""
     if self.ai_binary:
       print(f'OpenAI does not use local AI binary: {self.ai_binary}')
     client = openai.OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
 
-    completion = self.with_retry_on_error(
-        lambda: client.chat.completions.create(messages=prompt.get(),
-                                               model=self.name,
-                                               n=self.num_samples,
-                                               temperature=self.temperature),
-        openai.OpenAIError)
+    if spec:
+      completion = self.with_retry_on_error(
+          lambda: client.chat.completions.create(messages=prompt.get(),
+                                                 model=self.name,
+                                                 n=1,
+                                                 temperature=self.temperature,
+                                                 max_tokens=self.max_tokens,
+                                                 stop=None),
+          openai.OpenAIError)
+      
+    else:
+      
+      completion = self.with_retry_on_error(
+          lambda: client.chat.completions.create(messages=prompt.get(),
+                                                model=self.name,
+                                                n=self.num_samples,
+                                                temperature=self.temperature),
+          openai.OpenAIError)
+      
     # TODO: Add a default value for completion.
     if log_output:
       print(completion)

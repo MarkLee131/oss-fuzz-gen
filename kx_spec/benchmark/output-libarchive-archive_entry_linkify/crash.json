@@ -16,7 +16,7 @@
         "target_binary": "/target_binary",
         "reproducer": "/artifacts",
         "run_log": "run.log",
-        "source_code": "#include <fuzzer/FuzzedDataProvider.h>\\n#include <string>\\n#include <vector>\\n#include <cstdint>\\n#include <cstddef>\\n#include <cstdlib>\\n#include <cstring>\\n#include <iostream>\\n#include <sstream>\\n#include <algorithm>\\n#include <iterator>\\n#include <cctype>\\n\\nextern \"C\" { \\n#include <archive.h>\\n#include <archive_entry.h>\\n}\\n\\nextern \"C\" int LLVMFuzzerInitialize(int *argc, char ***argv) {\\n    return 0;\\n}\\n\\nextern \"C\" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {\\n    FuzzedDataProvider dataProvider(data, size);\\n\\n    struct archive_entry_linkresolver *resolver = archive_entry_linkresolver_new();\\n    if (!resolver) {\\n        return 0;\\n    }\\n\\n    struct archive_entry *entry = archive_entry_new();\\n    struct archive_entry *sparse_entry = archive_entry_new();\\n\\n    if (!entry || !sparse_entry) {\\n        if (entry) archive_entry_free(entry);\\n        if (sparse_entry) archive_entry_free(sparse_entry);\\n        archive_entry_linkresolver_free(resolver);\\n        return 0;\\n    }\\n\\n    // Simulate some fuzzing actions on the archive entries\\n    std::string entryPath = dataProvider.ConsumeRandomLengthString(100);\\n    std::string sparseEntryPath = dataProvider.ConsumeRandomLengthString(100);\\n\\n    archive_entry_set_pathname(entry, entryPath.c_str());\\n    archive_entry_set_pathname(sparse_entry, sparseEntryPath.c_str());\\n\\n    archive_entry_linkify(resolver, &entry, &sparse_entry);\\n\\n    if (entry) archive_entry_free(entry);\\n    if (sparse_entry) archive_entry_free(sparse_entry);\\n    archive_entry_linkresolver_free(resolver);\\n\\n    return 0;\\n}",
+        "source_code": "#include <fuzzer/FuzzedDataProvider.h>\\n#include <string>\\n#include <vector>\\n#include <cstdint>\\n#include <cstddef>\\n#include <cstdlib>\\n#include <cstring>\\n#include <iostream>\\n#include <sstream>\\n#include <algorithm>\\n#include <iterator>\\n#include <cctype>\\n\\nextern \"C\" {\\n#include \"archive_entry.h\"\\n#include \"archive.h\"\\n}\\n\\nextern \"C\" int LLVMFuzzerInitialize(int *argc, char ***argv) {\\n    return 0;\\n}\\n\\nextern \"C\" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {\\n    if (size < 1) {\\n        return 0;\\n    }\\n\\n    FuzzedDataProvider dataProvider(data, size);\\n\\n    struct archive *a = archive_write_new();\\n    if (!a) {\\n        return 0;\\n    }\\n\\n    struct archive_entry *entry = archive_entry_new();\\n    struct archive_entry *linked_entry = archive_entry_new();\\n    struct archive_entry_linkresolver *resolver = archive_entry_linkresolver_new();\\n\\n    std::vector<uint8_t> entry_data = dataProvider.ConsumeRemainingBytes<uint8_t>();\\n    if (!entry_data.empty()) {\\n        archive_entry_copy_pathname(entry, reinterpret_cast<const char *>(entry_data.data()));\\n    }\\n\\n    // Call the archive_entry_linkify function as required\\n    archive_entry_linkify(resolver, &entry, &linked_entry);\\n\\n    // Add the entry to the archive and then free it.\\n    archive_write_header(a, entry);\\n\\n    archive_entry_free(entry);\\n    archive_entry_free(linked_entry);\\n    archive_entry_linkresolver_free(resolver);\\n    archive_write_free(a);\\n\\n    return 0;\\n}",
         "model": ""
     },
 
@@ -24,10 +24,10 @@
         "benchmark": "output-libarchive-archive_entry_linkify",
         "sample": "02",
         "status": "Done",
-        "compiles": "False",
+        "compiles": "True",
         "crashes": "False",
-        "crash_reason": "-",
-        "bug": "True",
+        "crash_reason": "NO_COV_INCREASE",
+        "bug": "False",
         "coverage": "0.00",
         "coverage_diff": "0.0",
         "coverage_report": "#",
@@ -35,7 +35,64 @@
         "target_binary": "/target_binary",
         "reproducer": "/artifacts",
         "run_log": "run.log",
-        "source_code": "#include <fuzzer/FuzzedDataProvider.h>\\n#include <string>\\n#include <vector>\\n#include <cstdint>\\n#include <cstddef>\\n#include <cstdlib>\\n#include <cstring>\\n#include <iostream>\\n#include <sstream>\\n#include <algorithm>\\n#include <iterator>\\n#include <cctype>\\n\\nextern \"C\" { \\n#include <archive.h>\\n#include <archive_entry.h>\\n}\\n\\nextern \"C\" int LLVMFuzzerInitialize(int *argc, char ***argv) {\\n    return 0;\\n}\\n\\nextern \"C\" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {\\n    FuzzedDataProvider dataProvider(data, size);\\n\\n    struct archive_entry_linkresolver *resolver = archive_entry_linkresolver_new();\\n    if (!resolver) {\\n        return 0;\\n    }\\n\\n    struct archive_entry *entry = archive_entry_new();\\n    struct archive_entry *sparse_entry = archive_entry_new();\\n\\n    if (!entry || !sparse_entry) {\\n        if (entry) archive_entry_free(entry);\\n        if (sparse_entry) archive_entry_free(sparse_entry);\\n        archive_entry_linkresolver_free(resolver);\\n        return 0;\\n    }\\n\\n    // Populate the archive_entry with some data from the fuzzer\\n    std::string pathname = dataProvider.ConsumeRandomLengthString(100);\\n    archive_entry_set_pathname(entry, pathname.c_str());\\n    archive_entry_set_size(entry, dataProvider.ConsumeIntegral<int64_t>());\\n    archive_entry_set_filetype(entry, AE_IFREG);\\n    archive_entry_set_perm(entry, dataProvider.ConsumeIntegral<int>());\\n\\n    // Perform the linkify operation\\n    archive_entry_linkify(resolver, &entry, &sparse_entry);\\n\\n    // Free the allocated resources\\n    if (entry) archive_entry_free(entry);\\n    if (sparse_entry) archive_entry_free(sparse_entry);\\n    archive_entry_linkresolver_free(resolver);\\n\\n    return 0;\\n}",
+        "source_code": "#include <fuzzer/FuzzedDataProvider.h>\\n#include <string>\\n#include <vector>\\n#include <cstdint>\\n#include <cstddef>\\n#include <cstdlib>\\n#include <cstring>\\n#include <iostream>\\n#include <sstream>\\n#include <algorithm>\\n#include <iterator>\\n#include <cctype>\\n\\nextern \"C\" {\\n#include \"archive_entry.h\"\\n#include \"archive.h\"\\n}\\n\\nextern \"C\" int LLVMFuzzerInitialize(int *argc, char ***argv) {\\n    return 0;\\n}\\n\\nextern \"C\" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {\\n    if (size < 2 * sizeof(struct archive_entry *)) {\\n        return 0;\\n    }\\n\\n    FuzzedDataProvider dataProvider(data, size);\\n\\n    struct archive_entry_linkresolver *resolver = archive_entry_linkresolver_new();\\n    if (!resolver) {\\n        return 0;\\n    }\\n\\n    struct archive_entry *entry = archive_entry_new();\\n    struct archive_entry *linked_entry = nullptr;\\n\\n    std::vector<uint8_t> entry_data = dataProvider.ConsumeRemainingBytes<uint8_t>();\\n    if (!entry_data.empty()) {\\n        // Ensure the data is null-terminated to prevent buffer overflow\\n        entry_data.push_back('\\0');\\n        archive_entry_copy_pathname(entry, reinterpret_cast<const char *>(entry_data.data()));\\n    }\\n\\n    archive_entry_linkify(resolver, &entry, &linked_entry);\\n\\n    archive_entry_free(entry);\\n    if (linked_entry) {\\n        archive_entry_free(linked_entry);\\n    }\\n    archive_entry_linkresolver_free(resolver);\\n\\n    return 0;\\n}",
+        "model": ""
+    },
+
+    {
+        "benchmark": "output-libarchive-archive_entry_linkify",
+        "sample": "03",
+        "status": "Done",
+        "compiles": "True",
+        "crashes": "True",
+        "crash_reason": "FP_NEAR_INIT_CRASH",
+        "bug": "False",
+        "coverage": "0.00",
+        "coverage_diff": "0.0",
+        "coverage_report": "#",
+        "stacktrace": "/stacktrace",
+        "target_binary": "/target_binary",
+        "reproducer": "/artifacts",
+        "run_log": "run.log",
+        "source_code": "#include <fuzzer/FuzzedDataProvider.h>\\n#include <string>\\n#include <vector>\\n#include <cstdint>\\n#include <cstddef>\\n#include <cstdlib>\\n#include <cstring>\\n#include <iostream>\\n#include <sstream>\\n#include <algorithm>\\n#include <iterator>\\n#include <cctype>\\n\\nextern \"C\" {\\n#include \"archive_entry.h\"\\n#include \"archive.h\"\\n}\\n\\nextern \"C\" int LLVMFuzzerInitialize(int *argc, char ***argv) {\\n    return 0;\\n}\\n\\nextern \"C\" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {\\n    if (size < sizeof(struct archive_entry *) + sizeof(struct archive_entry *)) {\\n        return 0;\\n    }\\n\\n    FuzzedDataProvider dataProvider(data, size);\\n\\n    struct archive_entry_linkresolver *resolver = archive_entry_linkresolver_new();\\n    if (!resolver) {\\n        return 0;\\n    }\\n\\n    struct archive_entry *entry = archive_entry_new();\\n    struct archive_entry *linked_entry = nullptr;\\n\\n    std::vector<uint8_t> entry_data = dataProvider.ConsumeRemainingBytes<uint8_t>();\\n    if (!entry_data.empty()) {\\n        archive_entry_copy_pathname(entry, reinterpret_cast<const char *>(entry_data.data()));\\n    }\\n\\n    archive_entry_linkify(resolver, &entry, &linked_entry);\\n\\n    archive_entry_free(entry);\\n    if (linked_entry) {\\n        archive_entry_free(linked_entry);\\n    }\\n    archive_entry_linkresolver_free(resolver);\\n\\n    return 0;\\n}",
+        "model": ""
+    },
+
+    {
+        "benchmark": "output-libarchive-archive_entry_linkify",
+        "sample": "04",
+        "status": "Done",
+        "compiles": "True",
+        "crashes": "True",
+        "crash_reason": "FP_NEAR_INIT_CRASH",
+        "bug": "False",
+        "coverage": "0.00",
+        "coverage_diff": "0.0",
+        "coverage_report": "#",
+        "stacktrace": "/stacktrace",
+        "target_binary": "/target_binary",
+        "reproducer": "/artifacts",
+        "run_log": "run.log",
+        "source_code": "#include <fuzzer/FuzzedDataProvider.h>\\n#include <string>\\n#include <vector>\\n#include <cstdint>\\n#include <cstddef>\\n#include <cstdlib>\\n#include <cstring>\\n#include <iostream>\\n#include <sstream>\\n#include <algorithm>\\n#include <iterator>\\n#include <cctype>\\n\\nextern \"C\" {\\n#include \"archive_entry.h\"\\n#include \"archive.h\"\\n}\\n\\nextern \"C\" int LLVMFuzzerInitialize(int *argc, char ***argv) {\\n    return 0;\\n}\\n\\nextern \"C\" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {\\n    if (size < 2 * sizeof(archive_entry *)) {\\n        return 0;\\n    }\\n\\n    FuzzedDataProvider dataProvider(data, size);\\n\\n    archive_entry_linkresolver *resolver = archive_entry_linkresolver_new();\\n    if (!resolver) {\\n        return 0;\\n    }\\n\\n    archive_entry *entry = archive_entry_new();\\n    archive_entry *linked_entry = nullptr;\\n\\n    std::vector<uint8_t> entry_data = dataProvider.ConsumeRemainingBytes<uint8_t>();\\n    if (!entry_data.empty()) {\\n        archive_entry_copy_pathname(entry, reinterpret_cast<const char *>(entry_data.data()));\\n    }\\n\\n    archive_entry_linkify(resolver, &entry, &linked_entry);\\n\\n    archive_entry_free(entry);\\n    if (linked_entry) {\\n        archive_entry_free(linked_entry);\\n    }\\n    archive_entry_linkresolver_free(resolver);\\n\\n    return 0;\\n}",
+        "model": ""
+    },
+
+    {
+        "benchmark": "output-libarchive-archive_entry_linkify",
+        "sample": "05",
+        "status": "Done",
+        "compiles": "True",
+        "crashes": "True",
+        "crash_reason": "FP_NEAR_INIT_CRASH",
+        "bug": "False",
+        "coverage": "0.00",
+        "coverage_diff": "0.0",
+        "coverage_report": "#",
+        "stacktrace": "/stacktrace",
+        "target_binary": "/target_binary",
+        "reproducer": "/artifacts",
+        "run_log": "run.log",
+        "source_code": "#include <fuzzer/FuzzedDataProvider.h>\\n#include <string>\\n#include <vector>\\n#include <cstdint>\\n#include <cstddef>\\n#include <cstdlib>\\n#include <cstring>\\n#include <iostream>\\n#include <sstream>\\n#include <algorithm>\\n#include <iterator>\\n#include <cctype>\\n\\nextern \"C\" {\\n#include \"archive_entry.h\"\\n#include \"archive.h\"\\n}\\n\\nextern \"C\" int LLVMFuzzerInitialize(int *argc, char ***argv) {\\n    return 0;\\n}\\n\\nextern \"C\" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {\\n    if (size < 2 * sizeof(archive_entry *)) {\\n        return 0;\\n    }\\n\\n    FuzzedDataProvider dataProvider(data, size);\\n\\n    archive_entry_linkresolver *resolver = archive_entry_linkresolver_new();\\n    if (!resolver) {\\n        return 0;\\n    }\\n\\n    archive_entry *entry = archive_entry_new();\\n    archive_entry *linked_entry = nullptr;\\n\\n    std::vector<uint8_t> entry_data = dataProvider.ConsumeRemainingBytes<uint8_t>();\\n    if (!entry_data.empty()) {\\n        archive_entry_copy_pathname(entry, reinterpret_cast<const char *>(entry_data.data()));\\n    }\\n\\n    archive_entry_linkify(resolver, &entry, &linked_entry);\\n\\n    archive_entry_free(entry);\\n    if (linked_entry) {\\n        archive_entry_free(linked_entry);\\n    }\\n    archive_entry_linkresolver_free(resolver);\\n\\n    return 0;\\n}",
         "model": ""
     }
 

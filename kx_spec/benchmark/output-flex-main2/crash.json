@@ -16,7 +16,7 @@
         "target_binary": "/target_binary",
         "reproducer": "/artifacts",
         "run_log": "run.log",
-        "source_code": "#include <fuzzer/FuzzedDataProvider.h>\\n#include <string>\\n#include <vector>\\n#include <cstdint>\\n#include <cstddef>\\n#include <cstdlib>\\n#include <cstring>\\n#include <iostream>\\n#include <sstream>\\n#include <algorithm>\\n#include <iterator>\\n#include <cctype>\\n\\nextern \"C\" { \\n#include \"main2.h\"\\n}\\n\\nextern \"C\" int LLVMFuzzerInitialize(int *argc, char ***argv) {\\n    return 0;\\n}\\n\\nextern \"C\" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {\\n    FuzzedDataProvider dataProvider(data, size);\\n\\n    int argc = dataProvider.ConsumeIntegralInRange<int>(1, 100); // Ensure argc is at least 1\\n\\n    std::vector<std::string> args;\\n    std::vector<char*> argv;\\n    for (int i = 0; i < argc; ++i) {\\n        std::string arg = dataProvider.ConsumeRandomLengthString(100);\\n        args.push_back(arg);\\n        argv.push_back(args.back().data());\\n    }\\n    argv.push_back(nullptr);\\n\\n    // Ensure argv is not empty and contains valid pointers\\n    if (argv.empty() || argv[0] == nullptr) {\\n        return 0;\\n    }\\n\\n    int result = main2(argc, argv.data());\\n\\n    return 0;\\n}",
+        "source_code": "#include <fuzzer/FuzzedDataProvider.h>\\n#include <string>\\n#include <vector>\\n#include <cstdint>\\n#include <cstddef>\\n#include <cstdlib>\\n#include <cstring>\\n#include <iostream>\\n#include <sstream>\\n#include <algorithm>\\n#include <iterator>\\n#include <cctype>\\n\\nextern \"C\" {\\n    #include \"main2.h\"\\n}\\n\\nextern \"C\" int LLVMFuzzerInitialize(int *argc, char ***argv) {\\n    return 0;\\n}\\n\\nextern \"C\" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {\\n    FuzzedDataProvider provider(data, size);\\n\\n    int argc = provider.ConsumeIntegralInRange<int>(1, 100);  // Ensure at least 1 argument\\n\\n    std::vector<std::string> args;\\n    std::vector<char*> argv;\\n    for (int i = 0; i < argc; ++i) {\\n        args.push_back(provider.ConsumeRandomLengthString());\\n        argv.push_back(args.back().data());\\n    }\\n    argv.push_back(nullptr);\\n\\n    // Ensure argv[0] is not null\\n    if (argv.empty() || argv[0] == nullptr) {\\n        args.insert(args.begin(), \"fuzz\");\\n        argv.insert(argv.begin(), args.front().data());\\n    }\\n\\n    int result = main2(argc, argv.data());\\n\\n    return 0;\\n}",
         "model": ""
     },
 
@@ -35,7 +35,64 @@
         "target_binary": "/target_binary",
         "reproducer": "/artifacts",
         "run_log": "run.log",
-        "source_code": "#include <fuzzer/FuzzedDataProvider.h>\\n#include <string>\\n#include <vector>\\n#include <cstdint>\\n#include <cstddef>\\n#include <cstdlib>\\n#include <cstring>\\n#include <iostream>\\n#include <sstream>\\n#include <algorithm>\\n#include <iterator>\\n#include <cctype>\\n\\nextern \"C\" { \\n#include \"main2.h\"\\n}\\n\\nextern \"C\" int LLVMFuzzerInitialize(int *argc, char ***argv) {\\n    // Initialize the library or any resources within main2 needed for the fuzzing process here.\\n    return 0;\\n}\\n\\nextern \"C\" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {\\n    FuzzedDataProvider dataProvider(data, size);\\n\\n    // Generate argc\\n    int argc = dataProvider.ConsumeIntegralInRange<int>(1, 100); // Ensure argc is at least 1\\n\\n    // Generate argv\\n    std::vector<std::string> args;\\n    std::vector<char*> argv;\\n    for (int i = 0; i < argc; ++i) {\\n        std::string arg = dataProvider.ConsumeRandomLengthString(100);\\n        args.push_back(arg);\\n        argv.push_back(args.back().data());\\n    }\\n    argv.push_back(nullptr); // Null-terminate the array\\n\\n    // Call the function under test\\n    int result = main2(argc, argv.data());\\n\\n    // Postcondition checks (if any)\\n\\n    return 0;\\n}",
+        "source_code": "#include <fuzzer/FuzzedDataProvider.h>\\n#include <string>\\n#include <vector>\\n#include <cstdint>\\n#include <cstddef>\\n#include <cstdlib>\\n#include <cstring>\\n#include <iostream>\\n#include <sstream>\\n#include <algorithm>\\n#include <iterator>\\n#include <cctype>\\n\\nextern \"C\" {\\n    #include \"main2.h\"\\n}\\n\\nextern \"C\" int LLVMFuzzerInitialize(int *argc, char ***argv) {\\n    return 0;\\n}\\n\\nextern \"C\" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {\\n    FuzzedDataProvider provider(data, size);\\n\\n    int argc = provider.ConsumeIntegralInRange<int>(1, 100); // Ensure argc is at least 1\\n\\n    std::vector<std::string> args;\\n    std::vector<char*> argv;\\n    for (int i = 0; i < argc; ++i) {\\n        // Assuming a reasonable max length for the strings\\n        args.push_back(provider.ConsumeRandomLengthString(100));\\n        argv.push_back(args.back().data());\\n    }\\n    argv.push_back(nullptr);\\n\\n    int result = main2(argc, argv.data());\\n\\n    return 0;\\n}",
+        "model": ""
+    },
+
+    {
+        "benchmark": "output-flex-main2",
+        "sample": "03",
+        "status": "Done",
+        "compiles": "False",
+        "crashes": "False",
+        "crash_reason": "-",
+        "bug": "True",
+        "coverage": "0.00",
+        "coverage_diff": "0.0",
+        "coverage_report": "#",
+        "stacktrace": "/stacktrace",
+        "target_binary": "/target_binary",
+        "reproducer": "/artifacts",
+        "run_log": "run.log",
+        "source_code": "#include <fuzzer/FuzzedDataProvider.h>\\n#include <string>\\n#include <vector>\\n#include <cstdint>\\n#include <cstddef>\\n#include <cstdlib>\\n#include <cstring>\\n#include <iostream>\\n#include <sstream>\\n#include <algorithm>\\n#include <iterator>\\n#include <cctype>\\n\\nextern \"C\" {\\n    #include \"main2.h\"\\n}\\n\\nextern \"C\" int LLVMFuzzerInitialize(int *argc, char ***argv) {\\n    return 0;\\n}\\n\\nextern \"C\" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {\\n    FuzzedDataProvider provider(data, size);\\n\\n    int argc = provider.ConsumeIntegralInRange<int>(1, 100); // Ensure argc is at least 1\\n\\n    std::vector<std::string> args;\\n    std::vector<char*> argv;\\n    for (int i = 0; i < argc; ++i) {\\n        args.push_back(provider.ConsumeRandomLengthString());\\n        argv.push_back(args.back().data());\\n    }\\n    argv.push_back(nullptr);\\n\\n    int result = main2(argc, argv.data());\\n\\n    return 0;\\n}",
+        "model": ""
+    },
+
+    {
+        "benchmark": "output-flex-main2",
+        "sample": "04",
+        "status": "Done",
+        "compiles": "False",
+        "crashes": "False",
+        "crash_reason": "-",
+        "bug": "True",
+        "coverage": "0.00",
+        "coverage_diff": "0.0",
+        "coverage_report": "#",
+        "stacktrace": "/stacktrace",
+        "target_binary": "/target_binary",
+        "reproducer": "/artifacts",
+        "run_log": "run.log",
+        "source_code": "#include <fuzzer/FuzzedDataProvider.h>\\n#include <string>\\n#include <vector>\\n#include <cstdint>\\n#include <cstddef>\\n#include <cstdlib>\\n#include <cstring>\\n#include <iostream>\\n#include <sstream>\\n#include <algorithm>\\n#include <iterator>\\n#include <cctype>\\n\\nextern \"C\" {\\n    #include \"main2.h\"\\n}\\n\\nextern \"C\" int LLVMFuzzerInitialize(int *argc, char ***argv) {\\n    return 0;\\n}\\n\\nextern \"C\" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {\\n    FuzzedDataProvider provider(data, size);\\n\\n    int argc = provider.ConsumeIntegralInRange<int>(1, 100);  // Ensure argc is at least 1\\n\\n    std::vector<std::string> args;\\n    std::vector<char*> argv;\\n    for (int i = 0; i < argc; ++i) {\\n        std::string arg = provider.ConsumeRandomLengthString();\\n        args.push_back(arg);\\n        argv.push_back(args.back().data());\\n    }\\n    argv.push_back(nullptr);\\n\\n    int result = main2(argc, argv.data());\\n\\n    return 0;\\n}",
+        "model": ""
+    },
+
+    {
+        "benchmark": "output-flex-main2",
+        "sample": "05",
+        "status": "Done",
+        "compiles": "False",
+        "crashes": "False",
+        "crash_reason": "-",
+        "bug": "True",
+        "coverage": "0.00",
+        "coverage_diff": "0.0",
+        "coverage_report": "#",
+        "stacktrace": "/stacktrace",
+        "target_binary": "/target_binary",
+        "reproducer": "/artifacts",
+        "run_log": "run.log",
+        "source_code": "#include <fuzzer/FuzzedDataProvider.h>\\n#include <string>\\n#include <vector>\\n#include <cstdint>\\n#include <cstddef>\\n#include <cstdlib>\\n#include <cstring>\\n#include <iostream>\\n#include <sstream>\\n#include <algorithm>\\n#include <iterator>\\n#include <cctype>\\n\\nextern \"C\" {\\n    #include \"main2.h\"\\n}\\n\\nextern \"C\" int LLVMFuzzerInitialize(int *argc, char ***argv) {\\n    return 0;\\n}\\n\\nextern \"C\" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {\\n    FuzzedDataProvider provider(data, size);\\n\\n    int argc = provider.ConsumeIntegralInRange<int>(1, 100); // Ensure argc is at least 1\\n\\n    std::vector<std::string> args;\\n    std::vector<char*> argv;\\n    for (int i = 0; i < argc; ++i) {\\n        args.push_back(provider.ConsumeRandomLengthString());\\n        argv.push_back(args.back().data());\\n    }\\n    argv.push_back(nullptr);\\n\\n    // Call the function under test\\n    int result = main2(argc, argv.data());\\n\\n    return 0;\\n}",
         "model": ""
     }
 

@@ -1,0 +1,812 @@
+<!doctype html>
+
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Experiment results</title>
+<style>
+* {
+    box-sizing: border-box;
+}
+
+html {
+    line-height: 1.15;
+}
+
+body {
+    font-family: sans-serif;
+    font-size: 16px;
+}
+
+table {
+    border-collapse: collapse;
+    border-spacing: 0;
+}
+
+td, th {
+    border-right: 1px #dedede solid;
+    border-bottom: 1px #dedede solid;
+    padding: 5px;
+    text-align: left;
+}
+td:first-child, th:first-child {
+    border-left: 1px #dedede solid;
+}
+th {
+    border-top: 1px #dedede solid;
+}
+
+tbody tr:nth-child(odd) {
+    background-color: #f4f5ff;
+}
+</style>
+<body>
+    LLM: 
+    
+<h1>output-tinyxml2-_znk8tinyxml210xmlelement12shallowcloneepns_11xmldocumente / 05</h1>
+Bug: False
+<br>
+Crash reason: -
+<br>
+<br>
+
+
+
+
+<h3>Final code</h3>
+
+<pre>
+#include &lt;fuzzer/FuzzedDataProvider.h&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+#include &lt;cstdint&gt;
+#include &lt;cstddef&gt;
+#include &lt;cstdlib&gt;
+#include &lt;cstring&gt;
+#include &lt;iostream&gt;
+#include &lt;sstream&gt;
+#include &lt;algorithm&gt;
+#include &lt;iterator&gt;
+#include &lt;cctype&gt;
+
+// Include the TinyXML2 header
+#include &#34;tinyxml2.h&#34;
+
+using namespace tinyxml2;
+
+extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    return 0;
+}
+
+extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    FuzzedDataProvider dataProvider(data, size);
+
+    XMLDocument doc;
+
+    std::string xmlString = dataProvider.ConsumeRandomLengthString(size);
+    doc.Parse(xmlString.c_str());
+
+    XMLElement* root = doc.RootElement();
+    if (root) {
+        XMLNode* clonedNode = root-&gt;ShallowClone(&amp;doc);
+
+        if (clonedNode) {
+            delete clonedNode;
+        }
+    }
+
+    return 0;
+}
+</pre>
+
+
+<h3>Fixer prompt #1</h3>
+<pre>
+
+Given the following C++ fuzz harness and its build error message, fix the code to make it build for fuzzing.
+
+If there is undeclared identifier or unknown type name error, fix it by finding and including the related libraries.
+
+You MUST wrap the headers with &lt;code&gt;extern &#34;C&#34;&lt;/code&gt; if they are C headers, especially the headers are from the project.
+
+Note that some code may need to be wrapped with &lt;code&gt;extern &#34;C&#34;&lt;/code&gt; as their source is C program.
+
+MUST RETURN THE FULL CODE, INCLUDING UNCHANGED PARTS.
+EXTREMELY IMPORTANT: AVOID USING &lt;code&gt;goto&lt;/code&gt;. If you have to write code using &lt;code&gt;goto&lt;/code&gt;, you MUST MUST also declare all variables BEFORE the &lt;code&gt;goto&lt;/code&gt;. Never introduce new variables after the &lt;code&gt;goto&lt;/code&gt;.
+
+Below is the code needs to be built:
+&lt;code&gt;
+#include &lt;fuzzer/FuzzedDataProvider.h&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+#include &lt;cstdint&gt;
+#include &lt;cstddef&gt;
+#include &lt;cstdlib&gt;
+#include &lt;cstring&gt;
+#include &lt;iostream&gt;
+#include &lt;sstream&gt;
+#include &lt;algorithm&gt;
+#include &lt;iterator&gt;
+#include &lt;cctype&gt;
+#include &#34;tinyxml2.h&#34;
+
+using namespace tinyxml2;
+
+extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    return 0;
+}
+
+extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    FuzzedDataProvider dataProvider(data, size);
+
+    XMLDocument doc;
+
+    std::string xmlString = dataProvider.ConsumeRandomLengthString(size);
+    doc.Parse(xmlString.c_str());
+
+    XMLElement* root = doc.RootElement();
+    if (root) {
+        XMLNode* clonedNode = root-&gt;ShallowClone(&amp;doc);
+
+        if (clonedNode) {
+            delete clonedNode;
+        }
+    }
+
+    return 0;
+}
+&lt;/code&gt;
+
+The code has the following build issues:
+&lt;error&gt;
+/src/xmltest.cpp:13:10: fatal error: &#39;tinyxml2.h&#39; file not found
+   13 | #include &#34;tinyxml2.h&#34;
+      |          ^~~~~~~~~~~~
+&lt;/error&gt;
+
+Fix code:
+1. Consider possible solutions for the issues listed above.
+2. Choose a solution that can maximize fuzzing result, which is utilizing the function under test and feeding it not null input.
+3. Apply the solutions to the original code.
+It&#39;s important to show the complete code, not only the fixed line.
+&lt;solution&gt;
+</pre>
+
+
+
+<h3>Code #1</h3>
+
+<pre>
+To fix the build error related to the missing `tinyxml2.h` file, we need to include the correct path to the header file or ensure that the header file is available in the include path. Additionally, since `tinyxml2` is a C++ library, we don&#39;t need to wrap its header in `extern &#34;C&#34;`. However, for completeness and to avoid potential issues, we will ensure that all necessary standard headers are included correctly.
+
+Here is the full corrected code:
+
+```cpp
+#include &lt;fuzzer/FuzzedDataProvider.h&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+#include &lt;cstdint&gt;
+#include &lt;cstddef&gt;
+#include &lt;cstdlib&gt;
+#include &lt;cstring&gt;
+#include &lt;iostream&gt;
+#include &lt;sstream&gt;
+#include &lt;algorithm&gt;
+#include &lt;iterator&gt;
+#include &lt;cctype&gt;
+
+// Include the TinyXML2 header
+#include &#34;tinyxml2.h&#34;
+
+using namespace tinyxml2;
+
+extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    return 0;
+}
+
+extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    FuzzedDataProvider dataProvider(data, size);
+
+    XMLDocument doc;
+
+    std::string xmlString = dataProvider.ConsumeRandomLengthString(size);
+    doc.Parse(xmlString.c_str());
+
+    XMLElement* root = doc.RootElement();
+    if (root) {
+        XMLNode* clonedNode = root-&gt;ShallowClone(&amp;doc);
+
+        if (clonedNode) {
+            delete clonedNode;
+        }
+    }
+
+    return 0;
+}
+```
+
+Make sure that the `tinyxml2.h` file is available in the include path when you compile the code. If `tinyxml2` is installed in a non-standard directory, you may need to specify the include path explicitly using the `-I` flag during compilation, for example:
+
+```sh
+g++ -I/path/to/tinyxml2/include -fsanitize=fuzzer,address -o fuzz_target fuzz_target.cpp /path/to/tinyxml2/libtinyxml2.a
+```
+
+This ensures that the compiler can locate the `tinyxml2.h` file and link against the `tinyxml2` library correctly.
+</pre>
+
+
+<h3>Fixer prompt #2</h3>
+<pre>
+
+Given the following C++ fuzz harness and its build error message, fix the code to make it build for fuzzing.
+
+If there is undeclared identifier or unknown type name error, fix it by finding and including the related libraries.
+
+You MUST wrap the headers with &lt;code&gt;extern &#34;C&#34;&lt;/code&gt; if they are C headers, especially the headers are from the project.
+
+Note that some code may need to be wrapped with &lt;code&gt;extern &#34;C&#34;&lt;/code&gt; as their source is C program.
+
+MUST RETURN THE FULL CODE, INCLUDING UNCHANGED PARTS.
+EXTREMELY IMPORTANT: AVOID USING &lt;code&gt;goto&lt;/code&gt;. If you have to write code using &lt;code&gt;goto&lt;/code&gt;, you MUST MUST also declare all variables BEFORE the &lt;code&gt;goto&lt;/code&gt;. Never introduce new variables after the &lt;code&gt;goto&lt;/code&gt;.
+
+Below is the code needs to be built:
+&lt;code&gt;
+#include &lt;fuzzer/FuzzedDataProvider.h&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+#include &lt;cstdint&gt;
+#include &lt;cstddef&gt;
+#include &lt;cstdlib&gt;
+#include &lt;cstring&gt;
+#include &lt;iostream&gt;
+#include &lt;sstream&gt;
+#include &lt;algorithm&gt;
+#include &lt;iterator&gt;
+#include &lt;cctype&gt;
+
+// Include the TinyXML2 header
+#include &#34;tinyxml2.h&#34;
+
+using namespace tinyxml2;
+
+extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    return 0;
+}
+
+extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    FuzzedDataProvider dataProvider(data, size);
+
+    XMLDocument doc;
+
+    std::string xmlString = dataProvider.ConsumeRandomLengthString(size);
+    doc.Parse(xmlString.c_str());
+
+    XMLElement* root = doc.RootElement();
+    if (root) {
+        XMLNode* clonedNode = root-&gt;ShallowClone(&amp;doc);
+
+        if (clonedNode) {
+            delete clonedNode;
+        }
+    }
+
+    return 0;
+}
+&lt;/code&gt;
+
+The code has the following build issues:
+&lt;error&gt;
+/src/xmltest.cpp:15:10: fatal error: &#39;tinyxml2.h&#39; file not found
+   15 | #include &#34;tinyxml2.h&#34;
+      |          ^~~~~~~~~~~~
+&lt;/error&gt;
+
+Fix code:
+1. Consider possible solutions for the issues listed above.
+2. Choose a solution that can maximize fuzzing result, which is utilizing the function under test and feeding it not null input.
+3. Apply the solutions to the original code.
+It&#39;s important to show the complete code, not only the fixed line.
+&lt;solution&gt;
+</pre>
+
+
+
+<h3>Code #2</h3>
+
+<pre>
+To fix the build error, we need to ensure that the `tinyxml2.h` header file is correctly included. This can be done by making sure the path to the TinyXML2 library is correctly specified. Additionally, we need to wrap the TinyXML2 header include with `extern &#34;C&#34;` if the TinyXML2 library is written in C.
+
+Here is the full code with the necessary adjustments:
+
+```cpp
+#include &lt;fuzzer/FuzzedDataProvider.h&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+#include &lt;cstdint&gt;
+#include &lt;cstddef&gt;
+#include &lt;cstdlib&gt;
+#include &lt;cstring&gt;
+#include &lt;iostream&gt;
+#include &lt;sstream&gt;
+#include &lt;algorithm&gt;
+#include &lt;iterator&gt;
+#include &lt;cctype&gt;
+
+// Include the TinyXML2 header
+extern &#34;C&#34; {
+#include &#34;tinyxml2.h&#34;
+}
+
+using namespace tinyxml2;
+
+extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    return 0;
+}
+
+extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    FuzzedDataProvider dataProvider(data, size);
+
+    XMLDocument doc;
+
+    std::string xmlString = dataProvider.ConsumeRandomLengthString(size);
+    doc.Parse(xmlString.c_str());
+
+    XMLElement* root = doc.RootElement();
+    if (root) {
+        XMLNode* clonedNode = root-&gt;ShallowClone(&amp;doc);
+
+        if (clonedNode) {
+            delete clonedNode;
+        }
+    }
+
+    return 0;
+}
+```
+
+In this solution, we have wrapped the TinyXML2 header include with `extern &#34;C&#34;` to ensure compatibility if the library is written in C. This should resolve the build issue related to the `tinyxml2.h` file not being found. Additionally, the rest of the code remains unchanged to maintain the intended functionality of the fuzz harness.
+</pre>
+
+
+<h3>Fixer prompt #3</h3>
+<pre>
+
+Given the following C++ fuzz harness and its build error message, fix the code to make it build for fuzzing.
+
+If there is undeclared identifier or unknown type name error, fix it by finding and including the related libraries.
+
+You MUST wrap the headers with &lt;code&gt;extern &#34;C&#34;&lt;/code&gt; if they are C headers, especially the headers are from the project.
+
+Note that some code may need to be wrapped with &lt;code&gt;extern &#34;C&#34;&lt;/code&gt; as their source is C program.
+
+MUST RETURN THE FULL CODE, INCLUDING UNCHANGED PARTS.
+EXTREMELY IMPORTANT: AVOID USING &lt;code&gt;goto&lt;/code&gt;. If you have to write code using &lt;code&gt;goto&lt;/code&gt;, you MUST MUST also declare all variables BEFORE the &lt;code&gt;goto&lt;/code&gt;. Never introduce new variables after the &lt;code&gt;goto&lt;/code&gt;.
+
+Below is the code needs to be built:
+&lt;code&gt;
+#include &lt;fuzzer/FuzzedDataProvider.h&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+#include &lt;cstdint&gt;
+#include &lt;cstddef&gt;
+#include &lt;cstdlib&gt;
+#include &lt;cstring&gt;
+#include &lt;iostream&gt;
+#include &lt;sstream&gt;
+#include &lt;algorithm&gt;
+#include &lt;iterator&gt;
+#include &lt;cctype&gt;
+
+// Include the TinyXML2 header
+extern &#34;C&#34; {
+#include &#34;tinyxml2.h&#34;
+}
+
+using namespace tinyxml2;
+
+extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    return 0;
+}
+
+extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    FuzzedDataProvider dataProvider(data, size);
+
+    XMLDocument doc;
+
+    std::string xmlString = dataProvider.ConsumeRandomLengthString(size);
+    doc.Parse(xmlString.c_str());
+
+    XMLElement* root = doc.RootElement();
+    if (root) {
+        XMLNode* clonedNode = root-&gt;ShallowClone(&amp;doc);
+
+        if (clonedNode) {
+            delete clonedNode;
+        }
+    }
+
+    return 0;
+}
+&lt;/code&gt;
+
+The code has the following build issues:
+&lt;error&gt;
+/src/xmltest.cpp:16:10: fatal error: &#39;tinyxml2.h&#39; file not found
+   16 | #include &#34;tinyxml2.h&#34;
+      |          ^~~~~~~~~~~~
+&lt;/error&gt;
+
+Fix code:
+1. Consider possible solutions for the issues listed above.
+2. Choose a solution that can maximize fuzzing result, which is utilizing the function under test and feeding it not null input.
+3. Apply the solutions to the original code.
+It&#39;s important to show the complete code, not only the fixed line.
+&lt;solution&gt;
+</pre>
+
+
+
+<h3>Code #3</h3>
+
+<pre>
+To fix the build issue, we need to ensure that the `tinyxml2.h` header file is correctly included. Since TinyXML2 is a C++ library, we don&#39;t need to wrap it with `extern &#34;C&#34;`. However, we need to make sure that the include path for TinyXML2 is correctly set up in the build system. 
+
+Here is the complete fixed code:
+
+```cpp
+#include &lt;fuzzer/FuzzedDataProvider.h&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+#include &lt;cstdint&gt;
+#include &lt;cstddef&gt;
+#include &lt;cstdlib&gt;
+#include &lt;cstring&gt;
+#include &lt;iostream&gt;
+#include &lt;sstream&gt;
+#include &lt;algorithm&gt;
+#include &lt;iterator&gt;
+#include &lt;cctype&gt;
+
+// Include the TinyXML2 header
+#include &#34;tinyxml2.h&#34;
+
+using namespace tinyxml2;
+
+extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    return 0;
+}
+
+extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    FuzzedDataProvider dataProvider(data, size);
+
+    XMLDocument doc;
+
+    std::string xmlString = dataProvider.ConsumeRandomLengthString(size);
+    doc.Parse(xmlString.c_str());
+
+    XMLElement* root = doc.RootElement();
+    if (root) {
+        XMLNode* clonedNode = root-&gt;ShallowClone(&amp;doc);
+
+        if (clonedNode) {
+            delete clonedNode;
+        }
+    }
+
+    return 0;
+}
+```
+
+Make sure that the TinyXML2 library is correctly installed and the include path is set up in your build system. For example, if you are using `clang` or `gcc`, you might need to add the include path with the `-I` option:
+
+```sh
+clang++ -fsanitize=fuzzer -I/path/to/tinyxml2/include -L/path/to/tinyxml2/lib -ltinyxml2 -o fuzz_target fuzz_target.cpp
+```
+
+Or if you are using `cmake`, you can add the include path in your `CMakeLists.txt`:
+
+```cmake
+include_directories(/path/to/tinyxml2/include)
+target_link_libraries(fuzz_target /path/to/tinyxml2/lib/libtinyxml2.a)
+```
+
+This should resolve the build issue and allow you to fuzz the TinyXML2 library.
+</pre>
+
+
+<h3>Fixer prompt #4</h3>
+<pre>
+
+Given the following C++ fuzz harness and its build error message, fix the code to make it build for fuzzing.
+
+If there is undeclared identifier or unknown type name error, fix it by finding and including the related libraries.
+
+You MUST wrap the headers with &lt;code&gt;extern &#34;C&#34;&lt;/code&gt; if they are C headers, especially the headers are from the project.
+
+Note that some code may need to be wrapped with &lt;code&gt;extern &#34;C&#34;&lt;/code&gt; as their source is C program.
+
+MUST RETURN THE FULL CODE, INCLUDING UNCHANGED PARTS.
+EXTREMELY IMPORTANT: AVOID USING &lt;code&gt;goto&lt;/code&gt;. If you have to write code using &lt;code&gt;goto&lt;/code&gt;, you MUST MUST also declare all variables BEFORE the &lt;code&gt;goto&lt;/code&gt;. Never introduce new variables after the &lt;code&gt;goto&lt;/code&gt;.
+
+Below is the code needs to be built:
+&lt;code&gt;
+#include &lt;fuzzer/FuzzedDataProvider.h&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+#include &lt;cstdint&gt;
+#include &lt;cstddef&gt;
+#include &lt;cstdlib&gt;
+#include &lt;cstring&gt;
+#include &lt;iostream&gt;
+#include &lt;sstream&gt;
+#include &lt;algorithm&gt;
+#include &lt;iterator&gt;
+#include &lt;cctype&gt;
+
+// Include the TinyXML2 header
+#include &#34;tinyxml2.h&#34;
+
+using namespace tinyxml2;
+
+extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    return 0;
+}
+
+extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    FuzzedDataProvider dataProvider(data, size);
+
+    XMLDocument doc;
+
+    std::string xmlString = dataProvider.ConsumeRandomLengthString(size);
+    doc.Parse(xmlString.c_str());
+
+    XMLElement* root = doc.RootElement();
+    if (root) {
+        XMLNode* clonedNode = root-&gt;ShallowClone(&amp;doc);
+
+        if (clonedNode) {
+            delete clonedNode;
+        }
+    }
+
+    return 0;
+}
+&lt;/code&gt;
+
+The code has the following build issues:
+&lt;error&gt;
+/src/xmltest.cpp:15:10: fatal error: &#39;tinyxml2.h&#39; file not found
+   15 | #include &#34;tinyxml2.h&#34;
+      |          ^~~~~~~~~~~~
+&lt;/error&gt;
+
+Fix code:
+1. Consider possible solutions for the issues listed above.
+2. Choose a solution that can maximize fuzzing result, which is utilizing the function under test and feeding it not null input.
+3. Apply the solutions to the original code.
+It&#39;s important to show the complete code, not only the fixed line.
+&lt;solution&gt;
+</pre>
+
+
+
+<h3>Code #4</h3>
+
+<pre>
+To fix the build issues, we need to ensure that the `tinyxml2.h` header file is correctly included. This might involve ensuring the correct path to the header file or installing the TinyXML2 library if it&#39;s not already installed. Additionally, since TinyXML2 is a C++ library, we don&#39;t need to wrap its headers with `extern &#34;C&#34;`. 
+
+Here is the complete fixed code:
+
+```cpp
+#include &lt;fuzzer/FuzzedDataProvider.h&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+#include &lt;cstdint&gt;
+#include &lt;cstddef&gt;
+#include &lt;cstdlib&gt;
+#include &lt;cstring&gt;
+#include &lt;iostream&gt;
+#include &lt;sstream&gt;
+#include &lt;algorithm&gt;
+#include &lt;iterator&gt;
+#include &lt;cctype&gt;
+
+// Include the TinyXML2 header
+#include &#34;tinyxml2.h&#34;
+
+using namespace tinyxml2;
+
+extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    return 0;
+}
+
+extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    FuzzedDataProvider dataProvider(data, size);
+
+    XMLDocument doc;
+
+    std::string xmlString = dataProvider.ConsumeRandomLengthString(size);
+    doc.Parse(xmlString.c_str());
+
+    XMLElement* root = doc.RootElement();
+    if (root) {
+        XMLNode* clonedNode = root-&gt;ShallowClone(&amp;doc);
+
+        if (clonedNode) {
+            delete clonedNode;
+        }
+    }
+
+    return 0;
+}
+```
+
+### Explanation:
+
+1. **Include Path for `tinyxml2.h`**:
+   - Ensure that the TinyXML2 library is installed and the `tinyxml2.h` header file is accessible.
+   - If the header file is not found, you may need to specify the include directory in your build system (e.g., using `-I/path/to/tinyxml2` with your compiler).
+
+2. **Using the TinyXML2 Library**:
+   - Make sure that the TinyXML2 library is linked correctly during the build process. This might involve adding `-ltinyxml2` to your linker flags if you are using a build system like `make` or `cmake`.
+
+3. **Fuzzing Initialization and Test Function**:
+   - The `LLVMFuzzerInitialize` and `LLVMFuzzerTestOneInput` functions are correctly defined and use the TinyXML2 library to parse and manipulate XML data.
+
+By ensuring the correct path to the TinyXML2 header and linking the library properly, the code should compile and be ready for fuzzing.
+</pre>
+
+
+<h3>Fixer prompt #5</h3>
+<pre>
+
+Given the following C++ fuzz harness and its build error message, fix the code to make it build for fuzzing.
+
+If there is undeclared identifier or unknown type name error, fix it by finding and including the related libraries.
+
+You MUST wrap the headers with &lt;code&gt;extern &#34;C&#34;&lt;/code&gt; if they are C headers, especially the headers are from the project.
+
+Note that some code may need to be wrapped with &lt;code&gt;extern &#34;C&#34;&lt;/code&gt; as their source is C program.
+
+MUST RETURN THE FULL CODE, INCLUDING UNCHANGED PARTS.
+EXTREMELY IMPORTANT: AVOID USING &lt;code&gt;goto&lt;/code&gt;. If you have to write code using &lt;code&gt;goto&lt;/code&gt;, you MUST MUST also declare all variables BEFORE the &lt;code&gt;goto&lt;/code&gt;. Never introduce new variables after the &lt;code&gt;goto&lt;/code&gt;.
+
+Below is the code needs to be built:
+&lt;code&gt;
+#include &lt;fuzzer/FuzzedDataProvider.h&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+#include &lt;cstdint&gt;
+#include &lt;cstddef&gt;
+#include &lt;cstdlib&gt;
+#include &lt;cstring&gt;
+#include &lt;iostream&gt;
+#include &lt;sstream&gt;
+#include &lt;algorithm&gt;
+#include &lt;iterator&gt;
+#include &lt;cctype&gt;
+
+// Include the TinyXML2 header
+#include &#34;tinyxml2.h&#34;
+
+using namespace tinyxml2;
+
+extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    return 0;
+}
+
+extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    FuzzedDataProvider dataProvider(data, size);
+
+    XMLDocument doc;
+
+    std::string xmlString = dataProvider.ConsumeRandomLengthString(size);
+    doc.Parse(xmlString.c_str());
+
+    XMLElement* root = doc.RootElement();
+    if (root) {
+        XMLNode* clonedNode = root-&gt;ShallowClone(&amp;doc);
+
+        if (clonedNode) {
+            delete clonedNode;
+        }
+    }
+
+    return 0;
+}
+&lt;/code&gt;
+
+The code has the following build issues:
+&lt;error&gt;
+/src/xmltest.cpp:15:10: fatal error: &#39;tinyxml2.h&#39; file not found
+   15 | #include &#34;tinyxml2.h&#34;
+      |          ^~~~~~~~~~~~
+&lt;/error&gt;
+
+Fix code:
+1. Consider possible solutions for the issues listed above.
+2. Choose a solution that can maximize fuzzing result, which is utilizing the function under test and feeding it not null input.
+3. Apply the solutions to the original code.
+It&#39;s important to show the complete code, not only the fixed line.
+&lt;solution&gt;
+</pre>
+
+
+
+<h3>Code #5</h3>
+
+<pre>
+To fix the build issue, we need to ensure that the `tinyxml2.h` header file is correctly included. Additionally, since `tinyxml2` is a C++ library, we do not need to wrap its inclusion with `extern &#34;C&#34;`. However, we should ensure that the header file is correctly located in the include path.
+
+Here&#39;s the complete fixed code:
+
+```cpp
+#include &lt;fuzzer/FuzzedDataProvider.h&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+#include &lt;cstdint&gt;
+#include &lt;cstddef&gt;
+#include &lt;cstdlib&gt;
+#include &lt;cstring&gt;
+#include &lt;iostream&gt;
+#include &lt;sstream&gt;
+#include &lt;algorithm&gt;
+#include &lt;iterator&gt;
+#include &lt;cctype&gt;
+
+// Include the TinyXML2 header
+#include &#34;tinyxml2.h&#34;
+
+using namespace tinyxml2;
+
+extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    return 0;
+}
+
+extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    FuzzedDataProvider dataProvider(data, size);
+
+    XMLDocument doc;
+
+    std::string xmlString = dataProvider.ConsumeRandomLengthString(size);
+    doc.Parse(xmlString.c_str());
+
+    XMLElement* root = doc.RootElement();
+    if (root) {
+        XMLNode* clonedNode = root-&gt;ShallowClone(&amp;doc);
+
+        if (clonedNode) {
+            delete clonedNode;
+        }
+    }
+
+    return 0;
+}
+```
+
+Make sure that the `tinyxml2.h` file is available in the include path when you compile the code. If `tinyxml2.h` is located in a specific directory, you might need to specify the include directory with the `-I` option in your compiler command. For example:
+
+```sh
+g++ -I/path/to/tinyxml2 -fsanitize=fuzzer,address -o fuzz_target fuzz_target.cpp /path/to/tinyxml2/tinyxml2.cpp
+```
+
+This ensures that the compiler can find the `tinyxml2.h` header file and link against the `tinyxml2` implementation.
+</pre>
+
+
+<h2>Logs</h2>
+<pre>
+Fixing /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-tinyxml2-_znk8tinyxml210xmlelement12shallowcloneepns_11xmldocumente/fixed_targets/05.cpp with gpt-4o, attempt 1.
+Fixing /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-tinyxml2-_znk8tinyxml210xmlelement12shallowcloneepns_11xmldocumente/fixed_targets/05.cpp with gpt-4o, attempt 2.
+Fixing /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-tinyxml2-_znk8tinyxml210xmlelement12shallowcloneepns_11xmldocumente/fixed_targets/05.cpp with gpt-4o, attempt 3.
+Fixing /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-tinyxml2-_znk8tinyxml210xmlelement12shallowcloneepns_11xmldocumente/fixed_targets/05.cpp with gpt-4o, attempt 4.
+Fixing /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-tinyxml2-_znk8tinyxml210xmlelement12shallowcloneepns_11xmldocumente/fixed_targets/05.cpp with gpt-4o, attempt 5.
+Failed to build /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-tinyxml2-_znk8tinyxml210xmlelement12shallowcloneepns_11xmldocumente/fixed_targets/05.cpp with gpt-4o in 5 iterations of fixing.
+
+</pre>
+
+<h2>Run logs</h2>
+<pre>
+
+</pre>
+
+</body>

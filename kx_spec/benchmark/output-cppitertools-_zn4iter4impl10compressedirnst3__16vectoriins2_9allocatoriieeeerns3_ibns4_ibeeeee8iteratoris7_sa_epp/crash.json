@@ -16,7 +16,7 @@
         "target_binary": "/target_binary",
         "reproducer": "/artifacts",
         "run_log": "run.log",
-        "source_code": "#include <fuzzer/FuzzedDataProvider.h>\\n#include <vector>\\n#include <cstdint>\\n#include <cstddef>\\n#include <cstdlib>\\n#include <cstring>\\n#include <iostream>\\n#include <sstream>\\n#include <algorithm>\\n#include <iterator>\\n#include <cctype>\\n#include \"compressed_iterator.h\" // Assuming the project has a header file for the Compressed iterator\\n\\nextern \"C\" int LLVMFuzzerInitialize(int *argc, char ***argv) {\\n    // Initialize the library or any resources within iter::impl::Compressed needed for the fuzzing process here.\\n    return 0;\\n}\\n\\nextern \"C\" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {\\n    FuzzedDataProvider dataProvider(data, size);\\n\\n    // Generate test data for the vectors\\n    size_t intVectorSize = dataProvider.ConsumeIntegralInRange<size_t>(0, 100);\\n    size_t boolVectorSize = dataProvider.ConsumeIntegralInRange<size_t>(0, 100);\\n\\n    std::vector<int> intVector = dataProvider.ConsumeIntegralVector<int>(intVectorSize);\\n    std::vector<bool> boolVector = dataProvider.ConsumeBoolVector(boolVectorSize);\\n\\n    // Create the compressed iterator\\n    iter::impl::Compressed<std::vector<int>&, std::vector<bool>&>::Iterator iter(intVector, boolVector);\\n\\n    // Call the operator++ function and ensure it is utilized\\n    if (iter != iter.end()) {\\n        ++iter;\\n        *iter;\\n    }\\n\\n    // Ensure the operator++ is called again to satisfy the requirement\\n    if (iter != iter.end()) {\\n        ++iter;\\n        *iter;\\n    }\\n\\n    return 0;\\n}",
+        "source_code": "#include <fuzzer/FuzzedDataProvider.h>\\n#include <string>\\n#include <vector>\\n#include <cstdint>\\n#include <cstddef>\\n#include <cstdlib>\\n#include <cstring>\\n#include <iostream>\\n#include <sstream>\\n#include <algorithm>\\n#include <iterator>\\n#include <cctype>\\n\\nextern \"C\" {\\n#include \"compressed_iterator.h\"\\n}\\n\\nextern \"C\" int LLVMFuzzerInitialize(int *argc, char ***argv) {\\n    return 0;\\n}\\n\\nextern \"C\" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {\\n    FuzzedDataProvider provider(data, size);\\n\\n    std::vector<int> int_vector = provider.ConsumeIntegralVector<int>(provider.remaining_bytes() / 2);\\n    std::vector<bool> bool_vector = provider.ConsumeBoolVector(provider.remaining_bytes() / 2);\\n\\n    if (int_vector.empty() || bool_vector.empty()) {\\n        return 0;\\n    }\\n\\n    iter::impl::Compressed<std::vector<int>&, std::vector<bool>&> compressed(int_vector, bool_vector);\\n\\n    auto it = compressed.begin();\\n\\n    // Ensure that operator++ is called\\n    ++it;\\n\\n    // Optionally, you can perform more operations to maximize fuzzing results\\n    if (it != compressed.end()) {\\n        ++it;\\n    }\\n\\n    // Additional calls to operator++ to ensure it is utilized\\n    while (it != compressed.end()) {\\n        ++it;\\n    }\\n\\n    // Ensure the function under test is called\\n    if (it != compressed.end()) {\\n        ++it;\\n    }\\n\\n    return 0;\\n}",
         "model": ""
     },
 
@@ -35,7 +35,64 @@
         "target_binary": "/target_binary",
         "reproducer": "/artifacts",
         "run_log": "run.log",
-        "source_code": "#include <fuzzer/FuzzedDataProvider.h>\\n#include <vector>\\n#include <cstdint>\\n#include <cstddef>\\n#include <cstdlib>\\n#include <cstring>\\n#include <iostream>\\n#include <sstream>\\n#include <algorithm>\\n#include <iterator>\\n#include <cctype>\\n#include \"compressed_iterator.h\"\\n\\nextern \"C\" int LLVMFuzzerInitialize(int *argc, char ***argv) {\\n    // Initialize the library or any resources within iter::impl::Compressed needed for the fuzzing process here.\\n    // No specific initialization required for this example.\\n    return 0;\\n}\\n\\nextern \"C\" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {\\n    FuzzedDataProvider dataProvider(data, size);\\n\\n    // Generate test data for the vectors\\n    size_t intVectorSize = dataProvider.ConsumeIntegralInRange<size_t>(0, 100);\\n    size_t boolVectorSize = dataProvider.ConsumeIntegralInRange<size_t>(0, 100);\\n\\n    std::vector<int> intVector = dataProvider.ConsumeIntegralVector<int>(intVectorSize);\\n    std::vector<bool> boolVector = dataProvider.ConsumeBoolVector(boolVectorSize);\\n\\n    // Create the compressed iterator\\n    iter::impl::Compressed<std::vector<int>&, std::vector<bool>&>::Iterator iter(&intVector, &boolVector);\\n\\n    // Ensure the iterator is used\\n    if (intVectorSize > 0 && boolVectorSize > 0) {\\n        ++iter;\\n    }\\n\\n    return 0;\\n}",
+        "source_code": "#include <fuzzer/FuzzedDataProvider.h>\\n#include <string>\\n#include <vector>\\n#include <cstdint>\\n#include <cstddef>\\n#include <cstdlib>\\n#include <cstring>\\n#include <iostream>\\n#include <sstream>\\n#include <algorithm>\\n#include <iterator>\\n#include <cctype>\\n\\nextern \"C\" {\\n#include \"compressed_iterator.h\"\\n}\\n\\nextern \"C\" int LLVMFuzzerInitialize(int *argc, char ***argv) {\\n    return 0;\\n}\\n\\nextern \"C\" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {\\n    FuzzedDataProvider provider(data, size);\\n\\n    std::vector<int> int_vector = provider.ConsumeIntegralVector<int>(provider.remaining_bytes() / 2);\\n    std::vector<bool> bool_vector = provider.ConsumeBoolVector(provider.remaining_bytes() / 2);\\n\\n    iter::impl::Compressed<std::vector<int>&, std::vector<bool>&> compressed(int_vector, bool_vector);\\n\\n    auto it = compressed.begin();\\n\\n    // Call the operator++ function to ensure it is tested\\n    ++it;\\n\\n    // Use the iterator to access elements\\n    if (it != compressed.end()) {\\n        auto value = *it;\\n        (void)value; // Suppress unused variable warning\\n    }\\n\\n    // Explicitly call operator++ to satisfy the build requirement\\n    auto it_copy = it;\\n    it_copy.operator++();\\n\\n    // Call the operator++ function again to ensure it is tested\\n    it.operator++();\\n\\n    // Explicitly call the required function to satisfy the build requirement\\n    it.operator++(&it);\\n\\n    return 0;\\n}",
+        "model": ""
+    },
+
+    {
+        "benchmark": "output-cppitertools-_zn4iter4impl10compressedirnst3__16vectoriins2_9allocatoriieeeerns3_ibns4_ibeeeee8iteratoris7_sa_epp",
+        "sample": "03",
+        "status": "Done",
+        "compiles": "False",
+        "crashes": "False",
+        "crash_reason": "-",
+        "bug": "True",
+        "coverage": "0.00",
+        "coverage_diff": "0.0",
+        "coverage_report": "#",
+        "stacktrace": "/stacktrace",
+        "target_binary": "/target_binary",
+        "reproducer": "/artifacts",
+        "run_log": "run.log",
+        "source_code": "#include <fuzzer/FuzzedDataProvider.h>\\n#include <string>\\n#include <vector>\\n#include <cstdint>\\n#include <cstddef>\\n#include <cstdlib>\\n#include <cstring>\\n#include <iostream>\\n#include <sstream>\\n#include <algorithm>\\n#include <iterator>\\n#include <cctype>\\n\\nextern \"C\" {\\n#include \"compressed_iterator.h\"\\n}\\n\\nextern \"C\" int LLVMFuzzerInitialize(int *argc, char ***argv) {\\n    return 0;\\n}\\n\\nextern \"C\" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {\\n    if (size < 2) {\\n        return 0; // Early exit if not enough data\\n    }\\n\\n    FuzzedDataProvider provider(data, size);\\n\\n    std::vector<int> int_vector = provider.ConsumeIntegralVector<int>(provider.remaining_bytes() / 2);\\n    std::vector<bool> bool_vector = provider.ConsumeBoolVector(provider.remaining_bytes() / 2);\\n\\n    if (int_vector.empty() || bool_vector.empty()) {\\n        return 0; // Early exit if vectors are empty\\n    }\\n\\n    iter::impl::Compressed<std::vector<int>&, std::vector<bool>&> compressed(int_vector, bool_vector);\\n\\n    auto it = compressed.begin();\\n\\n    ++it; // Call the operator++ function\\n\\n    // Additional operations to maximize fuzzing result\\n    if (it != compressed.end()) {\\n        ++it; // Call the operator++ function again\\n    }\\n\\n    // Ensure the operator++ function is called inside LLVMFuzzerTestOneInput\\n    for (auto iter = compressed.begin(); iter != compressed.end(); ++iter) {\\n        // Do nothing, just iterate to call operator++\\n    }\\n\\n    // Explicitly call operator++ to satisfy the build requirement\\n    it.operator++();\\n\\n    // Call the operator++ function again to ensure it is called multiple times\\n    if (it != compressed.end()) {\\n        it.operator++();\\n    }\\n\\n    return 0;\\n}",
+        "model": ""
+    },
+
+    {
+        "benchmark": "output-cppitertools-_zn4iter4impl10compressedirnst3__16vectoriins2_9allocatoriieeeerns3_ibns4_ibeeeee8iteratoris7_sa_epp",
+        "sample": "04",
+        "status": "Done",
+        "compiles": "False",
+        "crashes": "False",
+        "crash_reason": "-",
+        "bug": "True",
+        "coverage": "0.00",
+        "coverage_diff": "0.0",
+        "coverage_report": "#",
+        "stacktrace": "/stacktrace",
+        "target_binary": "/target_binary",
+        "reproducer": "/artifacts",
+        "run_log": "run.log",
+        "source_code": "#include <fuzzer/FuzzedDataProvider.h>\\n#include <string>\\n#include <vector>\\n#include <cstdint>\\n#include <cstddef>\\n#include <cstdlib>\\n#include <cstring>\\n#include <iostream>\\n#include <sstream>\\n#include <algorithm>\\n#include <iterator>\\n#include <cctype>\\n\\nextern \"C\" {\\n#include \"compressed_iterator.h\" // Hypothetical header file for Compressed and Iterator classes\\n}\\n\\nextern \"C\" int LLVMFuzzerInitialize(int *argc, char ***argv) {\\n    return 0;\\n}\\n\\nextern \"C\" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {\\n    FuzzedDataProvider provider(data, size);\\n\\n    std::vector<int> int_vector = provider.ConsumeIntegralVector<int>(provider.remaining_bytes() / 2);\\n    std::vector<bool> bool_vector = provider.ConsumeBoolVector(provider.remaining_bytes() / 2);\\n\\n    iter::impl::Compressed<std::vector<int>&, std::vector<bool>&> compressed(int_vector, bool_vector);\\n\\n    auto it = compressed.begin();\\n\\n    // Ensure we use the operator++ function as required by the error message\\n    if (it != compressed.end()) {\\n        ++it; // Call operator++ once\\n    }\\n\\n    // Additional increment to ensure the operator++ is called\\n    if (it != compressed.end()) {\\n        ++it; // Call operator++ again\\n    }\\n\\n    // Further increments to ensure the operator++ is thoroughly tested\\n    while (it != compressed.end()) {\\n        ++it; // Continue calling operator++ until the end\\n    }\\n\\n    return 0;\\n}",
+        "model": ""
+    },
+
+    {
+        "benchmark": "output-cppitertools-_zn4iter4impl10compressedirnst3__16vectoriins2_9allocatoriieeeerns3_ibns4_ibeeeee8iteratoris7_sa_epp",
+        "sample": "05",
+        "status": "Done",
+        "compiles": "False",
+        "crashes": "False",
+        "crash_reason": "-",
+        "bug": "True",
+        "coverage": "0.00",
+        "coverage_diff": "0.0",
+        "coverage_report": "#",
+        "stacktrace": "/stacktrace",
+        "target_binary": "/target_binary",
+        "reproducer": "/artifacts",
+        "run_log": "run.log",
+        "source_code": "#include <fuzzer/FuzzedDataProvider.h>\\n#include <string>\\n#include <vector>\\n#include <cstdint>\\n#include <cstddef>\\n#include <cstdlib>\\n#include <cstring>\\n#include <iostream>\\n#include <sstream>\\n#include <algorithm>\\n#include <iterator>\\n#include <cctype>\\n\\nextern \"C\" {\\n#include \"compressed_iterator.h\"\\n}\\n\\nextern \"C\" int LLVMFuzzerInitialize(int *argc, char ***argv) {\\n    return 0;\\n}\\n\\nextern \"C\" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {\\n    FuzzedDataProvider provider(data, size);\\n\\n    // Ensure we have enough data to create vectors\\n    if (size < 2) {\\n        return 0;\\n    }\\n\\n    std::vector<int> int_vector = provider.ConsumeIntegralVector<int>(provider.remaining_bytes() / 2);\\n    std::vector<bool> bool_vector = provider.ConsumeBoolVector(provider.remaining_bytes() / 2);\\n\\n    iter::impl::Compressed<std::vector<int>&, std::vector<bool>&> compressed(int_vector, bool_vector);\\n\\n    auto it = compressed.begin();\\n\\n    // Ensure the operator++ is called\\n    if (it != compressed.end()) {\\n        ++it;\\n    }\\n\\n    // Further use the iterator to ensure the operator++ is utilized\\n    while (it != compressed.end()) {\\n        ++it;\\n    }\\n\\n    // Explicitly call the operator++ function to satisfy the build requirement\\n    if (it != compressed.end()) {\\n        it.operator++();\\n    }\\n\\n    // Ensure the operator++ is called again explicitly\\n    if (it != compressed.end()) {\\n        it.operator++();\\n    }\\n\\n    // Ensure the operator++ is called again explicitly to satisfy the build requirement\\n    if (it != compressed.end()) {\\n        it.operator++();\\n    }\\n\\n    return 0;\\n}",
         "model": ""
     }
 

@@ -1,0 +1,462 @@
+<!doctype html>
+
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Experiment results</title>
+<style>
+* {
+    box-sizing: border-box;
+}
+
+html {
+    line-height: 1.15;
+}
+
+body {
+    font-family: sans-serif;
+    font-size: 16px;
+}
+
+table {
+    border-collapse: collapse;
+    border-spacing: 0;
+}
+
+td, th {
+    border-right: 1px #dedede solid;
+    border-bottom: 1px #dedede solid;
+    padding: 5px;
+    text-align: left;
+}
+td:first-child, th:first-child {
+    border-left: 1px #dedede solid;
+}
+th {
+    border-top: 1px #dedede solid;
+}
+
+tbody tr:nth-child(odd) {
+    background-color: #f4f5ff;
+}
+</style>
+<body>
+    LLM: 
+    
+<h1>output-avahi-avahi_string_list_add_pair / 04</h1>
+Bug: False
+<br>
+Crash reason: NO_SEMANTIC_ERR
+<br>
+<br>
+
+
+
+
+<h3>Final code</h3>
+
+<pre>
+#include &lt;fuzzer/FuzzedDataProvider.h&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+#include &lt;cstdint&gt;
+#include &lt;cstddef&gt;
+#include &lt;cstdlib&gt;
+#include &lt;cstring&gt;
+#include &lt;iostream&gt;
+#include &lt;sstream&gt;
+#include &lt;algorithm&gt;
+#include &lt;iterator&gt;
+#include &lt;cctype&gt;
+
+extern &#34;C&#34; {
+#include &#34;avahi-common/strlst.h&#34;
+#include &lt;assert.h&gt;
+}
+
+extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    return 0;
+}
+
+extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    if (size &lt; 1) {
+        return 0;
+    }
+
+    FuzzedDataProvider provider(data, size);
+
+    AvahiStringList *list = nullptr;
+    std::string initialTxt = provider.ConsumeRandomLengthString();
+    if (!initialTxt.empty()) {
+        list = avahi_string_list_new(initialTxt.c_str(), nullptr);
+    }
+
+    std::string key = provider.ConsumeRandomLengthString();
+    if (key.empty()) {
+        if (list) {
+            avahi_string_list_free(list);
+        }
+        return 0;
+    }
+
+    const char *value = nullptr;
+    if (provider.ConsumeBool()) {
+        std::string valueStr = provider.ConsumeRandomLengthString();
+        if (!valueStr.empty()) {
+            value = strdup(valueStr.c_str());
+        }
+    }
+
+    AvahiStringList *result = avahi_string_list_add_pair(list, key.c_str(), value);
+
+    if (value) {
+        free((void *)value);
+    }
+    avahi_string_list_free(result);
+
+    return 0;
+}
+</pre>
+
+
+<h3>Fixer prompt #1</h3>
+<pre>
+
+Given the following C++ fuzz harness and its build error message, fix the code to make it build for fuzzing.
+
+If there is undeclared identifier or unknown type name error, fix it by finding and including the related libraries.
+
+You MUST wrap the headers with &lt;code&gt;extern &#34;C&#34;&lt;/code&gt; if they are C headers, especially the headers are from the project.
+
+Note that some code may need to be wrapped with &lt;code&gt;extern &#34;C&#34;&lt;/code&gt; as their source is C program.
+
+MUST RETURN THE FULL CODE, INCLUDING UNCHANGED PARTS.
+EXTREMELY IMPORTANT: AVOID USING &lt;code&gt;goto&lt;/code&gt;. If you have to write code using &lt;code&gt;goto&lt;/code&gt;, you MUST MUST also declare all variables BEFORE the &lt;code&gt;goto&lt;/code&gt;. Never introduce new variables after the &lt;code&gt;goto&lt;/code&gt;.
+
+Below is the code needs to be built:
+&lt;code&gt;
+#include &lt;fuzzer/FuzzedDataProvider.h&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+#include &lt;cstdint&gt;
+#include &lt;cstddef&gt;
+#include &lt;cstdlib&gt;
+#include &lt;cstring&gt;
+#include &lt;iostream&gt;
+#include &lt;sstream&gt;
+#include &lt;algorithm&gt;
+#include &lt;iterator&gt;
+#include &lt;cctype&gt;
+
+extern &#34;C&#34; {
+#include &#34;avahi-common/strlst.h&#34;
+#include &lt;assert.h&gt;
+}
+
+extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    return 0;
+}
+
+extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    if (size &lt; 1) {
+        return 0;
+    }
+
+    FuzzedDataProvider provider(data, size);
+
+    AvahiStringList *list = nullptr;
+    if (provider.ConsumeBool()) {
+        list = avahi_string_list_new();
+    }
+
+    std::string key = provider.ConsumeRandomLengthString();
+    if (key.empty()) {
+        return 0;
+    }
+
+    const char *value = nullptr;
+    if (provider.ConsumeBool()) {
+        std::string valueStr = provider.ConsumeRandomLengthString();
+        if (!valueStr.empty()) {
+            value = strdup(valueStr.c_str());
+        }
+    }
+
+    AvahiStringList *result = avahi_string_list_add_pair(list, key.c_str(), value);
+
+    if (value) {
+        free((void *)value);
+    }
+    avahi_string_list_free(result);
+
+    return 0;
+}
+&lt;/code&gt;
+
+The code has the following build issues:
+&lt;error&gt;
+fuzz/fuzz-consume-record.cpp:32:16: error: no matching function for call to &#39;avahi_string_list_new&#39;
+   32 |         list = avahi_string_list_new();
+      |                ^~~~~~~~~~~~~~~~~~~~~
+./avahi-common/strlst.h:51:18: note: candidate function not viable: requires at least argument &#39;txt&#39;, but no arguments were provided
+   51 | AvahiStringList *avahi_string_list_new(const char *txt, ...) AVAHI_GCC_SENTINEL;
+      |                  ^                     ~~~~~~~~~~~~~~~~~~~~
+&lt;/error&gt;
+
+Fix code:
+1. Consider possible solutions for the issues listed above.
+2. Choose a solution that can maximize fuzzing result, which is utilizing the function under test and feeding it not null input.
+3. Apply the solutions to the original code.
+It&#39;s important to show the complete code, not only the fixed line.
+&lt;solution&gt;
+</pre>
+
+
+
+<h3>Code #1</h3>
+
+<pre>
+Here is the fixed code with the necessary corrections:
+
+```cpp
+#include &lt;fuzzer/FuzzedDataProvider.h&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+#include &lt;cstdint&gt;
+#include &lt;cstddef&gt;
+#include &lt;cstdlib&gt;
+#include &lt;cstring&gt;
+#include &lt;iostream&gt;
+#include &lt;sstream&gt;
+#include &lt;algorithm&gt;
+#include &lt;iterator&gt;
+#include &lt;cctype&gt;
+
+extern &#34;C&#34; {
+#include &#34;avahi-common/strlst.h&#34;
+#include &lt;assert.h&gt;
+}
+
+extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    return 0;
+}
+
+extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    if (size &lt; 1) {
+        return 0;
+    }
+
+    FuzzedDataProvider provider(data, size);
+
+    AvahiStringList *list = nullptr;
+    std::string initialTxt = provider.ConsumeRandomLengthString();
+    if (!initialTxt.empty()) {
+        list = avahi_string_list_new(initialTxt.c_str(), nullptr);
+    }
+
+    std::string key = provider.ConsumeRandomLengthString();
+    if (key.empty()) {
+        if (list) {
+            avahi_string_list_free(list);
+        }
+        return 0;
+    }
+
+    const char *value = nullptr;
+    if (provider.ConsumeBool()) {
+        std::string valueStr = provider.ConsumeRandomLengthString();
+        if (!valueStr.empty()) {
+            value = strdup(valueStr.c_str());
+        }
+    }
+
+    AvahiStringList *result = avahi_string_list_add_pair(list, key.c_str(), value);
+
+    if (value) {
+        free((void *)value);
+    }
+    avahi_string_list_free(result);
+
+    return 0;
+}
+```
+
+### Explanation of Changes
+
+1. **Fixing the `avahi_string_list_new` Call:**
+   - The original code attempted to call `avahi_string_list_new()` without any arguments, which caused a build error because the function requires at least one argument (`const char *txt`).
+   - I modified the code to provide an initial string to `avahi_string_list_new`. This string is generated using `provider.ConsumeRandomLengthString()` to ensure it is not empty before passing it to the function.
+
+2. **Handling Empty Keys:**
+   - If the key generated by `provider.ConsumeRandomLengthString()` is empty, the function now frees the list (if it was created) and returns early.
+
+3. **Memory Management:**
+   - Ensured that any dynamically allocated memory (e.g., `value` created using `strdup`) is properly freed after use to avoid memory leaks.
+
+These changes ensure that the function `avahi_string_list_new` is called correctly and that the fuzzing harness handles various edge cases properly.
+</pre>
+
+
+<h2>Logs</h2>
+<pre>
+Fixing /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-avahi-avahi_string_list_add_pair/fixed_targets/04.c with gpt-4o, attempt 1.
+Successfully built /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-avahi-avahi_string_list_add_pair/fixed_targets/04.c with gpt-4o in 1 iterations of fixing.
+Result for avahi-avahi_string_list_add_pair-04: crashes=False, coverage=0.20088300220750552 (91/453), coverage diff=0.019303688383316097 (56/2901)
+
+</pre>
+
+<h2>Run logs</h2>
+<pre>
+INFO:__main__:Running: docker run --rm --privileged --shm-size=2g --platform linux/amd64 -e FUZZING_ENGINE=libfuzzer -e SANITIZER=address -e RUN_FUZZER_MODE=interactive -e HELPER=True -v /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-avahi-avahi_string_list_add_pair/corpora/04.c:/tmp/fuzz-consume-record_corpus -v /tmp/tmpk31m_hoq/build/out/avahi-avahi_string_list_add_pair-04:/out -t gcr.io/oss-fuzz-base/base-runner run_fuzzer fuzz-consume-record -print_final_stats=1 -max_total_time=30 -len_control=0 -timeout=30.
+vm.mmap_rnd_bits = 28
+rm: cannot remove &#39;/tmp/fuzz-consume-record_corpus&#39;: Device or resource busy
+/out/fuzz-consume-record -rss_limit_mb=2560 -timeout=25 -print_final_stats=1 -max_total_time=30 -len_control=0 -timeout=30 /tmp/fuzz-consume-record_corpus &lt; /dev/null
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 4266286173
+INFO: Loaded 1 modules   (453 inline 8-bit counters): 453 [0x55a97f4a6b58, 0x55a97f4a6d1d), 
+INFO: Loaded 1 PC tables (453 PCs): 453 [0x55a97f4a6d20,0x55a97f4a8970), 
+INFO:        0 files found in /tmp/fuzz-consume-record_corpus
+INFO: -max_len is not provided; libFuzzer will not generate inputs larger than 4096 bytes
+INFO: A corpus is not provided, starting from an empty corpus
+#2	INITED cov: 31 ft: 32 corp: 1/1b exec/s: 0 rss: 29Mb
+#3	NEW    cov: 31 ft: 36 corp: 2/3b lim: 4096 exec/s: 0 rss: 30Mb L: 2/2 MS: 1 InsertByte-
+#4	NEW    cov: 37 ft: 49 corp: 3/41b lim: 4096 exec/s: 0 rss: 30Mb L: 38/38 MS: 1 InsertRepeatedBytes-
+#8	NEW    cov: 37 ft: 53 corp: 4/276b lim: 4096 exec/s: 0 rss: 30Mb L: 235/235 MS: 4 InsertRepeatedBytes-ShuffleBytes-ChangeBit-InsertRepeatedBytes-
+#15	NEW    cov: 37 ft: 57 corp: 5/279b lim: 4096 exec/s: 0 rss: 30Mb L: 3/235 MS: 2 ChangeByte-CrossOver-
+#22	NEW    cov: 37 ft: 61 corp: 6/287b lim: 4096 exec/s: 0 rss: 30Mb L: 8/235 MS: 2 InsertByte-InsertRepeatedBytes-
+#24	NEW    cov: 37 ft: 65 corp: 7/317b lim: 4096 exec/s: 0 rss: 30Mb L: 30/235 MS: 2 EraseBytes-InsertRepeatedBytes-
+#38	NEW    cov: 37 ft: 69 corp: 8/323b lim: 4096 exec/s: 0 rss: 30Mb L: 6/235 MS: 4 ChangeBit-ChangeBit-ChangeByte-CMP- DE: &#34;\377\377\377\377&#34;-
+#115	NEW    cov: 38 ft: 70 corp: 9/329b lim: 4096 exec/s: 0 rss: 30Mb L: 6/235 MS: 2 CrossOver-InsertRepeatedBytes-
+#132	REDUCE cov: 38 ft: 70 corp: 9/327b lim: 4096 exec/s: 0 rss: 31Mb L: 4/235 MS: 2 ChangeByte-EraseBytes-
+#137	REDUCE cov: 38 ft: 70 corp: 9/317b lim: 4096 exec/s: 0 rss: 31Mb L: 20/235 MS: 5 ChangeBit-CMP-ChangeBinInt-InsertByte-EraseBytes- DE: &#34;\377\007&#34;-
+#169	REDUCE cov: 38 ft: 70 corp: 9/316b lim: 4096 exec/s: 0 rss: 31Mb L: 19/235 MS: 2 ChangeByte-EraseBytes-
+#170	REDUCE cov: 38 ft: 70 corp: 9/314b lim: 4096 exec/s: 0 rss: 31Mb L: 36/235 MS: 1 EraseBytes-
+#174	REDUCE cov: 38 ft: 70 corp: 9/307b lim: 4096 exec/s: 0 rss: 31Mb L: 228/228 MS: 4 ChangeBinInt-InsertByte-CrossOver-EraseBytes-
+#228	REDUCE cov: 38 ft: 70 corp: 9/303b lim: 4096 exec/s: 0 rss: 31Mb L: 32/228 MS: 4 InsertByte-InsertRepeatedBytes-CMP-EraseBytes- DE: &#34;\000\000\000\000\000\000\000(&#34;-
+#255	REDUCE cov: 38 ft: 70 corp: 9/280b lim: 4096 exec/s: 0 rss: 31Mb L: 205/205 MS: 2 ShuffleBytes-EraseBytes-
+#421	REDUCE cov: 38 ft: 70 corp: 9/279b lim: 4096 exec/s: 0 rss: 31Mb L: 3/205 MS: 1 EraseBytes-
+#505	REDUCE cov: 38 ft: 70 corp: 9/278b lim: 4096 exec/s: 0 rss: 31Mb L: 5/205 MS: 4 InsertByte-ChangeBinInt-ChangeBit-EraseBytes-
+#686	REDUCE cov: 38 ft: 70 corp: 9/267b lim: 4096 exec/s: 0 rss: 31Mb L: 194/194 MS: 1 EraseBytes-
+#813	REDUCE cov: 38 ft: 70 corp: 9/251b lim: 4096 exec/s: 0 rss: 31Mb L: 178/178 MS: 2 ChangeBinInt-EraseBytes-
+#878	REDUCE cov: 38 ft: 70 corp: 9/225b lim: 4096 exec/s: 0 rss: 31Mb L: 152/152 MS: 5 ChangeByte-ShuffleBytes-CopyPart-CMP-EraseBytes- DE: &#34;\011\000\000\000\000\000\000\000&#34;-
+#914	REDUCE cov: 38 ft: 70 corp: 9/224b lim: 4096 exec/s: 0 rss: 31Mb L: 4/152 MS: 1 EraseBytes-
+#952	REDUCE cov: 38 ft: 70 corp: 9/223b lim: 4096 exec/s: 0 rss: 31Mb L: 2/152 MS: 3 CopyPart-ChangeASCIIInt-EraseBytes-
+#1048	REDUCE cov: 38 ft: 70 corp: 9/222b lim: 4096 exec/s: 0 rss: 31Mb L: 151/151 MS: 1 EraseBytes-
+#1072	REDUCE cov: 38 ft: 70 corp: 9/221b lim: 4096 exec/s: 0 rss: 31Mb L: 1/151 MS: 4 InsertByte-ChangeByte-EraseBytes-EraseBytes-
+#1241	REDUCE cov: 38 ft: 70 corp: 9/203b lim: 4096 exec/s: 0 rss: 31Mb L: 133/133 MS: 4 ChangeBinInt-CopyPart-CrossOver-EraseBytes-
+#1360	REDUCE cov: 38 ft: 70 corp: 9/199b lim: 4096 exec/s: 0 rss: 31Mb L: 129/129 MS: 4 ChangeBit-InsertRepeatedBytes-InsertByte-EraseBytes-
+#1396	REDUCE cov: 38 ft: 70 corp: 9/198b lim: 4096 exec/s: 0 rss: 31Mb L: 128/128 MS: 1 EraseBytes-
+#1438	REDUCE cov: 38 ft: 70 corp: 9/195b lim: 4096 exec/s: 0 rss: 31Mb L: 16/128 MS: 2 EraseBytes-InsertByte-
+	NEW_FUNC[1/2]: 0x55a97f403a10 in std::__1::basic_string&lt;char, std::__1::char_traits&lt;char&gt;, std::__1::allocator&lt;char&gt;&gt;::__shrink_or_extend[abi:v180000](unsigned long) /usr/local/bin/../include/c++/v1/string:3269
+	NEW_FUNC[2/2]: 0x55a97f406b20 in avahi_string_list_add_pair /src/avahi/avahi-common/strlst.c:455
+#4881	REDUCE cov: 60 ft: 99 corp: 10/316b lim: 4096 exec/s: 0 rss: 32Mb L: 121/128 MS: 3 ShuffleBytes-ChangeBit-InsertRepeatedBytes-
+#4912	NEW    cov: 60 ft: 100 corp: 11/387b lim: 4096 exec/s: 0 rss: 32Mb L: 71/128 MS: 1 EraseBytes-
+#4956	NEW    cov: 65 ft: 120 corp: 12/629b lim: 4096 exec/s: 0 rss: 32Mb L: 242/242 MS: 4 CrossOver-CrossOver-ChangeBinInt-CrossOver-
+#4962	NEW    cov: 68 ft: 123 corp: 13/700b lim: 4096 exec/s: 0 rss: 32Mb L: 71/242 MS: 1 PersAutoDict- DE: &#34;\000\000\000\000\000\000\000(&#34;-
+#4982	NEW    cov: 68 ft: 126 corp: 14/774b lim: 4096 exec/s: 0 rss: 32Mb L: 74/242 MS: 5 ChangeByte-InsertByte-InsertByte-InsertByte-PersAutoDict- DE: &#34;\377\377\377\377&#34;-
+#5008	NEW    cov: 68 ft: 127 corp: 15/849b lim: 4096 exec/s: 0 rss: 32Mb L: 75/242 MS: 1 InsertByte-
+#5031	NEW    cov: 69 ft: 128 corp: 16/942b lim: 4096 exec/s: 0 rss: 33Mb L: 93/242 MS: 3 ChangeBit-InsertByte-EraseBytes-
+#5051	NEW    cov: 69 ft: 129 corp: 17/1027b lim: 4096 exec/s: 0 rss: 33Mb L: 85/242 MS: 5 PersAutoDict-PersAutoDict-ChangeByte-ChangeBit-ChangeByte- DE: &#34;\011\000\000\000\000\000\000\000&#34;-&#34;\377\007&#34;-
+#5069	NEW    cov: 69 ft: 130 corp: 18/1075b lim: 4096 exec/s: 0 rss: 33Mb L: 48/242 MS: 3 ChangeBinInt-CrossOver-EraseBytes-
+#5116	REDUCE cov: 69 ft: 130 corp: 18/1033b lim: 4096 exec/s: 0 rss: 33Mb L: 43/242 MS: 2 InsertByte-EraseBytes-
+#5132	REDUCE cov: 69 ft: 131 corp: 19/1075b lim: 4096 exec/s: 0 rss: 33Mb L: 42/242 MS: 1 CrossOver-
+#5169	REDUCE cov: 69 ft: 131 corp: 19/1071b lim: 4096 exec/s: 0 rss: 33Mb L: 44/242 MS: 2 CrossOver-EraseBytes-
+#5218	REDUCE cov: 69 ft: 131 corp: 19/1046b lim: 4096 exec/s: 0 rss: 33Mb L: 50/242 MS: 4 CrossOver-ChangeByte-ChangeByte-EraseBytes-
+#5229	REDUCE cov: 69 ft: 131 corp: 19/1027b lim: 4096 exec/s: 0 rss: 33Mb L: 23/242 MS: 1 EraseBytes-
+#5247	REDUCE cov: 69 ft: 131 corp: 19/1015b lim: 4096 exec/s: 0 rss: 33Mb L: 59/242 MS: 3 ChangeBit-ShuffleBytes-EraseBytes-
+#5328	REDUCE cov: 69 ft: 131 corp: 19/1005b lim: 4096 exec/s: 0 rss: 33Mb L: 83/242 MS: 1 EraseBytes-
+#5339	REDUCE cov: 69 ft: 131 corp: 19/999b lim: 4096 exec/s: 0 rss: 33Mb L: 68/242 MS: 1 EraseBytes-
+#5359	REDUCE cov: 70 ft: 133 corp: 20/1010b lim: 4096 exec/s: 0 rss: 33Mb L: 11/242 MS: 5 CMP-CMP-CrossOver-ChangeBit-ChangeBit- DE: &#34;\000\000&#34;-&#34;\024\000\000\000\000\000\000\000&#34;-
+#5410	REDUCE cov: 70 ft: 133 corp: 20/1006b lim: 4096 exec/s: 0 rss: 33Mb L: 46/242 MS: 1 EraseBytes-
+#5441	REDUCE cov: 70 ft: 133 corp: 20/1003b lim: 4096 exec/s: 0 rss: 33Mb L: 43/242 MS: 1 EraseBytes-
+#5512	REDUCE cov: 70 ft: 133 corp: 20/997b lim: 4096 exec/s: 0 rss: 33Mb L: 53/242 MS: 1 EraseBytes-
+#5544	REDUCE cov: 70 ft: 133 corp: 20/980b lim: 4096 exec/s: 0 rss: 33Mb L: 51/242 MS: 2 ChangeByte-EraseBytes-
+#5593	REDUCE cov: 70 ft: 133 corp: 20/964b lim: 4096 exec/s: 0 rss: 33Mb L: 27/242 MS: 4 InsertByte-ChangeBit-ChangeByte-EraseBytes-
+#5655	NEW    cov: 71 ft: 135 corp: 21/966b lim: 4096 exec/s: 0 rss: 33Mb L: 2/242 MS: 2 ChangeBit-CrossOver-
+#5708	NEW    cov: 71 ft: 136 corp: 22/1042b lim: 4096 exec/s: 0 rss: 33Mb L: 76/242 MS: 3 ChangeBinInt-CopyPart-InsertRepeatedBytes-
+#5712	REDUCE cov: 71 ft: 136 corp: 22/1028b lim: 4096 exec/s: 0 rss: 33Mb L: 29/242 MS: 4 ChangeBit-ShuffleBytes-EraseB
+...truncated...
+
+#139431	REDUCE cov: 91 ft: 181 corp: 29/1027b lim: 4096 exec/s: 139431 rss: 53Mb L: 79/290 MS: 1 EraseBytes-
+#141133	REDUCE cov: 91 ft: 181 corp: 29/1021b lim: 4096 exec/s: 141133 rss: 53Mb L: 76/290 MS: 2 EraseBytes-ChangeBit-
+#173663	REDUCE cov: 91 ft: 181 corp: 29/1016b lim: 4096 exec/s: 173663 rss: 53Mb L: 71/290 MS: 5 CrossOver-CopyPart-EraseBytes-ChangeASCIIInt-PersAutoDict- DE: &#34;\000\000\000\000\000\000\000(&#34;-
+#175702	REDUCE cov: 91 ft: 181 corp: 29/1012b lim: 4096 exec/s: 175702 rss: 53Mb L: 67/290 MS: 4 EraseBytes-ChangeBit-ChangeBit-PersAutoDict- DE: &#34;\000\000\000\000\000\000\000\000&#34;-
+#199154	REDUCE cov: 91 ft: 181 corp: 29/1009b lim: 4096 exec/s: 199154 rss: 53Mb L: 287/287 MS: 2 ShuffleBytes-EraseBytes-
+#202285	REDUCE cov: 91 ft: 181 corp: 29/1006b lim: 4096 exec/s: 202285 rss: 53Mb L: 64/287 MS: 1 EraseBytes-
+#203287	REDUCE cov: 91 ft: 181 corp: 29/1004b lim: 4096 exec/s: 203287 rss: 53Mb L: 62/287 MS: 2 ChangeByte-EraseBytes-
+#211674	REDUCE cov: 91 ft: 181 corp: 29/991b lim: 4096 exec/s: 211674 rss: 53Mb L: 274/274 MS: 2 EraseBytes-CopyPart-
+#238355	REDUCE cov: 91 ft: 181 corp: 29/990b lim: 4096 exec/s: 238355 rss: 53Mb L: 61/274 MS: 1 EraseBytes-
+#249599	REDUCE cov: 91 ft: 181 corp: 29/988b lim: 4096 exec/s: 249599 rss: 53Mb L: 59/274 MS: 4 CMP-InsertRepeatedBytes-ChangeByte-EraseBytes- DE: &#34;\016\000\000\000\000\000\000\000&#34;-
+#258721	REDUCE cov: 91 ft: 181 corp: 29/985b lim: 4096 exec/s: 258721 rss: 53Mb L: 144/274 MS: 2 ChangeBinInt-EraseBytes-
+#262144	pulse  cov: 91 ft: 181 corp: 29/985b lim: 4096 exec/s: 131072 rss: 53Mb
+#266614	REDUCE cov: 91 ft: 181 corp: 29/984b lim: 4096 exec/s: 133307 rss: 53Mb L: 58/274 MS: 3 ShuffleBytes-EraseBytes-PersAutoDict- DE: &#34;\000\000\000\000\000\000\000(&#34;-
+#289485	REDUCE cov: 91 ft: 181 corp: 29/983b lim: 4096 exec/s: 144742 rss: 53Mb L: 26/274 MS: 1 EraseBytes-
+#312307	REDUCE cov: 91 ft: 181 corp: 29/980b lim: 4096 exec/s: 156153 rss: 53Mb L: 76/274 MS: 2 ChangeByte-EraseBytes-
+#350180	REDUCE cov: 91 ft: 181 corp: 29/978b lim: 4096 exec/s: 175090 rss: 53Mb L: 142/274 MS: 3 CopyPart-ChangeASCIIInt-EraseBytes-
+#362782	REDUCE cov: 91 ft: 181 corp: 29/977b lim: 4096 exec/s: 181391 rss: 53Mb L: 29/274 MS: 2 EraseBytes-CrossOver-
+#368633	REDUCE cov: 91 ft: 181 corp: 29/976b lim: 4096 exec/s: 184316 rss: 53Mb L: 141/274 MS: 1 EraseBytes-
+#405246	REDUCE cov: 91 ft: 181 corp: 29/972b lim: 4096 exec/s: 202623 rss: 53Mb L: 270/270 MS: 3 CopyPart-CrossOver-EraseBytes-
+#439297	REDUCE cov: 91 ft: 181 corp: 29/970b lim: 4096 exec/s: 219648 rss: 53Mb L: 139/270 MS: 1 EraseBytes-
+#496863	REDUCE cov: 91 ft: 181 corp: 29/968b lim: 4096 exec/s: 165621 rss: 53Mb L: 137/270 MS: 1 EraseBytes-
+#524288	pulse  cov: 91 ft: 181 corp: 29/968b lim: 4096 exec/s: 174762 rss: 53Mb
+#534172	REDUCE cov: 91 ft: 181 corp: 29/956b lim: 4096 exec/s: 178057 rss: 53Mb L: 125/270 MS: 4 ChangeByte-ChangeASCIIInt-EraseBytes-CopyPart-
+#557439	REDUCE cov: 91 ft: 181 corp: 29/955b lim: 4096 exec/s: 185813 rss: 53Mb L: 124/270 MS: 2 PersAutoDict-EraseBytes- DE: &#34;\377\007&#34;-
+#627667	REDUCE cov: 91 ft: 181 corp: 29/954b lim: 4096 exec/s: 209222 rss: 53Mb L: 57/270 MS: 3 InsertRepeatedBytes-ChangeByte-EraseBytes-
+#639390	REDUCE cov: 91 ft: 181 corp: 29/953b lim: 4096 exec/s: 159847 rss: 53Mb L: 123/270 MS: 3 EraseBytes-ChangeBit-ChangeBinInt-
+#677951	REDUCE cov: 91 ft: 181 corp: 29/952b lim: 4096 exec/s: 169487 rss: 54Mb L: 75/270 MS: 1 EraseBytes-
+#728734	REDUCE cov: 91 ft: 181 corp: 29/951b lim: 4096 exec/s: 182183 rss: 54Mb L: 122/270 MS: 3 ChangeBit-EraseBytes-InsertByte-
+#737983	REDUCE cov: 91 ft: 181 corp: 29/950b lim: 4096 exec/s: 184495 rss: 54Mb L: 121/270 MS: 4 InsertByte-ChangeBinInt-ChangeByte-EraseBytes-
+#807250	REDUCE cov: 91 ft: 181 corp: 29/949b lim: 4096 exec/s: 201812 rss: 54Mb L: 25/270 MS: 2 ChangeBit-EraseBytes-
+#834943	REDUCE cov: 91 ft: 181 corp: 29/948b lim: 4096 exec/s: 166988 rss: 54Mb L: 74/270 MS: 3 PersAutoDict-EraseBytes-CopyPart- DE: &#34;\377\007&#34;-
+#904824	REDUCE cov: 91 ft: 181 corp: 29/946b lim: 4096 exec/s: 180964 rss: 54Mb L: 32/270 MS: 1 EraseBytes-
+#960548	REDUCE cov: 91 ft: 181 corp: 29/945b lim: 4096 exec/s: 192109 rss: 54Mb L: 120/270 MS: 4 ChangeByte-EraseBytes-InsertByte-CopyPart-
+#962999	REDUCE cov: 91 ft: 181 corp: 29/943b lim: 4096 exec/s: 192599 rss: 54Mb L: 118/270 MS: 1 EraseBytes-
+#1017499	REDUCE cov: 91 ft: 181 corp: 29/942b lim: 4096 exec/s: 169583 rss: 54Mb L: 29/270 MS: 5 ChangeByte-ChangeASCIIInt-CopyPart-ChangeByte-EraseBytes-
+#1048576	pulse  cov: 91 ft: 181 corp: 29/942b lim: 4096 exec/s: 174762 rss: 54Mb
+#1176425	REDUCE cov: 91 ft: 181 corp: 29/941b lim: 4096 exec/s: 168060 rss: 54Mb L: 73/270 MS: 1 EraseBytes-
+#1179236	REDUCE cov: 91 ft: 181 corp: 29/940b lim: 4096 exec/s: 168462 rss: 54Mb L: 72/270 MS: 1 EraseBytes-
+#1314482	REDUCE cov: 91 ft: 181 corp: 29/939b lim: 4096 exec/s: 187783 rss: 54Mb L: 71/270 MS: 1 EraseBytes-
+#1727693	REDUCE cov: 91 ft: 181 corp: 29/936b lim: 4096 exec/s: 191965 rss: 54Mb L: 267/267 MS: 1 EraseBytes-
+#1914366	REDUCE cov: 91 ft: 181 corp: 29/935b lim: 4096 exec/s: 174033 rss: 54Mb L: 266/266 MS: 3 CopyPart-CopyPart-EraseBytes-
+#1920123	REDUCE cov: 91 ft: 181 corp: 29/934b lim: 4096 exec/s: 174556 rss: 54Mb L: 70/266 MS: 2 EraseBytes-CopyPart-
+#1994845	REDUCE cov: 91 ft: 181 corp: 29/933b lim: 4096 exec/s: 181349 rss: 54Mb L: 117/266 MS: 2 CopyPart-EraseBytes-
+#1996470	REDUCE cov: 91 ft: 181 corp: 29/932b lim: 4096 exec/s: 181497 rss: 54Mb L: 69/266 MS: 5 CopyPart-ShuffleBytes-EraseBytes-ChangeBinInt-ShuffleBytes-
+#1997509	REDUCE cov: 91 ft: 181 corp: 29/931b lim: 4096 exec/s: 181591 rss: 54Mb L: 68/266 MS: 4 ChangeBit-CopyPart-CopyPart-EraseBytes-
+#2000625	REDUCE cov: 91 ft: 181 corp: 29/930b lim: 4096 exec/s: 181875 rss: 54Mb L: 116/266 MS: 1 EraseBytes-
+#2097152	pulse  cov: 91 ft: 181 corp: 29/930b lim: 4096 exec/s: 174762 rss: 54Mb
+#2198932	REDUCE cov: 91 ft: 181 corp: 29/929b lim: 4096 exec/s: 183244 rss: 54Mb L: 115/266 MS: 2 PersAutoDict-EraseBytes- DE: &#34;\006\000\000\000\000\000\000\000&#34;-
+#2240148	REDUCE cov: 91 ft: 181 corp: 29/927b lim: 4096 exec/s: 186679 rss: 54Mb L: 113/266 MS: 1 EraseBytes-
+#2292275	REDUCE cov: 91 ft: 181 corp: 29/926b lim: 4096 exec/s: 176328 rss: 54Mb L: 67/266 MS: 2 ShuffleBytes-EraseBytes-
+#2725032	REDUCE cov: 91 ft: 181 corp: 29/925b lim: 4096 exec/s: 181668 rss: 54Mb L: 265/265 MS: 2 CopyPart-EraseBytes-
+#2764213	REDUCE cov: 91 ft: 181 corp: 29/923b lim: 4096 exec/s: 184280 rss: 54Mb L: 263/263 MS: 1 EraseBytes-
+#2794081	REDUCE cov: 91 ft: 181 corp: 29/922b lim: 4096 exec/s: 174630 rss: 54Mb L: 262/262 MS: 3 ChangeBit-EraseBytes-CopyPart-
+#2842582	REDUCE cov: 91 ft: 181 corp: 29/921b lim: 4096 exec/s: 177661 rss: 54Mb L: 261/261 MS: 1 EraseBytes-
+#2848908	REDUCE cov: 91 ft: 181 corp: 29/920b lim: 4096 exec/s: 178056 rss: 54Mb L: 260/260 MS: 1 EraseBytes-
+#3424901	REDUCE cov: 91 ft: 181 corp: 29/919b lim: 4096 exec/s: 163090 rss: 54Mb L: 259/259 MS: 3 ShuffleBytes-CopyPart-EraseBytes-
+#4022408	REDUCE cov: 91 ft: 181 corp: 29/918b lim: 4096 exec/s: 148978 rss: 54Mb L: 112/259 MS: 2 PersAutoDict-EraseBytes- DE: &#34;\024\000\000\000\000\000\000\000&#34;-
+#4194304	pulse  cov: 91 ft: 181 corp: 29/918b lim: 4096 exec/s: 155344 rss: 54Mb
+#4532793	DONE   cov: 91 ft: 181 corp: 29/918b lim: 4096 exec/s: 146219 rss: 55Mb
+###### Recommended dictionary. ######
+&#34;\377\377\377\377&#34; # Uses: 31257
+&#34;\377\007&#34; # Uses: 33371
+&#34;\000\000\000\000\000\000\000(&#34; # Uses: 29146
+&#34;\011\000\000\000\000\000\000\000&#34; # Uses: 28978
+&#34;\000\000&#34; # Uses: 33758
+&#34;\024\000\000\000\000\000\000\000&#34; # Uses: 28913
+&#34;\005\000\000\000\000\000\000\000&#34; # Uses: 28570
+&#34;\000\000\000\000\000\000\000\000&#34; # Uses: 28765
+&#34;\001\000\000\000\000\000\000\242&#34; # Uses: 28845
+&#34;\006\000\000\000\000\000\000\000&#34; # Uses: 29015
+&#34;\023\000\000\000\000\000\000\000&#34; # Uses: 28713
+&#34;\377\377\377q&#34; # Uses: 30442
+&#34;\016\000\000\000\000\000\000\000&#34; # Uses: 26894
+###### End of recommended dictionary. ######
+Done 4532793 runs in 31 second(s)
+stat::number_of_executed_units: 4532793
+stat::average_exec_per_sec:     146219
+stat::new_units_added:          275
+stat::slowest_unit_time_sec:    0
+stat::peak_rss_mb:              55
+
+</pre>
+
+</body>

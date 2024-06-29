@@ -40,10 +40,10 @@ tbody tr:nth-child(odd) {
 }
 </style>
 <body>
-    LLM:
-
+    LLM: 
+    
 <h1>output-avahi-avahi_string_list_add_pair / 02</h1>
-Bug: True
+Bug: False
 <br>
 Crash reason: NO_SEMANTIC_ERR
 <br>
@@ -56,39 +56,60 @@ Crash reason: NO_SEMANTIC_ERR
 
 <pre>
 #include &lt;fuzzer/FuzzedDataProvider.h&gt;
-#include &lt;cassert&gt;
 #include &lt;string&gt;
-#include &#34;avahi-common/strlst.h&#34; // Assuming this header defines AvahiStringList and related functions
+#include &lt;vector&gt;
+#include &lt;cstdint&gt;
+#include &lt;cstddef&gt;
+#include &lt;cstdlib&gt;
+#include &lt;cstring&gt;
+#include &lt;iostream&gt;
+#include &lt;sstream&gt;
+#include &lt;algorithm&gt;
+#include &lt;iterator&gt;
+#include &lt;cctype&gt;
+
+extern &#34;C&#34; {
+#include &#34;avahi-common/strlst.h&#34;
+#include &lt;assert.h&gt;
+}
 
 extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
     return 0;
 }
 
 extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
-    FuzzedDataProvider dataProvider(data, size);
+    if (size &lt; 1) {
+        return 0;
+    }
+
+    FuzzedDataProvider provider(data, size);
 
     AvahiStringList *list = nullptr;
-    if (dataProvider.ConsumeBool()) {
-        std::string randomStr = dataProvider.ConsumeRandomLengthString(100);
-        if (!randomStr.empty()) {
-            list = avahi_string_list_new(randomStr.c_str());
-        }
+    if (provider.ConsumeBool()) {
+        std::string txt = provider.ConsumeRandomLengthString();
+        list = avahi_string_list_new(txt.c_str(), nullptr);
     }
 
-    std::string key = dataProvider.ConsumeRandomLengthString(100);
+    std::string key = provider.ConsumeRandomLengthString();
     if (key.empty()) {
-        if (list) {
-            avahi_string_list_free(list);
-        }
-        return 0; // Skip if key is empty to avoid assertion failure
+        return 0;
     }
 
-    std::string value = dataProvider.ConsumeRandomLengthString(100);
-    const char *valuePtr = value.empty() ? nullptr : value.c_str();
+    const char *value = nullptr;
+    if (provider.ConsumeBool()) {
+        std::string valueStr = provider.ConsumeRandomLengthString();
+        if (!valueStr.empty()) {
+            value = strdup(valueStr.c_str());
+        }
+    }
 
-    AvahiStringList *result = avahi_string_list_add_pair(list, key.c_str(), valuePtr);
+    AvahiStringList *result = avahi_string_list_add_pair(list, key.c_str(), value);
 
+    if (value) {
+        free((void *)value);
+    }
     avahi_string_list_free(result);
+
     return 0;
 }
 </pre>
@@ -101,6 +122,8 @@ Given the following C++ fuzz harness and its build error message, fix the code t
 
 If there is undeclared identifier or unknown type name error, fix it by finding and including the related libraries.
 
+You MUST wrap the headers with &lt;code&gt;extern &#34;C&#34;&lt;/code&gt; if they are C headers, especially the headers are from the project.
+
 Note that some code may need to be wrapped with &lt;code&gt;extern &#34;C&#34;&lt;/code&gt; as their source is C program.
 
 MUST RETURN THE FULL CODE, INCLUDING UNCHANGED PARTS.
@@ -109,54 +132,71 @@ EXTREMELY IMPORTANT: AVOID USING &lt;code&gt;goto&lt;/code&gt;. If you have to w
 Below is the code needs to be built:
 &lt;code&gt;
 #include &lt;fuzzer/FuzzedDataProvider.h&gt;
-#include &lt;cassert&gt;
-#include &#34;avahi-common/strlst.h&#34; // Assuming this header defines AvahiStringList and related functions
+#include &lt;string&gt;
+#include &lt;vector&gt;
+#include &lt;cstdint&gt;
+#include &lt;cstddef&gt;
+#include &lt;cstdlib&gt;
+#include &lt;cstring&gt;
+#include &lt;iostream&gt;
+#include &lt;sstream&gt;
+#include &lt;algorithm&gt;
+#include &lt;iterator&gt;
+#include &lt;cctype&gt;
+
+extern &#34;C&#34; {
+#include &#34;avahi-common/strlst.h&#34;
+#include &lt;assert.h&gt;
+}
 
 extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
     return 0;
 }
 
 extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
-    FuzzedDataProvider dataProvider(data, size);
+    if (size &lt; 1) {
+        return 0;
+    }
+
+    FuzzedDataProvider provider(data, size);
 
     AvahiStringList *list = nullptr;
-    if (dataProvider.ConsumeBool()) {
-        list = avahi_string_list_new(dataProvider.ConsumeRandomLengthString(100).c_str());
+    if (provider.ConsumeBool()) {
+        list = avahi_string_list_new();
     }
 
-    std::string key = dataProvider.ConsumeRandomLengthString(100);
+    std::string key = provider.ConsumeRandomLengthString();
     if (key.empty()) {
-        return 0; // Skip if key is empty to avoid assertion failure
+        return 0;
     }
 
-    std::string value = dataProvider.ConsumeRandomLengthString(100);
-    const char *valuePtr = value.empty() ? nullptr : value.c_str();
+    const char *value = nullptr;
+    if (provider.ConsumeBool()) {
+        std::string valueStr = provider.ConsumeRandomLengthString();
+        if (!valueStr.empty()) {
+            value = strdup(valueStr.c_str());
+        }
+    }
 
-    AvahiStringList *result = avahi_string_list_add_pair(list, key.c_str(), valuePtr);
+    AvahiStringList *result = avahi_string_list_add_pair(list, key.c_str(), value);
 
+    if (value) {
+        free((void *)value);
+    }
     avahi_string_list_free(result);
+
     return 0;
 }
 &lt;/code&gt;
 
-The code can build successfully but has a runtime issue: Fuzzing crashed immediately at runtime (ASAN-ERROR: AddressSanitizer: SEGV on unknown address 0x0000000002e0 (pc 0x7f40f8a71947 bp 0x7ffe26ce73f0 sp 0x7ffe26ce6ba8 T0)), indicating fuzz target code for invoking the function under test is incorrect or unrobust.
+The code has the following build issues:
 &lt;error&gt;
-Crash stacks:
-Stack 0:
-#0 0x7f40f8a71947  (/lib/x86_64-linux-gnu/libc.so.6+0x188947) (BuildId: 0702430aef5fa3dda43986563e9ffcc47efbd75e)
-#1 0x564bd8e9074a in strlen /src/llvm-project/compiler-rt/lib/asan/../sanitizer_common/sanitizer_common_interceptors.inc
-#2 0x564bd8f57abf in avahi_string_list_add /src/avahi/avahi-common/strlst.c:66:70
-#3 0x564bd8f57abf in avahi_string_list_add_many_va /src/avahi/avahi-common/strlst.c:329:13
-#4 0x564bd8f57abf in avahi_string_list_new /src/avahi/avahi-common/strlst.c:342:13
-#5 0x564bd8f54db6 in LLVMFuzzerTestOneInput /src/avahi/fuzz/fuzz-consume-record.cpp:14:16
-#6 0x564bd8e074e0 in fuzzer::Fuzzer::ExecuteCallback(unsigned char const*, unsigned long) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:614:13
-#7 0x564bd8e06d05 in fuzzer::Fuzzer::RunOne(unsigned char const*, unsigned long, bool, fuzzer::InputInfo*, bool, bool*) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:516:7
-#8 0x564bd8e084d5 in fuzzer::Fuzzer::MutateAndTestOne() /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:760:19
-#9 0x564bd8e092c5 in fuzzer::Fuzzer::Loop(std::__Fuzzer::vector&lt;fuzzer::SizedFile, std::__Fuzzer::allocator&lt;fuzzer::SizedFile&gt;&gt;&amp;) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:905:5
-#10 0x564bd8df75d6 in fuzzer::FuzzerDriver(int*, char***, int (*)(unsigned char const*, unsigned long)) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerDriver.cpp:914:6
-#11 0x564bd8e23b02 in main /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerMain.cpp:20:10
-#12 0x7f40f890d082 in __libc_start_main (/lib/x86_64-linux-gnu/libc.so.6+0x24082) (BuildId: 0702430aef5fa3dda43986563e9ffcc47efbd75e)
-#13 0x564bd8de874d in _start (/out/fuzz-consume-record+0x4774d)
+fuzz/fuzz-consume-record.cpp:32:16: error: no matching function for call to &#39;avahi_string_list_new&#39;
+   32 |         list = avahi_string_list_new();
+      |                ^~~~~~~~~~~~~~~~~~~~~
+./avahi-common/strlst.h:51:18: note: candidate function not viable: requires at least argument &#39;txt&#39;, but no arguments were provided
+   51 | AvahiStringList *avahi_string_list_new(const char *txt, ...) AVAHI_GCC_SENTINEL;
+      |                  ^                     ~~~~~~~~~~~~~~~~~~~~
 &lt;/error&gt;
 
 Fix code:
@@ -172,57 +212,74 @@ It&#39;s important to show the complete code, not only the fixed line.
 <h3>Code #1</h3>
 
 <pre>
-Here is the fixed code, including necessary changes to ensure that the fuzzing harness does not crash immediately at runtime due to null or invalid inputs:
+Here is the complete fixed code with the necessary changes:
 
 ```cpp
 #include &lt;fuzzer/FuzzedDataProvider.h&gt;
-#include &lt;cassert&gt;
 #include &lt;string&gt;
-#include &#34;avahi-common/strlst.h&#34; // Assuming this header defines AvahiStringList and related functions
+#include &lt;vector&gt;
+#include &lt;cstdint&gt;
+#include &lt;cstddef&gt;
+#include &lt;cstdlib&gt;
+#include &lt;cstring&gt;
+#include &lt;iostream&gt;
+#include &lt;sstream&gt;
+#include &lt;algorithm&gt;
+#include &lt;iterator&gt;
+#include &lt;cctype&gt;
+
+extern &#34;C&#34; {
+#include &#34;avahi-common/strlst.h&#34;
+#include &lt;assert.h&gt;
+}
 
 extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
     return 0;
 }
 
 extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
-    FuzzedDataProvider dataProvider(data, size);
+    if (size &lt; 1) {
+        return 0;
+    }
+
+    FuzzedDataProvider provider(data, size);
 
     AvahiStringList *list = nullptr;
-    if (dataProvider.ConsumeBool()) {
-        std::string randomStr = dataProvider.ConsumeRandomLengthString(100);
-        if (!randomStr.empty()) {
-            list = avahi_string_list_new(randomStr.c_str());
-        }
+    if (provider.ConsumeBool()) {
+        std::string txt = provider.ConsumeRandomLengthString();
+        list = avahi_string_list_new(txt.c_str(), nullptr);
     }
 
-    std::string key = dataProvider.ConsumeRandomLengthString(100);
+    std::string key = provider.ConsumeRandomLengthString();
     if (key.empty()) {
-        if (list) {
-            avahi_string_list_free(list);
-        }
-        return 0; // Skip if key is empty to avoid assertion failure
+        return 0;
     }
 
-    std::string value = dataProvider.ConsumeRandomLengthString(100);
-    const char *valuePtr = value.empty() ? nullptr : value.c_str();
+    const char *value = nullptr;
+    if (provider.ConsumeBool()) {
+        std::string valueStr = provider.ConsumeRandomLengthString();
+        if (!valueStr.empty()) {
+            value = strdup(valueStr.c_str());
+        }
+    }
 
-    AvahiStringList *result = avahi_string_list_add_pair(list, key.c_str(), valuePtr);
+    AvahiStringList *result = avahi_string_list_add_pair(list, key.c_str(), value);
 
+    if (value) {
+        free((void *)value);
+    }
     avahi_string_list_free(result);
+
     return 0;
 }
 ```
 
-### Explanation of Fixes:
-1. **Check for Empty Strings**:
-   - Before calling `avahi_string_list_new`, ensure that the string is not empty.
-   - This prevents passing a null pointer to functions that expect a valid C string.
+### Explanation of Changes:
+1. **Include Headers in `extern &#34;C&#34;`**: The `avahi-common/strlst.h` header is included within an `extern &#34;C&#34;` block to ensure proper linkage since it is a C header.
+2. **Fix `avahi_string_list_new` Call**: The `avahi_string_list_new` function requires at least one argument, so I provided a string from the `FuzzedDataProvider` to ensure that the function is called correctly.
+3. **Maintain Original Structure**: The rest of the code structure remains unchanged to ensure that the fuzzing logic is preserved.
 
-2. **Free Resources Properly**:
-   - If the key is empty, free the `list` if it was allocated before returning.
-   - This ensures that any allocated resources are properly freed, avoiding memory leaks.
-
-These changes ensure that the inputs to the functions are valid and that resources are managed properly, preventing crashes and maximizing the fuzzing results.
+This should resolve the build error and ensure that the fuzzing harness can be compiled and run correctly.
 </pre>
 
 
@@ -230,63 +287,61 @@ These changes ensure that the inputs to the functions are valid and that resourc
 <pre>
 Fixing /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-avahi-avahi_string_list_add_pair/fixed_targets/02.c with gpt-4o, attempt 1.
 Successfully built /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-avahi-avahi_string_list_add_pair/fixed_targets/02.c with gpt-4o in 1 iterations of fixing.
-Result for avahi-avahi_string_list_add_pair-02: crashes=True, coverage=0.0757238307349666 (34/449), coverage diff=0.003447087211306446 (10/2901)
+Result for avahi-avahi_string_list_add_pair-02: crashes=False, coverage=0.035634743875278395 (16/449), coverage diff=0.001034126163391934 (3/2901)
 
 </pre>
 
 <h2>Run logs</h2>
 <pre>
-INFO:__main__:Running: docker run --rm --privileged --shm-size=2g --platform linux/amd64 -e FUZZING_ENGINE=libfuzzer -e SANITIZER=address -e RUN_FUZZER_MODE=interactive -e HELPER=True -v /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-avahi-avahi_string_list_add_pair/corpora/02.c:/tmp/fuzz-consume-record_corpus -v /tmp/tmp9gg1c8dt/build/out/avahi-avahi_string_list_add_pair-02:/out -t gcr.io/oss-fuzz-base/base-runner run_fuzzer fuzz-consume-record -print_final_stats=1 -max_total_time=30 -len_control=0 -timeout=30.
+INFO:__main__:Running: docker run --rm --privileged --shm-size=2g --platform linux/amd64 -e FUZZING_ENGINE=libfuzzer -e SANITIZER=address -e RUN_FUZZER_MODE=interactive -e HELPER=True -v /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-avahi-avahi_string_list_add_pair/corpora/02.c:/tmp/fuzz-consume-record_corpus -v /tmp/tmpk31m_hoq/build/out/avahi-avahi_string_list_add_pair-02:/out -t gcr.io/oss-fuzz-base/base-runner run_fuzzer fuzz-consume-record -print_final_stats=1 -max_total_time=30 -len_control=0 -timeout=30.
 vm.mmap_rnd_bits = 28
 rm: cannot remove &#39;/tmp/fuzz-consume-record_corpus&#39;: Device or resource busy
 /out/fuzz-consume-record -rss_limit_mb=2560 -timeout=25 -print_final_stats=1 -max_total_time=30 -len_control=0 -timeout=30 /tmp/fuzz-consume-record_corpus &lt; /dev/null
 INFO: Running with entropic power schedule (0xFF, 100).
-INFO: Seed: 4073925346
-INFO: Loaded 1 modules   (449 inline 8-bit counters): 449 [0x561ea2797b58, 0x561ea2797d19),
-INFO: Loaded 1 PC tables (449 PCs): 449 [0x561ea2797d20,0x561ea2799930),
+INFO: Seed: 4152525392
+INFO: Loaded 1 modules   (449 inline 8-bit counters): 449 [0x5584f57feb58, 0x5584f57fed19), 
+INFO: Loaded 1 PC tables (449 PCs): 449 [0x5584f57fed20,0x5584f5800930), 
 INFO:        0 files found in /tmp/fuzz-consume-record_corpus
 INFO: -max_len is not provided; libFuzzer will not generate inputs larger than 4096 bytes
 INFO: A corpus is not provided, starting from an empty corpus
-#2	INITED cov: 16 ft: 17 corp: 1/1b exec/s: 0 rss: 30Mb
-	NEW_FUNC[1/4]: 0x561ea26f5410 in avahi_string_list_free /src/avahi/avahi-common/strlst.c:108
-	NEW_FUNC[2/4]: 0x561ea26f7af0 in avahi_string_list_add_pair /src/avahi/avahi-common/strlst.c:455
-#3	NEW    cov: 33 ft: 43 corp: 2/10b lim: 4096 exec/s: 0 rss: 30Mb L: 9/9 MS: 1 CMP- DE: &#34;\000\000\000\000\000\000\000\000&#34;-
-#4	NEW    cov: 34 ft: 44 corp: 3/19b lim: 4096 exec/s: 0 rss: 30Mb L: 9/9 MS: 1 ChangeBinInt-
-AddressSanitizer:DEADLYSIGNAL
-=================================================================
-[1m[31m==12==ERROR: AddressSanitizer: SEGV on unknown address 0x000000000002 (pc 0x7f87a8da1915 bp 0x7ffe79d6eed0 sp 0x7ffe79d6e688 T0)
-[1m[0m==12==The signal is caused by a READ memory access.
-==12==Hint: address points to the zero page.
-SCARINESS: 10 (null-deref)
-    #0 0x7f87a8da1915  (/lib/x86_64-linux-gnu/libc.so.6+0x188915) (BuildId: 0702430aef5fa3dda43986563e9ffcc47efbd75e)
-    #1 0x561ea262f74a in strlen /src/llvm-project/compiler-rt/lib/asan/../sanitizer_common/sanitizer_common_interceptors.inc
-    #2 0x561ea26f6b4f in avahi_string_list_add /src/avahi/avahi-common/strlst.c:66:70
-    #3 0x561ea26f6b4f in avahi_string_list_add_many_va /src/avahi/avahi-common/strlst.c:329:13
-    #4 0x561ea26f6b4f in avahi_string_list_new /src/avahi/avahi-common/strlst.c:342:13
-    #5 0x561ea26f3e23 in LLVMFuzzerTestOneInput /src/avahi/fuzz/fuzz-consume-record.cpp:17:20
-    #6 0x561ea25a64e0 in fuzzer::Fuzzer::ExecuteCallback(unsigned char const*, unsigned long) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:614:13
-    #7 0x561ea25a5d05 in fuzzer::Fuzzer::RunOne(unsigned char const*, unsigned long, bool, fuzzer::InputInfo*, bool, bool*) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:516:7
-    #8 0x561ea25a74d5 in fuzzer::Fuzzer::MutateAndTestOne() /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:760:19
-    #9 0x561ea25a82c5 in fuzzer::Fuzzer::Loop(std::__Fuzzer::vector&lt;fuzzer::SizedFile, std::__Fuzzer::allocator&lt;fuzzer::SizedFile&gt;&gt;&amp;) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:905:5
-    #10 0x561ea25965d6 in fuzzer::FuzzerDriver(int*, char***, int (*)(unsigned char const*, unsigned long)) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerDriver.cpp:914:6
-    #11 0x561ea25c2b02 in main /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerMain.cpp:20:10
-    #12 0x7f87a8c3d082 in __libc_start_main (/lib/x86_64-linux-gnu/libc.so.6+0x24082) (BuildId: 0702430aef5fa3dda43986563e9ffcc47efbd75e)
-    #13 0x561ea258774d in _start (/out/fuzz-consume-record+0x4774d)
+#2	INITED cov: 16 ft: 17 corp: 1/1b exec/s: 0 rss: 29Mb
+	NEW_FUNC[1/2]: 0x5584f575d890 in avahi_string_list_new /src/avahi/avahi-common/strlst.c:334
+	NEW_FUNC[2/2]: 0x5584f575f810 in avahi_malloc /src/avahi/avahi-common/malloc.c:101
 
-DEDUP_TOKEN: ___interceptor_strlen--avahi_string_list_add
-AddressSanitizer can not provide additional info.
-SUMMARY: AddressSanitizer: SEGV (/lib/x86_64-linux-gnu/libc.so.6+0x188915) (BuildId: 0702430aef5fa3dda43986563e9ffcc47efbd75e)
-==12==ABORTING
-MS: 5 ChangeBinInt-ChangeBit-CrossOver-ChangeBit-ChangeBit-; base unit: a2c5daf8cf0f7a564fa1cd1fe8990ff6f13e932c
-0x0,0x20,0x2a,0x0,0x0,0x0,0x0,0x0,0xb,
-\000 *\000\000\000\000\000\013
-artifact_prefix=&#39;./&#39;; Test unit written to ./crash-dc323e2c4d3342766a9b0aba1d0060a33bdffa33
-Base64: ACAqAAAAAAAL
-stat::number_of_executed_units: 14
+=================================================================
+[1m[31m==12==ERROR: LeakSanitizer: detected memory leaks
+[1m[0m
+[1m[34mDirect leak of 25 byte(s) in 1 object(s) allocated from:
+[1m[0m    #0 0x5584f571ba7e in malloc /src/llvm-project/compiler-rt/lib/asan/asan_malloc_linux.cpp:69:3
+    #1 0x5584f575f896 in xmalloc /src/avahi/avahi-common/malloc.c:68:15
+    #2 0x5584f575f896 in avahi_malloc /src/avahi/avahi-common/malloc.c:107:16
+    #3 0x5584f575d9c6 in avahi_string_list_add_anonymous /src/avahi/avahi-common/strlst.c:37:15
+    #4 0x5584f575d9c6 in avahi_string_list_add_arbitrary /src/avahi/avahi-common/strlst.c:54:15
+    #5 0x5584f575d9c6 in avahi_string_list_add /src/avahi/avahi-common/strlst.c:66:12
+    #6 0x5584f575d9c6 in avahi_string_list_new /src/avahi/avahi-common/strlst.c:339:13
+    #7 0x5584f575adf3 in LLVMFuzzerTestOneInput /src/avahi/fuzz/fuzz-consume-record.cpp:33:16
+    #8 0x5584f560d4e0 in fuzzer::Fuzzer::ExecuteCallback(unsigned char const*, unsigned long) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:614:13
+    #9 0x5584f560cd05 in fuzzer::Fuzzer::RunOne(unsigned char const*, unsigned long, bool, fuzzer::InputInfo*, bool, bool*) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:516:7
+    #10 0x5584f560e4d5 in fuzzer::Fuzzer::MutateAndTestOne() /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:760:19
+    #11 0x5584f560f2c5 in fuzzer::Fuzzer::Loop(std::__Fuzzer::vector&lt;fuzzer::SizedFile, std::__Fuzzer::allocator&lt;fuzzer::SizedFile&gt;&gt;&amp;) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:905:5
+    #12 0x5584f55fd5d6 in fuzzer::FuzzerDriver(int*, char***, int (*)(unsigned char const*, unsigned long)) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerDriver.cpp:914:6
+    #13 0x5584f5629b02 in main /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerMain.cpp:20:10
+    #14 0x7fd0085c0082 in __libc_start_main (/lib/x86_64-linux-gnu/libc.so.6+0x24082) (BuildId: 0702430aef5fa3dda43986563e9ffcc47efbd75e)
+
+DEDUP_TOKEN: __interceptor_malloc--xmalloc--avahi_malloc
+SUMMARY: AddressSanitizer: 25 byte(s) leaked in 1 allocation(s).
+INFO: to ignore leaks on libFuzzer side use -detect_leaks=0.
+
+MS: 2 ChangeByte-InsertByte-; base unit: adc83b19e793491b1c6ea0fd8b46cd9f32e592fc
+0x7a,0x5b,
+z[
+artifact_prefix=&#39;./&#39;; Test unit written to ./leak-1810a64be125bfdfb9e59191818fe0d8bd99aa61
+Base64: els=
+stat::number_of_executed_units: 10
 stat::average_exec_per_sec:     0
-stat::new_units_added:          2
+stat::new_units_added:          0
 stat::slowest_unit_time_sec:    0
-stat::peak_rss_mb:              31
+stat::peak_rss_mb:              30
 
 </pre>
 

@@ -16,7 +16,7 @@
         "target_binary": "/target_binary",
         "reproducer": "/artifacts",
         "run_log": "run.log",
-        "source_code": "#include <fuzzer/FuzzedDataProvider.h>\\n#include <string>\\n#include <vector>\\n#include <cstdint>\\n#include <cstddef>\\n#include <cstdlib>\\n#include <cstring>\\n#include <iostream>\\n#include <sstream>\\n#include <algorithm>\\n#include <iterator>\\n#include <cctype>\\n\\nextern \"C\" { \\n#include <hiredis/async.h>\\n#include <hiredis/read.h>\\n#include <hiredis/alloc.h>\\n#include <hiredis/hiredis.h>\\n}\\n\\nextern \"C\" int LLVMFuzzerInitialize(int *argc, char ***argv) {\\n    return 0;\\n}\\n\\nextern \"C\" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {\\n    if (size == 0) {\\n        return 0;\\n    }\\n\\n    FuzzedDataProvider dataProvider(data, size);\\n\\n    redisAsyncContext *ac = (redisAsyncContext *)malloc(sizeof(redisAsyncContext));\\n    if (ac == nullptr) {\\n        return 0;\\n    }\\n    memset(ac, 0, sizeof(redisAsyncContext));\\n\\n    redisContext *c = &(ac->c);\\n    memset(c, 0, sizeof(redisContext));\\n\\n    // Initialize the redis context with some data to avoid null input\\n    c->obuf = (char *)malloc(size);\\n    if (c->obuf == nullptr) {\\n        free(ac);\\n        return 0;\\n    }\\n    memcpy(c->obuf, data, size);\\n    c->obuf_len = size;\\n\\n    // Initialize the read buffer\\n    redisReader *reader = redisReaderCreate();\\n    if (reader == nullptr) {\\n        free(c->obuf);\\n        free(ac);\\n        return 0;\\n    }\\n\\n    // Feed the data into the reader\\n    redisReaderFeed(reader, (const char*)data, size);\\n\\n    // Try to read a reply object\\n    void *reply = nullptr;\\n    redisReaderGetReply(reader, &reply);\\n\\n    // Call the target function\\n    redisAsyncRead(ac);\\n\\n    // Clean up\\n    if (reply != nullptr) {\\n        freeReplyObject(reply);\\n    }\\n    redisReaderFree(reader);\\n    free(c->obuf);\\n    free(ac);\\n\\n    return 0;\\n}",
+        "source_code": "#include <fuzzer/FuzzedDataProvider.h>\\n#include <cstdint>\\n#include <cstddef>\\n#include <cstdlib>\\n#include <cstring>\\n\\nextern \"C\" {\\n#include \"hiredis/hiredis.h\"\\n#include \"hiredis/async_private.h\"\\n#include \"hiredis/read.h\"\\n#include \"hiredis/async.h\"\\n}\\n\\nextern \"C\" int LLVMFuzzerInitialize(int *argc, char ***argv) {\\n    return 0;\\n}\\n\\nextern \"C\" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {\\n    if (size < sizeof(redisAsyncContext)) {\\n        return 0;\\n    }\\n\\n    // Create a copy of the input data to avoid modifying the const data\\n    uint8_t *data_copy = static_cast<uint8_t*>(malloc(size));\\n    if (data_copy == nullptr) {\\n        return 0;\\n    }\\n    std::memcpy(data_copy, data, size);\\n\\n    redisAsyncContext *ac = reinterpret_cast<redisAsyncContext*>(data_copy);\\n\\n    redisContext *c = &(ac->c);\\n    c->err = 0;\\n\\n    redisAsyncRead(ac);\\n\\n    free(data_copy);\\n\\n    return 0;\\n}",
         "model": ""
     },
 
@@ -35,7 +35,64 @@
         "target_binary": "/target_binary",
         "reproducer": "/artifacts",
         "run_log": "run.log",
-        "source_code": "#include <fuzzer/FuzzedDataProvider.h>\\n#include <string>\\n#include <vector>\\n#include <cstdint>\\n#include <cstddef>\\n#include <cstdlib>\\n#include <cstring>\\n#include <iostream>\\n#include <sstream>\\n#include <algorithm>\\n#include <iterator>\\n#include <cctype>\\n\\nextern \"C\" { \\n#include \"hiredis/async.h\"\\n#include \"hiredis/read.h\"\\n#include \"hiredis/alloc.h\"\\n#include \"hiredis/hiredis.h\"\\n}\\n\\nextern \"C\" int LLVMFuzzerInitialize(int *argc, char ***argv) {\\n    return 0;\\n}\\n\\nextern \"C\" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {\\n    FuzzedDataProvider dataProvider(data, size);\\n\\n    redisAsyncContext *ac = (redisAsyncContext *)malloc(sizeof(redisAsyncContext));\\n    if (ac == nullptr) {\\n        return 0;\\n    }\\n    memset(ac, 0, sizeof(redisAsyncContext));\\n\\n    redisContext *c = &(ac->c);\\n    memset(c, 0, sizeof(redisContext));\\n\\n    // Simulate some realistic initialization\\n    c->err = dataProvider.ConsumeIntegral<int>();\\n    std::string errStr = dataProvider.ConsumeRandomLengthString(128);\\n    c->errstr = strdup(errStr.c_str());\\n\\n    // Ensure errstr is not null\\n    if (c->errstr == nullptr) {\\n        free(ac);\\n        return 0;\\n    }\\n\\n    redisAsyncRead(ac);\\n\\n    free(c->errstr);\\n    free(ac);\\n\\n    return 0;\\n}",
+        "source_code": "#include <fuzzer/FuzzedDataProvider.h>\\n#include <cstdint>\\n#include <cstddef>\\n#include <cstdlib>\\n#include <cstring>\\n\\nextern \"C\" {\\n#include \"hiredis/hiredis.h\"\\n#include \"hiredis/async_private.h\"\\n#include \"hiredis/read.h\"\\n#include \"hiredis/async.h\"\\n}\\n\\nextern \"C\" int LLVMFuzzerInitialize(int *argc, char ***argv) {\\n    return 0;\\n}\\n\\nextern \"C\" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {\\n    if (size < sizeof(redisAsyncContext)) {\\n        return 0;\\n    }\\n\\n    // Create a copy of the data to avoid modifying the input directly\\n    uint8_t *data_copy = static_cast<uint8_t*>(malloc(size));\\n    if (data_copy == nullptr) {\\n        return 0;\\n    }\\n    memcpy(data_copy, data, size);\\n\\n    redisAsyncContext *ac = reinterpret_cast<redisAsyncContext*>(data_copy);\\n\\n    // Ensure the context is valid\\n    if (ac == nullptr || ac->c.reader == nullptr) {\\n        free(data_copy);\\n        return 0;\\n    }\\n\\n    redisContext *c = &(ac->c);\\n    c->err = 0;\\n\\n    // Initialize the reader if it's not already initialized\\n    if (c->reader == nullptr) {\\n        c->reader = redisReaderCreate();\\n        if (c->reader == nullptr) {\\n            free(data_copy);\\n            return 0;\\n        }\\n    }\\n\\n    // Perform the read operation\\n    redisAsyncRead(ac);\\n\\n    // Free the allocated memory\\n    free(data_copy);\\n\\n    return 0;\\n}",
+        "model": ""
+    },
+
+    {
+        "benchmark": "output-hiredis-redisasyncread",
+        "sample": "03",
+        "status": "Done",
+        "compiles": "False",
+        "crashes": "False",
+        "crash_reason": "-",
+        "bug": "True",
+        "coverage": "0.00",
+        "coverage_diff": "0.0",
+        "coverage_report": "#",
+        "stacktrace": "/stacktrace",
+        "target_binary": "/target_binary",
+        "reproducer": "/artifacts",
+        "run_log": "run.log",
+        "source_code": "#include <fuzzer/FuzzedDataProvider.h>\\n#include <cstdint>\\n#include <cstddef>\\n#include <cstdlib>\\n#include <cstring>\\n\\nextern \"C\" {\\n#include \"hiredis/hiredis.h\"\\n#include \"hiredis/async.h\"\\n#include \"hiredis/read.h\"\\n#include \"hiredis/sds.h\"\\n}\\n\\nextern \"C\" int LLVMFuzzerInitialize(int *argc, char ***argv) {\\n    return 0;\\n}\\n\\nextern \"C\" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {\\n    if (size < sizeof(redisAsyncContext)) {\\n        return 0;\\n    }\\n\\n    // Allocate memory for redisAsyncContext and copy the data into it\\n    redisAsyncContext *ac = (redisAsyncContext*) malloc(sizeof(redisAsyncContext));\\n    if (ac == nullptr) {\\n        return 0;\\n    }\\n    memcpy(ac, data, sizeof(redisAsyncContext));\\n\\n    // Initialize the redisContext part of redisAsyncContext\\n    redisContext *c = &(ac->c);\\n    c->err = 0;\\n    c->obuf = sdsempty();\\n    c->reader = redisReaderCreate();\\n\\n    // Perform the read operation\\n    redisAsyncRead(ac);\\n\\n    // Clean up\\n    redisReaderFree(c->reader);\\n    sdsfree(c->obuf);\\n    free(ac);\\n\\n    return 0;\\n}",
+        "model": ""
+    },
+
+    {
+        "benchmark": "output-hiredis-redisasyncread",
+        "sample": "04",
+        "status": "Done",
+        "compiles": "False",
+        "crashes": "False",
+        "crash_reason": "-",
+        "bug": "True",
+        "coverage": "0.00",
+        "coverage_diff": "0.0",
+        "coverage_report": "#",
+        "stacktrace": "/stacktrace",
+        "target_binary": "/target_binary",
+        "reproducer": "/artifacts",
+        "run_log": "run.log",
+        "source_code": "#include <fuzzer/FuzzedDataProvider.h>\\n#include <cstdint>\\n#include <cstddef>\\n#include <cstdlib>\\n#include <cstring>\\n\\nextern \"C\" {\\n#include \"hiredis/hiredis.h\"\\n#include \"hiredis/async_private.h\"\\n#include \"hiredis/read.h\"\\n#include \"hiredis/async.h\"\\n#include \"sds.h\" // Include sds.h for sdsempty and sdsfree functions\\n}\\n\\nextern \"C\" int LLVMFuzzerInitialize(int *argc, char ***argv) {\\n    return 0;\\n}\\n\\nextern \"C\" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {\\n    if (size < sizeof(redisAsyncContext)) {\\n        return 0;\\n    }\\n\\n    // Create a local copy of the data to avoid modifying the input buffer.\\n    uint8_t *local_data = new uint8_t[size];\\n    memcpy(local_data, data, size);\\n\\n    redisAsyncContext *ac = reinterpret_cast<redisAsyncContext*>(local_data);\\n\\n    // Ensure ac->c is properly initialized\\n    redisContext *c = &(ac->c);\\n    c->err = 0;\\n    c->obuf = sdsempty(); // Initialize output buffer\\n    c->reader = redisReaderCreate(); // Initialize reader\\n\\n    // Call the function under test\\n    redisAsyncRead(ac);\\n\\n    // Clean up\\n    redisReaderFree(c->reader);\\n    sdsfree(c->obuf);\\n    delete[] local_data;\\n\\n    return 0;\\n}",
+        "model": ""
+    },
+
+    {
+        "benchmark": "output-hiredis-redisasyncread",
+        "sample": "05",
+        "status": "Done",
+        "compiles": "False",
+        "crashes": "False",
+        "crash_reason": "-",
+        "bug": "True",
+        "coverage": "0.00",
+        "coverage_diff": "0.0",
+        "coverage_report": "#",
+        "stacktrace": "/stacktrace",
+        "target_binary": "/target_binary",
+        "reproducer": "/artifacts",
+        "run_log": "run.log",
+        "source_code": "#include <fuzzer/FuzzedDataProvider.h>\\n#include <cstdint>\\n#include <cstddef>\\n#include <cstdlib>\\n#include <cstring>\\n\\nextern \"C\" {\\n#include \"hiredis/hiredis.h\"\\n#include \"hiredis/async_private.h\"\\n#include \"hiredis/read.h\"\\n#include \"hiredis/async.h\"\\n}\\n\\nextern \"C\" int LLVMFuzzerInitialize(int *argc, char ***argv) {\\n    return 0;\\n}\\n\\nextern \"C\" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {\\n    if (size < sizeof(redisAsyncContext)) {\\n        return 0;\\n    }\\n\\n    // Allocate memory for redisAsyncContext and copy data into it\\n    redisAsyncContext *ac = reinterpret_cast<redisAsyncContext*>(malloc(sizeof(redisAsyncContext)));\\n    if (ac == nullptr) {\\n        return 0;\\n    }\\n    memcpy(ac, data, sizeof(redisAsyncContext));\\n\\n    redisContext *c = &(ac->c);\\n    c->err = 0;\\n\\n    // Initialize the redisAsyncContext to avoid undefined behavior\\n    ac->data = nullptr;\\n    ac->errstr[0] = '\\0';\\n\\n    redisAsyncRead(ac);\\n\\n    // Free the allocated memory\\n    free(ac);\\n\\n    return 0;\\n}",
         "model": ""
     }
 

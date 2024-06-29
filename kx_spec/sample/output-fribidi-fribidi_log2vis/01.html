@@ -40,8 +40,8 @@ tbody tr:nth-child(odd) {
 }
 </style>
 <body>
-    LLM:
-
+    LLM: 
+    
 <h1>output-fribidi-fribidi_log2vis / 01</h1>
 Bug: False
 <br>
@@ -56,789 +56,306 @@ Crash reason: NO_SEMANTIC_ERR
 
 <pre>
 #include &lt;fuzzer/FuzzedDataProvider.h&gt;
-#include &lt;fribidi.h&gt;
-#include &lt;vector&gt; // Include vector for dynamic array management
+#include &lt;string&gt;
+#include &lt;vector&gt;
+#include &lt;cstdint&gt;
+#include &lt;cstddef&gt;
+#include &lt;cstdlib&gt;
+#include &lt;cstring&gt;
+#include &lt;iostream&gt;
+#include &lt;sstream&gt;
+#include &lt;algorithm&gt;
+#include &lt;iterator&gt;
+#include &lt;cctype&gt;
+
+extern &#34;C&#34; {
+#include &#34;fribidi-types.h&#34;
+#include &#34;fribidi-bidi-types.h&#34;
+#include &#34;fribidi-flags.h&#34;
+#include &#34;fribidi-joining-types.h&#34;
+#include &#34;fribidi-joining-types-list.h&#34;
+#include &#34;run.h&#34;
+}
+
+extern &#34;C&#34; FriBidiLevel fribidi_log2vis(const FriBidiChar *, const FriBidiStrIndex, FriBidiParType *, FriBidiChar *, FriBidiStrIndex *, FriBidiStrIndex *, FriBidiLevel *);
 
 extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
     return 0;
 }
 
 extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
-    if (size &lt; sizeof(FriBidiChar) + sizeof(FriBidiStrIndex)) {
-        return 0;
+    FuzzedDataProvider data_provider(data, size);
+
+    FriBidiStrIndex len = data_provider.ConsumeIntegralInRange&lt;FriBidiStrIndex&gt;(0, 1024);
+    std::vector&lt;FriBidiChar&gt; str(len);
+    for (FriBidiStrIndex i = 0; i &lt; len; ++i) {
+        str[i] = data_provider.ConsumeIntegral&lt;FriBidiChar&gt;();
     }
 
-    FuzzedDataProvider dataProvider(data, size);
-    FriBidiStrIndex len = dataProvider.ConsumeIntegralInRange&lt;FriBidiStrIndex&gt;(1, size / sizeof(FriBidiChar));
-
-    // Ensure there is enough data left to consume
-    if (dataProvider.remaining_bytes() &lt; len * sizeof(FriBidiChar)) {
-        return 0;
-    }
-
-    // Use std::vector to manage the memory of the input string
-    std::vector&lt;uint8_t&gt; strVec = dataProvider.ConsumeBytes&lt;uint8_t&gt;(len * sizeof(FriBidiChar));
-    const FriBidiChar *str = reinterpret_cast&lt;const FriBidiChar*&gt;(strVec.data());
-
-    FriBidiParType pbase_dir = dataProvider.ConsumeIntegral&lt;FriBidiParType&gt;();
-
-    // Use std::vector for automatic memory management
+    FriBidiParType base_dir = data_provider.ConsumeIntegral&lt;FriBidiParType&gt;();
     std::vector&lt;FriBidiChar&gt; visual_str(len);
     std::vector&lt;FriBidiStrIndex&gt; positions_L_to_V(len);
     std::vector&lt;FriBidiStrIndex&gt; positions_V_to_L(len);
     std::vector&lt;FriBidiLevel&gt; embedding_levels(len);
 
-    fribidi_log2vis(str, len, &amp;pbase_dir, visual_str.data(), positions_L_to_V.data(), positions_V_to_L.data(), embedding_levels.data());
+    FriBidiLevel result = fribidi_log2vis(
+        str.data(),
+        len,
+        &amp;base_dir,
+        visual_str.data(),
+        positions_L_to_V.data(),
+        positions_V_to_L.data(),
+        embedding_levels.data()
+    );
 
-    return 0;
-}
-</pre>
-
-
-<h3>Fixer prompt #1</h3>
-<pre>
-
-Given the following C++ fuzz harness and its build error message, fix the code to make it build for fuzzing.
-
-If there is undeclared identifier or unknown type name error, fix it by finding and including the related libraries.
-
-Note that some code may need to be wrapped with &lt;code&gt;extern &#34;C&#34;&lt;/code&gt; as their source is C program.
-
-MUST RETURN THE FULL CODE, INCLUDING UNCHANGED PARTS.
-EXTREMELY IMPORTANT: AVOID USING &lt;code&gt;goto&lt;/code&gt;. If you have to write code using &lt;code&gt;goto&lt;/code&gt;, you MUST MUST also declare all variables BEFORE the &lt;code&gt;goto&lt;/code&gt;. Never introduce new variables after the &lt;code&gt;goto&lt;/code&gt;.
-
-Below is the code needs to be built:
-&lt;code&gt;
-#include &lt;fuzzer/FuzzedDataProvider.h&gt;
-#include &lt;fribidi.h&gt;
-
-extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
-    return 0;
-}
-
-extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
-    if (size &lt; sizeof(FriBidiChar) + sizeof(FriBidiStrIndex)) {
-        return 0;
+    if (result &lt; 0) {
+        // Handle error condition
     }
 
-    FuzzedDataProvider dataProvider(data, size);
-    FriBidiStrIndex len = dataProvider.ConsumeIntegral&lt;FriBidiStrIndex&gt;();
-    const FriBidiChar *str = reinterpret_cast&lt;const FriBidiChar *&gt;(dataProvider.ConsumeBytes&lt;uint8_t&gt;(len * sizeof(FriBidiChar)).data());
-
-    FriBidiParType pbase_dir = dataProvider.ConsumeIntegral&lt;FriBidiParType&gt;();
-    FriBidiChar *visual_str = new FriBidiChar[len];
-    FriBidiStrIndex *positions_L_to_V = new FriBidiStrIndex[len];
-    FriBidiStrIndex *positions_V_to_L = new FriBidiStrIndex[len];
-    FriBidiLevel *embedding_levels = new FriBidiLevel[len];
-
-    fribidi_log2vis(str, len, &amp;pbase_dir, visual_str, positions_L_to_V, positions_V_to_L, embedding_levels);
-
-    delete[] visual_str;
-    delete[] positions_L_to_V;
-    delete[] positions_V_to_L;
-    delete[] embedding_levels;
-
-    return 0;
-}
-&lt;/code&gt;
-
-The code can build successfully but has a runtime issue: Fuzzing crashed immediately at runtime (ASAN-ERROR: AddressSanitizer: ABRT on unknown address 0x00000000000d (pc 0x7f4cdc57b00b bp 0x7f4cdca6c1a2 sp 0x7fff43c7bb90 T0)), indicating fuzz target code for invoking the function under test is incorrect or unrobust.
-&lt;error&gt;
-Crash stacks:
-Stack 0:
-#0 0x7f4cdc57b00b in raise (/lib/x86_64-linux-gnu/libc.so.6+0x4300b) (BuildId: 0702430aef5fa3dda43986563e9ffcc47efbd75e)
-#1 0x7f4cdc55a858 in abort (/lib/x86_64-linux-gnu/libc.so.6+0x22858) (BuildId: 0702430aef5fa3dda43986563e9ffcc47efbd75e)
-#2 0x7f4cdc9838d0  (/lib/x86_64-linux-gnu/libstdc++.so.6+0x9e8d0) (BuildId: fcd5414020056f1d95855868e00f3a7d479630fd)
-#3 0x7f4cdc98f37b  (/lib/x86_64-linux-gnu/libstdc++.so.6+0xaa37b) (BuildId: fcd5414020056f1d95855868e00f3a7d479630fd)
-#4 0x7f4cdc98f3e6 in std::terminate() (/lib/x86_64-linux-gnu/libstdc++.so.6+0xaa3e6) (BuildId: fcd5414020056f1d95855868e00f3a7d479630fd)
-#5 0x7f4cdc98f698 in __cxa_throw (/lib/x86_64-linux-gnu/libstdc++.so.6+0xaa698) (BuildId: fcd5414020056f1d95855868e00f3a7d479630fd)
-#6 0x7f4cdc9834e1  (/lib/x86_64-linux-gnu/libstdc++.so.6+0x9e4e1) (BuildId: fcd5414020056f1d95855868e00f3a7d479630fd)
-#7 0x557497ff5c21 in LLVMFuzzerTestOneInput /work/build/../../src/fribidi/bin/fribidi-fuzzer.cpp:18:31
-#8 0x557497eaa520 in fuzzer::Fuzzer::ExecuteCallback(unsigned char const*, unsigned long) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:614:13
-#9 0x557497ea9d45 in fuzzer::Fuzzer::RunOne(unsigned char const*, unsigned long, bool, fuzzer::InputInfo*, bool, bool*) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:516:7
-#10 0x557497eabcd2 in fuzzer::Fuzzer::ReadAndExecuteSeedCorpora(std::__Fuzzer::vector&lt;fuzzer::SizedFile, std::__Fuzzer::allocator&lt;fuzzer::SizedFile&gt;&gt;&amp;) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:829:7
-#11 0x557497eac007 in fuzzer::Fuzzer::Loop(std::__Fuzzer::vector&lt;fuzzer::SizedFile, std::__Fuzzer::allocator&lt;fuzzer::SizedFile&gt;&gt;&amp;) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:867:3
-#12 0x557497e9a616 in fuzzer::FuzzerDriver(int*, char***, int (*)(unsigned char const*, unsigned long)) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerDriver.cpp:914:6
-#13 0x557497ec6b42 in main /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerMain.cpp:20:10
-#14 0x7f4cdc55c082 in __libc_start_main (/lib/x86_64-linux-gnu/libc.so.6+0x24082) (BuildId: 0702430aef5fa3dda43986563e9ffcc47efbd75e)
-#15 0x557497e8b78d in _start (/out/fribidi-fuzzer+0x4478d)
-&lt;/error&gt;
-
-Fix code:
-1. Consider possible solutions for the issues listed above.
-2. Choose a solution that can maximize fuzzing result, which is utilizing the function under test and feeding it not null input.
-3. Apply the solutions to the original code.
-It&#39;s important to show the complete code, not only the fixed line.
-&lt;solution&gt;
-</pre>
-
-
-
-<h3>Code #1</h3>
-
-<pre>
-The runtime issue you&#39;re encountering is likely due to the `len` variable being set to a value that is larger than the actual size of the remaining data, leading to an out-of-bounds access when trying to consume bytes. To fix this, we need to ensure that `len` is within a reasonable range given the size of the input data.
-
-Here&#39;s the corrected code:
-
-```cpp
-#include &lt;fuzzer/FuzzedDataProvider.h&gt;
-#include &lt;fribidi.h&gt;
-#include &lt;vector&gt; // Include vector for dynamic array management
-
-extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
-    return 0;
-}
-
-extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
-    if (size &lt; sizeof(FriBidiChar) + sizeof(FriBidiStrIndex)) {
-        return 0;
+    for (FriBidiStrIndex i = 0; i &lt; len; ++i) {
+        // Validate visual_str[i] if necessary
     }
 
-    FuzzedDataProvider dataProvider(data, size);
-    FriBidiStrIndex len = dataProvider.ConsumeIntegralInRange&lt;FriBidiStrIndex&gt;(1, size / sizeof(FriBidiChar));
-    const FriBidiChar *str = reinterpret_cast&lt;const FriBidiChar *&gt;(dataProvider.ConsumeBytes&lt;uint8_t&gt;(len * sizeof(FriBidiChar)).data());
-
-    // Ensure str is not null and has enough data
-    if (dataProvider.remaining_bytes() &lt; len * sizeof(FriBidiChar)) {
-        return 0;
+    for (FriBidiStrIndex i = 0; i &lt; len; ++i) {
+        // Validate positions_L_to_V[i] and positions_V_to_L[i] if necessary
     }
 
-    FriBidiParType pbase_dir = dataProvider.ConsumeIntegral&lt;FriBidiParType&gt;();
-
-    // Use std::vector for automatic memory management
-    std::vector&lt;FriBidiChar&gt; visual_str(len);
-    std::vector&lt;FriBidiStrIndex&gt; positions_L_to_V(len);
-    std::vector&lt;FriBidiStrIndex&gt; positions_V_to_L(len);
-    std::vector&lt;FriBidiLevel&gt; embedding_levels(len);
-
-    fribidi_log2vis(str, len, &amp;pbase_dir, visual_str.data(), positions_L_to_V.data(), positions_V_to_L.data(), embedding_levels.data());
+    for (FriBidiStrIndex i = 0; i &lt; len; ++i) {
+        // Validate embedding_levels[i] if necessary
+    }
 
     return 0;
 }
-```
-
-### Explanation of Changes:
-1. **Range Check for `len`:** We use `ConsumeIntegralInRange` to ensure `len` is within a reasonable range, specifically between 1 and `size / sizeof(FriBidiChar)`. This prevents `len` from being too large.
-2. **Check Remaining Bytes:** Before consuming bytes for `str`, we check if there are enough remaining bytes to accommodate `len * sizeof(FriBidiChar)`.
-3. **Use `std::vector`:** We replace raw pointers with `std::vector` for `visual_str`, `positions_L_to_V`, `positions_V_to_L`, and `embedding_levels`. This ensures automatic memory management and prevents memory leaks.
-
-By making these changes, we ensure that the input data is correctly bounded and that memory is managed safely, which should prevent the runtime crash you encountered.
-</pre>
-
-
-<h3>Fixer prompt #2</h3>
-<pre>
-
-Given the following C++ fuzz harness and its build error message, fix the code to make it build for fuzzing.
-
-If there is undeclared identifier or unknown type name error, fix it by finding and including the related libraries.
-
-Note that some code may need to be wrapped with &lt;code&gt;extern &#34;C&#34;&lt;/code&gt; as their source is C program.
-
-MUST RETURN THE FULL CODE, INCLUDING UNCHANGED PARTS.
-EXTREMELY IMPORTANT: AVOID USING &lt;code&gt;goto&lt;/code&gt;. If you have to write code using &lt;code&gt;goto&lt;/code&gt;, you MUST MUST also declare all variables BEFORE the &lt;code&gt;goto&lt;/code&gt;. Never introduce new variables after the &lt;code&gt;goto&lt;/code&gt;.
-
-Below is the code needs to be built:
-&lt;code&gt;
-#include &lt;fuzzer/FuzzedDataProvider.h&gt;
-#include &lt;fribidi.h&gt;
-#include &lt;vector&gt; // Include vector for dynamic array management
-
-extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
-    return 0;
-}
-
-extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
-    if (size &lt; sizeof(FriBidiChar) + sizeof(FriBidiStrIndex)) {
-        return 0;
-    }
-
-    FuzzedDataProvider dataProvider(data, size);
-    FriBidiStrIndex len = dataProvider.ConsumeIntegralInRange&lt;FriBidiStrIndex&gt;(1, size / sizeof(FriBidiChar));
-    const FriBidiChar *str = reinterpret_cast&lt;const FriBidiChar *&gt;(dataProvider.ConsumeBytes&lt;uint8_t&gt;(len * sizeof(FriBidiChar)).data());
-
-    // Ensure str is not null and has enough data
-    if (dataProvider.remaining_bytes() &lt; len * sizeof(FriBidiChar)) {
-        return 0;
-    }
-
-    FriBidiParType pbase_dir = dataProvider.ConsumeIntegral&lt;FriBidiParType&gt;();
-
-    // Use std::vector for automatic memory management
-    std::vector&lt;FriBidiChar&gt; visual_str(len);
-    std::vector&lt;FriBidiStrIndex&gt; positions_L_to_V(len);
-    std::vector&lt;FriBidiStrIndex&gt; positions_V_to_L(len);
-    std::vector&lt;FriBidiLevel&gt; embedding_levels(len);
-
-    fribidi_log2vis(str, len, &amp;pbase_dir, visual_str.data(), positions_L_to_V.data(), positions_V_to_L.data(), embedding_levels.data());
-
-    return 0;
-}
-&lt;/code&gt;
-
-The code can build successfully but has a runtime issue: Fuzzing crashed immediately at runtime (ASAN-ERROR: AddressSanitizer: heap-use-after-free on address 0x5020000000b0 at pc 0x5645c6997e77 bp 0x7ffffe779640 sp 0x7ffffe779638), indicating fuzz target code for invoking the function under test is incorrect or unrobust.
-&lt;error&gt;
-Crash stacks:
-Stack 0:
-#0 0x5645c6997e76 in fribidi_get_bidi_types /work/build/../../src/fribidi/lib/fribidi-bidi-types.c:72:44
-#1 0x5645c698e073 in fribidi_log2vis /work/build/../../src/fribidi/lib/fribidi.c:185:3
-#2 0x5645c698ada2 in LLVMFuzzerTestOneInput /work/build/../../src/fribidi/bin/fribidi-fuzzer.cpp:31:5
-#3 0x5645c683f500 in fuzzer::Fuzzer::ExecuteCallback(unsigned char const*, unsigned long) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:614:13
-#4 0x5645c683ed25 in fuzzer::Fuzzer::RunOne(unsigned char const*, unsigned long, bool, fuzzer::InputInfo*, bool, bool*) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:516:7
-#5 0x5645c6840cb2 in fuzzer::Fuzzer::ReadAndExecuteSeedCorpora(std::__Fuzzer::vector&lt;fuzzer::SizedFile, std::__Fuzzer::allocator&lt;fuzzer::SizedFile&gt;&gt;&amp;) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:829:7
-#6 0x5645c6840fe7 in fuzzer::Fuzzer::Loop(std::__Fuzzer::vector&lt;fuzzer::SizedFile, std::__Fuzzer::allocator&lt;fuzzer::SizedFile&gt;&gt;&amp;) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:867:3
-#7 0x5645c682f5f6 in fuzzer::FuzzerDriver(int*, char***, int (*)(unsigned char const*, unsigned long)) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerDriver.cpp:914:6
-#8 0x5645c685bb22 in main /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerMain.cpp:20:10
-#9 0x7fd129b9d082 in __libc_start_main (/lib/x86_64-linux-gnu/libc.so.6+0x24082) (BuildId: 0702430aef5fa3dda43986563e9ffcc47efbd75e)
-#10 0x5645c682076d in _start (/out/fribidi-fuzzer+0x4476d)
-Stack 1:
-#0 0x5645c694d7f6 in free /src/llvm-project/compiler-rt/lib/asan/asan_malloc_linux.cpp:52:3
-#1 0x5645c698ab95 in __libcpp_operator_delete&lt;void *&gt; /usr/local/bin/../include/c++/v1/new:278:3
-#2 0x5645c698ab95 in __do_deallocate_handle_size&lt;&gt; /usr/local/bin/../include/c++/v1/new:302:10
-#3 0x5645c698ab95 in __libcpp_deallocate /usr/local/bin/../include/c++/v1/new:318:14
-#4 0x5645c698ab95 in deallocate /usr/local/bin/../include/c++/v1/__memory/allocator.h:130:13
-#5 0x5645c698ab95 in deallocate /usr/local/bin/../include/c++/v1/__memory/allocator_traits.h:288:13
-#6 0x5645c698ab95 in operator() /usr/local/bin/../include/c++/v1/vector:491:13
-#7 0x5645c698ab95 in ~vector /usr/local/bin/../include/c++/v1/vector:500:67
-#8 0x5645c698ab95 in LLVMFuzzerTestOneInput /work/build/../../src/fribidi/bin/fribidi-fuzzer.cpp:16:30
-#9 0x5645c683f500 in fuzzer::Fuzzer::ExecuteCallback(unsigned char const*, unsigned long) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:614:13
-#10 0x5645c683ed25 in fuzzer::Fuzzer::RunOne(unsigned char const*, unsigned long, bool, fuzzer::InputInfo*, bool, bool*) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:516:7
-#11 0x5645c6840cb2 in fuzzer::Fuzzer::ReadAndExecuteSeedCorpora(std::__Fuzzer::vector&lt;fuzzer::SizedFile, std::__Fuzzer::allocator&lt;fuzzer::SizedFile&gt;&gt;&amp;) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:829:7
-#12 0x5645c6840fe7 in fuzzer::Fuzzer::Loop(std::__Fuzzer::vector&lt;fuzzer::SizedFile, std::__Fuzzer::allocator&lt;fuzzer::SizedFile&gt;&gt;&amp;) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:867:3
-&lt;/error&gt;
-
-Fix code:
-1. Consider possible solutions for the issues listed above.
-2. Choose a solution that can maximize fuzzing result, which is utilizing the function under test and feeding it not null input.
-3. Apply the solutions to the original code.
-It&#39;s important to show the complete code, not only the fixed line.
-&lt;solution&gt;
-</pre>
-
-
-
-<h3>Code #2</h3>
-
-<pre>
-Here&#39;s the complete fixed code:
-
-```cpp
-#include &lt;fuzzer/FuzzedDataProvider.h&gt;
-#include &lt;fribidi.h&gt;
-#include &lt;vector&gt; // Include vector for dynamic array management
-
-extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
-    return 0;
-}
-
-extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
-    if (size &lt; sizeof(FriBidiChar) + sizeof(FriBidiStrIndex)) {
-        return 0;
-    }
-
-    FuzzedDataProvider dataProvider(data, size);
-    FriBidiStrIndex len = dataProvider.ConsumeIntegralInRange&lt;FriBidiStrIndex&gt;(1, size / sizeof(FriBidiChar));
-
-    // Ensure there is enough data left to consume
-    if (dataProvider.remaining_bytes() &lt; len * sizeof(FriBidiChar)) {
-        return 0;
-    }
-
-    const FriBidiChar *str = reinterpret_cast&lt;const FriBidiChar *&gt;(dataProvider.ConsumeBytes&lt;uint8_t&gt;(len * sizeof(FriBidiChar)).data());
-
-    FriBidiParType pbase_dir = dataProvider.ConsumeIntegral&lt;FriBidiParType&gt;();
-
-    // Use std::vector for automatic memory management
-    std::vector&lt;FriBidiChar&gt; visual_str(len);
-    std::vector&lt;FriBidiStrIndex&gt; positions_L_to_V(len);
-    std::vector&lt;FriBidiStrIndex&gt; positions_V_to_L(len);
-    std::vector&lt;FriBidiLevel&gt; embedding_levels(len);
-
-    fribidi_log2vis(str, len, &amp;pbase_dir, visual_str.data(), positions_L_to_V.data(), positions_V_to_L.data(), embedding_levels.data());
-
-    return 0;
-}
-```
-
-Explanation of the fix:
-1. **Check for Remaining Bytes**: Before consuming the bytes for `str`, we ensure that there are enough bytes remaining in the `dataProvider`. This avoids accessing out-of-bounds memory which was causing the heap-use-after-free error.
-2. **Data Consumption**: The `ConsumeBytes` method is used to safely consume the required number of bytes from the `dataProvider`.
-
-These changes ensure that the input data is correctly consumed and managed, preventing the runtime crash observed with AddressSanitizer.
-</pre>
-
-
-<h3>Fixer prompt #3</h3>
-<pre>
-
-Given the following C++ fuzz harness and its build error message, fix the code to make it build for fuzzing.
-
-If there is undeclared identifier or unknown type name error, fix it by finding and including the related libraries.
-
-Note that some code may need to be wrapped with &lt;code&gt;extern &#34;C&#34;&lt;/code&gt; as their source is C program.
-
-MUST RETURN THE FULL CODE, INCLUDING UNCHANGED PARTS.
-EXTREMELY IMPORTANT: AVOID USING &lt;code&gt;goto&lt;/code&gt;. If you have to write code using &lt;code&gt;goto&lt;/code&gt;, you MUST MUST also declare all variables BEFORE the &lt;code&gt;goto&lt;/code&gt;. Never introduce new variables after the &lt;code&gt;goto&lt;/code&gt;.
-
-Below is the code needs to be built:
-&lt;code&gt;
-#include &lt;fuzzer/FuzzedDataProvider.h&gt;
-#include &lt;fribidi.h&gt;
-#include &lt;vector&gt; // Include vector for dynamic array management
-
-extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
-    return 0;
-}
-
-extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
-    if (size &lt; sizeof(FriBidiChar) + sizeof(FriBidiStrIndex)) {
-        return 0;
-    }
-
-    FuzzedDataProvider dataProvider(data, size);
-    FriBidiStrIndex len = dataProvider.ConsumeIntegralInRange&lt;FriBidiStrIndex&gt;(1, size / sizeof(FriBidiChar));
-
-    // Ensure there is enough data left to consume
-    if (dataProvider.remaining_bytes() &lt; len * sizeof(FriBidiChar)) {
-        return 0;
-    }
-
-    const FriBidiChar *str = reinterpret_cast&lt;const FriBidiChar *&gt;(dataProvider.ConsumeBytes&lt;uint8_t&gt;(len * sizeof(FriBidiChar)).data());
-
-    FriBidiParType pbase_dir = dataProvider.ConsumeIntegral&lt;FriBidiParType&gt;();
-
-    // Use std::vector for automatic memory management
-    std::vector&lt;FriBidiChar&gt; visual_str(len);
-    std::vector&lt;FriBidiStrIndex&gt; positions_L_to_V(len);
-    std::vector&lt;FriBidiStrIndex&gt; positions_V_to_L(len);
-    std::vector&lt;FriBidiLevel&gt; embedding_levels(len);
-
-    fribidi_log2vis(str, len, &amp;pbase_dir, visual_str.data(), positions_L_to_V.data(), positions_V_to_L.data(), embedding_levels.data());
-
-    return 0;
-}
-&lt;/code&gt;
-
-The code can build successfully but has a runtime issue: Fuzzing crashed immediately at runtime (ASAN-ERROR: AddressSanitizer: heap-use-after-free on address 0x5020000000b0 at pc 0x563597ddee27 bp 0x7fffdbaea100 sp 0x7fffdbaea0f8), indicating fuzz target code for invoking the function under test is incorrect or unrobust.
-&lt;error&gt;
-Crash stacks:
-Stack 0:
-#0 0x563597ddee26 in fribidi_get_bidi_types /work/build/../../src/fribidi/lib/fribidi-bidi-types.c:72:44
-#1 0x563597dd5023 in fribidi_log2vis /work/build/../../src/fribidi/lib/fribidi.c:185:3
-#2 0x563597dd1d5c in LLVMFuzzerTestOneInput /work/build/../../src/fribidi/bin/fribidi-fuzzer.cpp:32:5
-#3 0x563597c86500 in fuzzer::Fuzzer::ExecuteCallback(unsigned char const*, unsigned long) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:614:13
-#4 0x563597c85d25 in fuzzer::Fuzzer::RunOne(unsigned char const*, unsigned long, bool, fuzzer::InputInfo*, bool, bool*) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:516:7
-#5 0x563597c87cb2 in fuzzer::Fuzzer::ReadAndExecuteSeedCorpora(std::__Fuzzer::vector&lt;fuzzer::SizedFile, std::__Fuzzer::allocator&lt;fuzzer::SizedFile&gt;&gt;&amp;) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:829:7
-#6 0x563597c87fe7 in fuzzer::Fuzzer::Loop(std::__Fuzzer::vector&lt;fuzzer::SizedFile, std::__Fuzzer::allocator&lt;fuzzer::SizedFile&gt;&gt;&amp;) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:867:3
-#7 0x563597c765f6 in fuzzer::FuzzerDriver(int*, char***, int (*)(unsigned char const*, unsigned long)) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerDriver.cpp:914:6
-#8 0x563597ca2b22 in main /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerMain.cpp:20:10
-#9 0x7f8da7359082 in __libc_start_main (/lib/x86_64-linux-gnu/libc.so.6+0x24082) (BuildId: 0702430aef5fa3dda43986563e9ffcc47efbd75e)
-#10 0x563597c6776d in _start (/out/fribidi-fuzzer+0x4476d)
-Stack 1:
-#0 0x563597d947f6 in free /src/llvm-project/compiler-rt/lib/asan/asan_malloc_linux.cpp:52:3
-#1 0x563597dd1b86 in __libcpp_operator_delete&lt;void *&gt; /usr/local/bin/../include/c++/v1/new:278:3
-#2 0x563597dd1b86 in __do_deallocate_handle_size&lt;&gt; /usr/local/bin/../include/c++/v1/new:302:10
-#3 0x563597dd1b86 in __libcpp_deallocate /usr/local/bin/../include/c++/v1/new:318:14
-#4 0x563597dd1b86 in deallocate /usr/local/bin/../include/c++/v1/__memory/allocator.h:130:13
-#5 0x563597dd1b86 in deallocate /usr/local/bin/../include/c++/v1/__memory/allocator_traits.h:288:13
-#6 0x563597dd1b86 in operator() /usr/local/bin/../include/c++/v1/vector:491:13
-#7 0x563597dd1b86 in ~vector /usr/local/bin/../include/c++/v1/vector:500:67
-#8 0x563597dd1b86 in LLVMFuzzerTestOneInput /work/build/../../src/fribidi/bin/fribidi-fuzzer.cpp:22:30
-#9 0x563597c86500 in fuzzer::Fuzzer::ExecuteCallback(unsigned char const*, unsigned long) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:614:13
-#10 0x563597c85d25 in fuzzer::Fuzzer::RunOne(unsigned char const*, unsigned long, bool, fuzzer::InputInfo*, bool, bool*) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:516:7
-#11 0x563597c87cb2 in fuzzer::Fuzzer::ReadAndExecuteSeedCorpora(std::__Fuzzer::vector&lt;fuzzer::SizedFile, std::__Fuzzer::allocator&lt;fuzzer::SizedFile&gt;&gt;&amp;) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:829:7
-#12 0x563597c87fe7 in fuzzer::Fuzzer::Loop(std::__Fuzzer::vector&lt;fuzzer::SizedFile, std::__Fuzzer::allocator&lt;fuzzer::SizedFile&gt;&gt;&amp;) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:867:3
-&lt;/error&gt;
-
-Fix code:
-1. Consider possible solutions for the issues listed above.
-2. Choose a solution that can maximize fuzzing result, which is utilizing the function under test and feeding it not null input.
-3. Apply the solutions to the original code.
-It&#39;s important to show the complete code, not only the fixed line.
-&lt;solution&gt;
-</pre>
-
-
-
-<h3>Code #3</h3>
-
-<pre>
-Below is the fixed code to address the runtime issue. The main problem seems to be related to the handling of the input data and ensuring that it is properly managed and valid throughout the function execution.
-
-To fix the issue, we need to ensure that the input data is properly allocated and managed. Additionally, we should ensure that we handle the input data correctly to avoid any heap-use-after-free errors.
-
-Here is the complete code with the necessary fixes:
-
-```cpp
-#include &lt;fuzzer/FuzzedDataProvider.h&gt;
-#include &lt;fribidi.h&gt;
-#include &lt;vector&gt; // Include vector for dynamic array management
-
-extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
-    return 0;
-}
-
-extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
-    if (size &lt; sizeof(FriBidiChar) + sizeof(FriBidiStrIndex)) {
-        return 0;
-    }
-
-    FuzzedDataProvider dataProvider(data, size);
-    FriBidiStrIndex len = dataProvider.ConsumeIntegralInRange&lt;FriBidiStrIndex&gt;(1, size / sizeof(FriBidiChar));
-
-    // Ensure there is enough data left to consume
-    if (dataProvider.remaining_bytes() &lt; len * sizeof(FriBidiChar)) {
-        return 0;
-    }
-
-    // Use std::vector to manage the memory of the input string
-    std::vector&lt;FriBidiChar&gt; strVec = dataProvider.ConsumeBytes&lt;FriBidiChar&gt;(len);
-    const FriBidiChar *str = strVec.data();
-
-    FriBidiParType pbase_dir = dataProvider.ConsumeIntegral&lt;FriBidiParType&gt;();
-
-    // Use std::vector for automatic memory management
-    std::vector&lt;FriBidiChar&gt; visual_str(len);
-    std::vector&lt;FriBidiStrIndex&gt; positions_L_to_V(len);
-    std::vector&lt;FriBidiStrIndex&gt; positions_V_to_L(len);
-    std::vector&lt;FriBidiLevel&gt; embedding_levels(len);
-
-    fribidi_log2vis(str, len, &amp;pbase_dir, visual_str.data(), positions_L_to_V.data(), positions_V_to_L.data(), embedding_levels.data());
-
-    return 0;
-}
-```
-
-### Explanation of the Fixes:
-1. **Memory Management with `std::vector`:**
-   - Instead of directly using a pointer to the consumed bytes, we use `std::vector` to manage the memory of the input string (`strVec`). This ensures that the memory is properly allocated and managed by the vector, preventing any heap-use-after-free issues.
-   - We then get the pointer to the data managed by the vector using `strVec.data()`.
-
-2. **Consuming Bytes Correctly:**
-   - We use `ConsumeBytes&lt;FriBidiChar&gt;(len)` to consume the appropriate number of bytes for the input string. This ensures that the data is correctly interpreted as `FriBidiChar` and managed by the vector.
-
-3. **Ensuring Enough Data:**
-   - We check if there are enough remaining bytes to consume the required length of `FriBidiChar` to avoid accessing out-of-bound memory.
-
-By making these changes, we ensure that the input data is properly managed and valid throughout the function execution, preventing any heap-use-after-free errors and ensuring robust fuzzing.
-</pre>
-
-
-<h3>Fixer prompt #4</h3>
-<pre>
-
-Given the following C++ fuzz harness and its build error message, fix the code to make it build for fuzzing.
-
-If there is undeclared identifier or unknown type name error, fix it by finding and including the related libraries.
-
-Note that some code may need to be wrapped with &lt;code&gt;extern &#34;C&#34;&lt;/code&gt; as their source is C program.
-
-MUST RETURN THE FULL CODE, INCLUDING UNCHANGED PARTS.
-EXTREMELY IMPORTANT: AVOID USING &lt;code&gt;goto&lt;/code&gt;. If you have to write code using &lt;code&gt;goto&lt;/code&gt;, you MUST MUST also declare all variables BEFORE the &lt;code&gt;goto&lt;/code&gt;. Never introduce new variables after the &lt;code&gt;goto&lt;/code&gt;.
-
-Below is the code needs to be built:
-&lt;code&gt;
-#include &lt;fuzzer/FuzzedDataProvider.h&gt;
-#include &lt;fribidi.h&gt;
-#include &lt;vector&gt; // Include vector for dynamic array management
-
-extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
-    return 0;
-}
-
-extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
-    if (size &lt; sizeof(FriBidiChar) + sizeof(FriBidiStrIndex)) {
-        return 0;
-    }
-
-    FuzzedDataProvider dataProvider(data, size);
-    FriBidiStrIndex len = dataProvider.ConsumeIntegralInRange&lt;FriBidiStrIndex&gt;(1, size / sizeof(FriBidiChar));
-
-    // Ensure there is enough data left to consume
-    if (dataProvider.remaining_bytes() &lt; len * sizeof(FriBidiChar)) {
-        return 0;
-    }
-
-    // Use std::vector to manage the memory of the input string
-    std::vector&lt;FriBidiChar&gt; strVec = dataProvider.ConsumeBytes&lt;FriBidiChar&gt;(len);
-    const FriBidiChar *str = strVec.data();
-
-    FriBidiParType pbase_dir = dataProvider.ConsumeIntegral&lt;FriBidiParType&gt;();
-
-    // Use std::vector for automatic memory management
-    std::vector&lt;FriBidiChar&gt; visual_str(len);
-    std::vector&lt;FriBidiStrIndex&gt; positions_L_to_V(len);
-    std::vector&lt;FriBidiStrIndex&gt; positions_V_to_L(len);
-    std::vector&lt;FriBidiLevel&gt; embedding_levels(len);
-
-    fribidi_log2vis(str, len, &amp;pbase_dir, visual_str.data(), positions_L_to_V.data(), positions_V_to_L.data(), embedding_levels.data());
-
-    return 0;
-}
-&lt;/code&gt;
-
-The code has the following build issues:
-&lt;error&gt;
-In file included from ../../src/fribidi/bin/fribidi-fuzzer.cpp:1:
-/usr/local/lib/clang/18/include/fuzzer/FuzzedDataProvider.h:353:17: error: static assertion failed due to requirement &#39;sizeof(unsigned int) == sizeof(unsigned char)&#39;: Incompatible data type.
-  353 |   static_assert(sizeof(T) == sizeof(uint8_t), &#34;Incompatible data type.&#34;);
-      |                 ^~~~~~~~~~~~~~~~~~~~~~~~~~~~
-/usr/local/lib/clang/18/include/fuzzer/FuzzedDataProvider.h:110:10: note: in instantiation of function template specialization &#39;FuzzedDataProvider::ConsumeBytes&lt;unsigned int&gt;&#39; requested here
-  110 |   return ConsumeBytes&lt;T&gt;(num_bytes, num_bytes);
-      |          ^
-../../src/fribidi/bin/fribidi-fuzzer.cpp:23:52: note: in instantiation of function template specialization &#39;FuzzedDataProvider::ConsumeBytes&lt;unsigned int&gt;&#39; requested here
-   23 |     std::vector&lt;FriBidiChar&gt; strVec = dataProvider.ConsumeBytes&lt;FriBidiChar&gt;(len);
-      |                                                    ^
-/usr/local/lib/clang/18/include/fuzzer/FuzzedDataProvider.h:353:27: note: expression evaluates to &#39;4 == 1&#39;
-  353 |   static_assert(sizeof(T) == sizeof(uint8_t), &#34;Incompatible data type.&#34;);
-      |                 ~~~~~~~~~~^~~~~~~~~~~~~~~~~~
-&lt;/error&gt;
-
-Fix code:
-1. Consider possible solutions for the issues listed above.
-2. Choose a solution that can maximize fuzzing result, which is utilizing the function under test and feeding it not null input.
-3. Apply the solutions to the original code.
-It&#39;s important to show the complete code, not only the fixed line.
-&lt;solution&gt;
-</pre>
-
-
-
-<h3>Code #4</h3>
-
-<pre>
-Here is the fixed code:
-
-```cpp
-#include &lt;fuzzer/FuzzedDataProvider.h&gt;
-#include &lt;fribidi.h&gt;
-#include &lt;vector&gt; // Include vector for dynamic array management
-
-extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
-    return 0;
-}
-
-extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
-    if (size &lt; sizeof(FriBidiChar) + sizeof(FriBidiStrIndex)) {
-        return 0;
-    }
-
-    FuzzedDataProvider dataProvider(data, size);
-    FriBidiStrIndex len = dataProvider.ConsumeIntegralInRange&lt;FriBidiStrIndex&gt;(1, size / sizeof(FriBidiChar));
-
-    // Ensure there is enough data left to consume
-    if (dataProvider.remaining_bytes() &lt; len * sizeof(FriBidiChar)) {
-        return 0;
-    }
-
-    // Use std::vector to manage the memory of the input string
-    std::vector&lt;uint8_t&gt; strVec = dataProvider.ConsumeBytes&lt;uint8_t&gt;(len * sizeof(FriBidiChar));
-    const FriBidiChar *str = reinterpret_cast&lt;const FriBidiChar*&gt;(strVec.data());
-
-    FriBidiParType pbase_dir = dataProvider.ConsumeIntegral&lt;FriBidiParType&gt;();
-
-    // Use std::vector for automatic memory management
-    std::vector&lt;FriBidiChar&gt; visual_str(len);
-    std::vector&lt;FriBidiStrIndex&gt; positions_L_to_V(len);
-    std::vector&lt;FriBidiStrIndex&gt; positions_V_to_L(len);
-    std::vector&lt;FriBidiLevel&gt; embedding_levels(len);
-
-    fribidi_log2vis(str, len, &amp;pbase_dir, visual_str.data(), positions_L_to_V.data(), positions_V_to_L.data(), embedding_levels.data());
-
-    return 0;
-}
-```
-
-### Explanation of Changes:
-1. **ConsumeBytes**: The `ConsumeBytes` function in `FuzzedDataProvider` expects a type that has the same size as `uint8_t`. Since `FriBidiChar` does not meet this requirement, we use `uint8_t` to consume the bytes and then reinterpret the data as `FriBidiChar`.
-2. **Reinterpret Cast**: After consuming the bytes as `uint8_t`, we use `reinterpret_cast` to convert the data to `FriBidiChar*`. This ensures that the data is correctly interpreted as `FriBidiChar` for the `fribidi_log2vis` function.
 </pre>
 
 
 <h2>Logs</h2>
 <pre>
-Fixing /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-fribidi-fribidi_log2vis/fixed_targets/01.c with gpt-4o, attempt 1.
-Fixing /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-fribidi-fribidi_log2vis/fixed_targets/01.c with gpt-4o, attempt 2.
-Fixing /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-fribidi-fribidi_log2vis/fixed_targets/01.c with gpt-4o, attempt 3.
-Fixing /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-fribidi-fribidi_log2vis/fixed_targets/01.c with gpt-4o, attempt 4.
-Successfully built /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-fribidi-fribidi_log2vis/fixed_targets/01.c with gpt-4o in 4 iterations of fixing.
-Result for fribidi-fribidi_log2vis-01: crashes=False, coverage=0.46527196652719666 (556/1195), coverage diff=0.1422360248447205 (229/1610)
+Successfully built /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-fribidi-fribidi_log2vis/fixed_targets/01.c with gpt-4o in 0 iterations of fixing.
+Result for fribidi-fribidi_log2vis-01: crashes=False, coverage=0.4794040315512708 (547/1141), coverage diff=0.1453416149068323 (234/1610)
 
 </pre>
 
 <h2>Run logs</h2>
 <pre>
-INFO:__main__:Running: docker run --rm --privileged --shm-size=2g --platform linux/amd64 -e FUZZING_ENGINE=libfuzzer -e SANITIZER=address -e RUN_FUZZER_MODE=interactive -e HELPER=True -v /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-fribidi-fribidi_log2vis/corpora/01.c:/tmp/fribidi-fuzzer_corpus -v /tmp/tmp9gg1c8dt/build/out/fribidi-fribidi_log2vis-01:/out -t gcr.io/oss-fuzz-base/base-runner run_fuzzer fribidi-fuzzer -print_final_stats=1 -max_total_time=30 -len_control=0 -timeout=30.
+INFO:__main__:Running: docker run --rm --privileged --shm-size=2g --platform linux/amd64 -e FUZZING_ENGINE=libfuzzer -e SANITIZER=address -e RUN_FUZZER_MODE=interactive -e HELPER=True -v /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-fribidi-fribidi_log2vis/corpora/01.c:/tmp/fribidi-fuzzer_corpus -v /tmp/tmpk31m_hoq/build/out/fribidi-fribidi_log2vis-01:/out -t gcr.io/oss-fuzz-base/base-runner run_fuzzer fribidi-fuzzer -print_final_stats=1 -max_total_time=30 -len_control=0 -timeout=30.
 vm.mmap_rnd_bits = 28
 rm: cannot remove &#39;/tmp/fribidi-fuzzer_corpus&#39;: Device or resource busy
 Using seed corpus: fribidi-fuzzer_seed_corpus.zip
 /out/fribidi-fuzzer -rss_limit_mb=2560 -timeout=25 -print_final_stats=1 -max_total_time=30 -len_control=0 -timeout=30 /tmp/fribidi-fuzzer_corpus &lt; /dev/null
 INFO: Running with entropic power schedule (0xFF, 100).
-INFO: Seed: 437032827
-INFO: Loaded 1 modules   (1195 inline 8-bit counters): 1195 [0x55bdda3f9b60, 0x55bdda3fa00b),
-INFO: Loaded 1 PC tables (1195 PCs): 1195 [0x55bdda3fa010,0x55bdda3feac0),
+INFO: Seed: 81428464
+INFO: Loaded 1 modules   (1141 inline 8-bit counters): 1141 [0x5652474a5b60, 0x5652474a5fd5), 
+INFO: Loaded 1 PC tables (1141 PCs): 1141 [0x5652474a5fd8,0x5652474aa728), 
 INFO:       14 files found in /tmp/fribidi-fuzzer_corpus
 INFO: -max_len is not provided; libFuzzer will not generate inputs larger than 4096 bytes
 INFO: seed corpus: files: 14 min: 38b max: 2362b total: 12804b rss: 30Mb
-#15	INITED cov: 308 ft: 390 corp: 6/4711b exec/s: 0 rss: 32Mb
-#19	NEW    cov: 308 ft: 392 corp: 7/5342b lim: 4096 exec/s: 0 rss: 32Mb L: 631/1420 MS: 4 ChangeBit-ShuffleBytes-CrossOver-CrossOver-
-	NEW_FUNC[1/1]: 0x55bdda370fe0 in merge_with_prev /work/build/../../src/fribidi/lib/fribidi-bidi.c:74
-#20	NEW    cov: 366 ft: 487 corp: 8/6712b lim: 4096 exec/s: 0 rss: 32Mb L: 1370/1420 MS: 1 CrossOver-
-#27	NEW    cov: 367 ft: 513 corp: 9/8091b lim: 4096 exec/s: 0 rss: 33Mb L: 1379/1420 MS: 2 InsertByte-CMP- DE: &#34;\037\000\000\000\000\000\000\000&#34;-
-#30	NEW    cov: 377 ft: 614 corp: 10/8466b lim: 4096 exec/s: 0 rss: 33Mb L: 375/1420 MS: 3 InsertRepeatedBytes-ChangeBinInt-CrossOver-
-#32	NEW    cov: 379 ft: 647 corp: 11/9849b lim: 4096 exec/s: 0 rss: 33Mb L: 1383/1420 MS: 2 InsertRepeatedBytes-PersAutoDict- DE: &#34;\037\000\000\000\000\000\000\000&#34;-
-#42	REDUCE cov: 379 ft: 647 corp: 11/9561b lim: 4096 exec/s: 0 rss: 33Mb L: 1082/1420 MS: 5 CMP-ChangeBit-CopyPart-ChangeBinInt-EraseBytes- DE: &#34;abc@&#34;-
-#45	NEW    cov: 379 ft: 648 corp: 12/10364b lim: 4096 exec/s: 0 rss: 33Mb L: 803/1420 MS: 3 InsertRepeatedBytes-CMP-EraseBytes- DE: &#34;\377\377\377\377\377\377\377\000&#34;-
-#84	REDUCE cov: 379 ft: 678 corp: 13/10946b lim: 4096 exec/s: 0 rss: 33Mb L: 582/1420 MS: 4 ShuffleBytes-ShuffleBytes-ChangeBit-EraseBytes-
-#92	NEW    cov: 393 ft: 730 corp: 14/12382b lim: 4096 exec/s: 0 rss: 33Mb L: 1436/1436 MS: 3 InsertByte-CrossOver-InsertByte-
-#95	REDUCE cov: 393 ft: 730 corp: 14/12240b lim: 4096 exec/s: 0 rss: 33Mb L: 413/1436 MS: 3 ChangeByte-ShuffleBytes-EraseBytes-
-#107	NEW    cov: 393 ft: 743 corp: 15/14407b lim: 4096 exec/s: 0 rss: 33Mb L: 2167/2167 MS: 2 PersAutoDict-CrossOver- DE: &#34;abc@&#34;-
-#108	REDUCE cov: 393 ft: 743 corp: 15/14371b lim: 4096 exec/s: 0 rss: 33Mb L: 595/2167 MS: 1 EraseBytes-
-#110	REDUCE cov: 393 ft: 743 corp: 15/14291b lim: 4096 exec/s: 0 rss: 33Mb L: 333/2167 MS: 2 InsertByte-EraseBytes-
-#114	REDUCE cov: 393 ft: 743 corp: 15/14163b lim: 4096 exec/s: 0 rss: 33Mb L: 467/2167 MS: 4 CMP-ChangeByte-InsertRepeatedBytes-EraseBytes- DE: &#34;\000\017\377\377&#34;-
-#121	REDUCE cov: 393 ft: 743 corp: 15/14139b lim: 4096 exec/s: 0 rss: 33Mb L: 152/2167 MS: 2 PersAutoDict-EraseBytes- DE: &#34;\000\017\377\377&#34;-
-#134	NEW    cov: 393 ft: 745 corp: 16/15565b lim: 4096 exec/s: 0 rss: 34Mb L: 1426/2167 MS: 3 InsertByte-ChangeASCIIInt-InsertRepeatedBytes-
-#142	NEW    cov: 393 ft: 753 corp: 17/15974b lim: 4096 exec/s: 0 rss: 34Mb L: 409/2167 MS: 3 ChangeByte-EraseBytes-InsertRepeatedBytes-
-#147	NEW    cov: 430 ft: 889 corp: 18/17Kb lim: 4096 exec/s: 0 rss: 34Mb L: 1611/2167 MS: 5 CopyPart-ChangeByte-ChangeByte-EraseBytes-CrossOver-
-#159	REDUCE cov: 430 ft: 889 corp: 18/16Kb lim: 4096 exec/s: 0 rss: 34Mb L: 1025/2167 MS: 2 ChangeBit-EraseBytes-
-#161	NEW    cov: 430 ft: 893 corp: 19/17Kb lim: 4096 exec/s: 0 rss: 34Mb L: 1068/2167 MS: 2 CopyPart-EraseBytes-
-#162	REDUCE cov: 430 ft: 893 corp: 19/17Kb lim: 4096 exec/s: 0 rss: 34Mb L: 32/2167 MS: 1 EraseBytes-
-#163	NEW    cov: 430 ft: 912 corp: 20/18Kb lim: 4096 exec/s: 0 rss: 34Mb L: 653/2167 MS: 1 CrossOver-
-#165	REDUCE cov: 430 ft: 912 corp: 20/18Kb lim: 4096 exec/s: 0 rss: 34Mb L: 620/2167 MS: 2 CrossOver-EraseBytes-
-#166	NEW    cov: 430 ft: 932 corp: 21/18Kb lim: 4096 exec/s: 0 rss: 34Mb L: 421/2167 MS: 1 InsertRepeatedBytes-
-#176	NEW    cov: 434 ft: 990 corp: 22/20Kb lim: 4096 exec/s: 0 rss: 34Mb L: 1307/2167 MS: 5 EraseBytes-CrossOver-ChangeBinInt-PersAutoDict-PersAutoDict- DE: &#34;\377\377\377\377\377\377\377\000&#34;-&#34;\000\017\377\377&#34;-
-#187	NEW    cov: 434 ft: 994 corp: 23/22Kb lim: 4096 exec/s: 0 rss: 34Mb L: 2716/2716 MS: 1 CopyPart-
-#190	REDUCE cov: 434 ft: 994 corp: 23/22Kb lim: 4096 exec/s: 0 rss: 35Mb L: 1192/2716 MS: 3 CopyPart-ShuffleBytes-EraseBytes-
-#192	NEW    cov: 445 ft: 1033 corp: 24/24Kb lim: 4096 exec/s: 0 rss: 35Mb L: 1611/2716 MS: 2 ChangeByte-CrossOver-
-#193	NEW    cov: 445 ft: 1042 corp: 25/24Kb lim: 4096 exec/s: 0 rss: 35Mb L: 425/2716 MS: 1 PersAutoDict- DE: &#34;\000\017\377\377&#34;-
-#201	NEW    cov: 445 ft: 1052 corp: 26/26Kb lim: 4096 exec/s: 0 rss: 35Mb L: 1995/2716 MS: 3 CopyPart-PersAutoDict-CrossOver- DE: &#34;abc@&#34;-
-#222	NEW    cov: 445 ft: 1063 corp: 27/27Kb lim: 4096 exec/s: 0 rss: 35Mb L: 1360/2716 MS: 1 InsertRepeatedBytes-
-#227	REDUCE cov: 445 ft: 1075 corp: 28/29Kb lim: 4096 exec/s: 0 rss: 35Mb L: 1621/2716 MS: 5 InsertByte-InsertRepeatedBytes-InsertRepeatedBytes-CopyPart-CrossOver-
-#232	REDUCE cov: 445 ft: 1075 corp: 28/29Kb lim: 4096 exec/s: 0 rss: 35Mb L: 597/2716 MS: 5 PersAutoDict-ChangeBinInt-ChangeBinInt-CMP-EraseBytes- DE: &#34;\377\377\377\377\377\377\377\000&#34;-&#34;\001\000\000\000&#34;-
-#238	NEW    cov: 447 ft: 1145 corp: 29/30Kb lim: 4096 exec/s: 0 rss: 35Mb L: 1822/2716 MS: 1 CrossOver-
-#242	NEW    cov: 448 ft: 1147 corp: 30/31Kb lim: 4096 exec/s: 0 rss: 35Mb L: 1228/2716 MS: 4 InsertByte-ShuffleBytes-InsertByte-EraseBytes-
-#246	REDUCE cov: 449 ft: 1196 corp: 31/33Kb lim: 4096 exec/s: 0 rss: 35Mb L: 1350/2716 MS: 4 InsertRepeatedBytes-ChangeBinInt-ChangeBinInt-InsertRepeatedBytes-
-#254	REDUCE cov: 449 ft: 1197 corp: 32/33Kb lim: 4096 exec/s: 0 rss: 35Mb L: 341/2716 MS: 3 ChangeByte-ShuffleBytes-CMP- DE: &#34;-\000\000\000\000\000\000\000&#34;-
-#264	NEW    cov: 449 ft: 1201 corp: 33/35Kb lim: 4096 exec/s: 0 rss: 35Mb L: 1995/2716 MS: 5 CopyPart-ChangeBinInt-ChangeASCIIInt-ChangeBinInt-ChangeBinInt-
-#278	NEW    cov: 449 ft: 1215 corp: 34/36Kb lim: 4096 exec/s: 0 rss: 36Mb L: 814/2716 MS: 4 ChangeASCIIInt-ChangeByte-ShuffleBytes-EraseBytes-
-#281	REDUCE cov: 449 ft: 1216 corp: 35/36Kb lim: 4096 exec/s: 0 rss: 36Mb L: 310/2716 MS: 3 CrossOver-InsertByte-CrossOver-
-#287	REDUCE cov: 449 ft: 1216 corp: 35/36Kb lim: 4096 exec/s: 0 rss: 36Mb L: 173/2716 MS: 1 EraseBytes-
-#294	REDUCE cov: 449 ft: 1216 corp: 35/36Kb lim: 4096 exec/s: 0 rss: 36Mb L: 1110/2716 MS: 2 ShuffleBytes-EraseBytes-
-#306	NEW    cov: 449 ft: 1217 corp: 36/37Kb lim: 4096 exec/s: 0 rss: 36Mb L: 1228/2716 MS: 2 ShuffleBytes-CrossOver-
-#307	NEW    cov: 449 ft: 1218 corp: 37/38Kb lim: 4096 exec/s: 0 rss: 36Mb L: 716/2716 MS: 1 EraseBytes-
-#316	NEW    cov: 449 ft: 1219 corp: 38/39Kb lim: 4096 exec/s: 0 rss: 36Mb L: 1426/2716 MS: 4 InsertRepeatedBytes-EraseBytes-ShuffleBytes-InsertByte-
-#333	REDUCE cov: 449 ft: 1220 corp: 39/40Kb lim: 4096 exec/s: 0 rss: 36Mb L: 1201/2716 MS: 2 ShuffleBytes-InsertRepeatedBytes-
-#350	NEW    cov: 449 ft: 1233 corp: 40/43Kb lim: 4096 exec/s: 0 rss: 36Mb L: 2535/2716 MS: 2 ShuffleBytes-CrossOver-
-#356	REDUCE cov: 449 ft: 1235 corp: 41/44Kb lim: 4096 exec/s: 0 rss: 36Mb L: 1110/2716 MS: 1 CrossOver-
-#367	NEW    cov: 449 ft: 1236 corp: 42/46Kb lim: 4096 exec/s: 0 rss: 37Mb L: 1995/2716 MS: 1 PersAutoDict- DE: &#34;abc@&#34;-
-#377	NEW    cov: 449 ft: 1241 corp: 43/48Kb lim: 4096 exec/s: 0 rss: 37Mb L: 2786/2786 MS: 5 ChangeByte-InsertByte-InsertByte-ChangeBinInt-CopyPart-
-#381	NEW    cov: 451 ft: 1253 corp: 44/51Kb lim: 4096 exec/s: 0 rss: 37Mb L: 2095/2786 MS: 4 CrossOver-EraseBytes-CopyPart-CrossOve
+#15	INITED cov: 295 ft: 383 corp: 9/4755b exec/s: 0 rss: 32Mb
+#24	NEW    cov: 295 ft: 390 corp: 10/4875b lim: 4096 exec/s: 0 rss: 33Mb L: 120/1152 MS: 4 ChangeByte-ChangeBit-ShuffleBytes-CrossOver-
+#32	REDUCE cov: 295 ft: 390 corp: 10/4855b lim: 4096 exec/s: 0 rss: 33Mb L: 929/1152 MS: 3 ShuffleBytes-ChangeBinInt-EraseBytes-
+#44	NEW    cov: 295 ft: 392 corp: 11/5412b lim: 4096 exec/s: 0 rss: 33Mb L: 557/1152 MS: 2 ChangeByte-CMP- DE: &#34;\001\213&#34;-
+#50	REDUCE cov: 295 ft: 402 corp: 12/6475b lim: 4096 exec/s: 0 rss: 33Mb L: 1063/1152 MS: 1 CrossOver-
+#63	REDUCE cov: 295 ft: 402 corp: 12/6446b lim: 4096 exec/s: 0 rss: 34Mb L: 91/1152 MS: 3 ChangeBit-InsertByte-EraseBytes-
+	NEW_FUNC[1/1]: 0x56524741d110 in merge_with_prev /work/build/../../src/fribidi/lib/fribidi-bidi.c:74
+#69	NEW    cov: 337 ft: 461 corp: 13/6705b lim: 4096 exec/s: 0 rss: 34Mb L: 259/1152 MS: 1 CopyPart-
+#74	NEW    cov: 337 ft: 468 corp: 14/6936b lim: 4096 exec/s: 0 rss: 34Mb L: 231/1152 MS: 5 ChangeBit-CrossOver-InsertByte-ChangeBinInt-CopyPart-
+#89	NEW    cov: 348 ft: 501 corp: 15/7255b lim: 4096 exec/s: 0 rss: 34Mb L: 319/1152 MS: 5 InsertRepeatedBytes-EraseBytes-ChangeByte-PersAutoDict-CrossOver- DE: &#34;\001\213&#34;-
+#97	NEW    cov: 351 ft: 527 corp: 16/8415b lim: 4096 exec/s: 0 rss: 35Mb L: 1160/1160 MS: 3 PersAutoDict-ChangeBinInt-CMP- DE: &#34;\001\213&#34;-&#34;\001\000\000\000\000\000\000\000&#34;-
+#113	NEW    cov: 352 ft: 541 corp: 17/8646b lim: 4096 exec/s: 0 rss: 35Mb L: 231/1160 MS: 1 PersAutoDict- DE: &#34;\001\000\000\000\000\000\000\000&#34;-
+#117	NEW    cov: 353 ft: 560 corp: 18/9881b lim: 4096 exec/s: 0 rss: 35Mb L: 1235/1235 MS: 4 InsertRepeatedBytes-PersAutoDict-ShuffleBytes-CMP- DE: &#34;\001\213&#34;-&#34;\377\377\017\000&#34;-
+#125	NEW    cov: 353 ft: 565 corp: 19/10389b lim: 4096 exec/s: 0 rss: 35Mb L: 508/1235 MS: 3 EraseBytes-PersAutoDict-InsertRepeatedBytes- DE: &#34;\001\213&#34;-
+#126	NEW    cov: 353 ft: 567 corp: 20/11452b lim: 4096 exec/s: 0 rss: 35Mb L: 1063/1235 MS: 1 PersAutoDict- DE: &#34;\001\000\000\000\000\000\000\000&#34;-
+#136	REDUCE cov: 353 ft: 571 corp: 21/11500b lim: 4096 exec/s: 0 rss: 36Mb L: 48/1235 MS: 5 ChangeBinInt-ChangeBit-ChangeBinInt-ChangeByte-EraseBytes-
+#141	NEW    cov: 353 ft: 597 corp: 22/12255b lim: 4096 exec/s: 0 rss: 36Mb L: 755/1235 MS: 5 PersAutoDict-CrossOver-CrossOver-ChangeByte-PersAutoDict- DE: &#34;\001\000\000\000\000\000\000\000&#34;-&#34;\001\000\000\000\000\000\000\000&#34;-
+#147	NEW    cov: 353 ft: 618 corp: 23/13627b lim: 4096 exec/s: 0 rss: 36Mb L: 1372/1372 MS: 1 CopyPart-
+#159	REDUCE cov: 353 ft: 618 corp: 23/13388b lim: 4096 exec/s: 0 rss: 36Mb L: 921/1372 MS: 2 ChangeBinInt-EraseBytes-
+#177	REDUCE cov: 353 ft: 618 corp: 23/13092b lim: 4096 exec/s: 0 rss: 37Mb L: 459/1372 MS: 3 ShuffleBytes-ShuffleBytes-EraseBytes-
+#193	NEW    cov: 353 ft: 620 corp: 24/13140b lim: 4096 exec/s: 0 rss: 37Mb L: 48/1372 MS: 1 PersAutoDict- DE: &#34;\001\000\000\000\000\000\000\000&#34;-
+#206	NEW    cov: 353 ft: 621 corp: 25/13401b lim: 4096 exec/s: 0 rss: 37Mb L: 261/1372 MS: 3 ShuffleBytes-ChangeByte-PersAutoDict- DE: &#34;\001\213&#34;-
+#223	REDUCE cov: 357 ft: 626 corp: 26/14322b lim: 4096 exec/s: 0 rss: 38Mb L: 921/1372 MS: 2 ChangeBit-PersAutoDict- DE: &#34;\001\000\000\000\000\000\000\000&#34;-
+#252	NEW    cov: 357 ft: 627 corp: 27/14821b lim: 4096 exec/s: 0 rss: 38Mb L: 499/1372 MS: 4 CMP-ChangeByte-ChangeBinInt-EraseBytes- DE: &#34;\005\000\000\000&#34;-
+#260	NEW    cov: 357 ft: 628 corp: 28/15321b lim: 4096 exec/s: 0 rss: 38Mb L: 500/1372 MS: 3 CopyPart-ChangeBit-InsertByte-
+#264	NEW    cov: 357 ft: 629 corp: 29/18Kb lim: 4096 exec/s: 0 rss: 39Mb L: 3336/3336 MS: 4 CrossOver-ChangeByte-InsertRepeatedBytes-CrossOver-
+#280	REDUCE cov: 357 ft: 630 corp: 30/19Kb lim: 4096 exec/s: 0 rss: 39Mb L: 1799/3336 MS: 1 CopyPart-
+#281	REDUCE cov: 357 ft: 630 corp: 30/19Kb lim: 4096 exec/s: 0 rss: 39Mb L: 3334/3334 MS: 1 EraseBytes-
+#291	NEW    cov: 357 ft: 638 corp: 31/20Kb lim: 4096 exec/s: 0 rss: 39Mb L: 26/3334 MS: 5 CrossOver-ChangeBit-ChangeByte-ChangeByte-EraseBytes-
+#303	REDUCE cov: 357 ft: 638 corp: 31/19Kb lim: 4096 exec/s: 0 rss: 40Mb L: 138/3334 MS: 2 InsertByte-EraseBytes-
+#309	REDUCE cov: 357 ft: 642 corp: 32/20Kb lim: 4096 exec/s: 0 rss: 40Mb L: 981/3334 MS: 1 InsertRepeatedBytes-
+#320	NEW    cov: 360 ft: 680 corp: 33/21Kb lim: 4096 exec/s: 0 rss: 40Mb L: 81/3334 MS: 1 InsertRepeatedBytes-
+#324	REDUCE cov: 360 ft: 681 corp: 34/24Kb lim: 4096 exec/s: 0 rss: 40Mb L: 3516/3516 MS: 4 ShuffleBytes-InsertRepeatedBytes-ChangeByte-CopyPart-
+#335	REDUCE cov: 360 ft: 694 corp: 35/25Kb lim: 4096 exec/s: 0 rss: 41Mb L: 1510/3516 MS: 1 CrossOver-
+#341	REDUCE cov: 360 ft: 694 corp: 35/25Kb lim: 4096 exec/s: 0 rss: 41Mb L: 23/3516 MS: 1 EraseBytes-
+#357	REDUCE cov: 360 ft: 694 corp: 35/25Kb lim: 4096 exec/s: 0 rss: 41Mb L: 29/3516 MS: 1 EraseBytes-
+#375	NEW    cov: 360 ft: 704 corp: 36/27Kb lim: 4096 exec/s: 0 rss: 42Mb L: 2060/3516 MS: 3 CopyPart-CopyPart-CrossOver-
+#378	NEW    cov: 360 ft: 705 corp: 37/28Kb lim: 4096 exec/s: 0 rss: 42Mb L: 557/3516 MS: 3 ShuffleBytes-PersAutoDict-CMP- DE: &#34;\001\213&#34;-&#34;\001\000\000\000\000\000\000\234&#34;-
+#379	NEW    cov: 363 ft: 708 corp: 38/29Kb lim: 4096 exec/s: 0 rss: 42Mb L: 740/3516 MS: 1 EraseBytes-
+#386	NEW    cov: 363 ft: 710 corp: 39/29Kb lim: 4096 exec/s: 0 rss: 42Mb L: 556/3516 MS: 2 InsertByte-CMP- DE: &#34;\001\000\000\000\000\000\000\000&#34;-
+#402	NEW    cov: 363 ft: 711 corp: 40/29Kb lim: 4096 exec/s: 0 rss: 42Mb L: 265/3516 MS: 1 PersAutoDict- DE: &#34;\005\000\000\000&#34;-
+#415	NEW    cov: 363 ft: 712 corp: 41/30Kb lim: 4096 exec/s: 0 rss: 43Mb L: 439/3516 MS: 3 PersAutoDict-CopyPart-CopyPart- DE: &#34;\001\000\000\000\000\000\000\000&#34;-
+#436	REDUCE cov: 363 ft: 712 corp: 41/30Kb lim: 4096 exec/s: 0 rss: 43Mb L: 265/3516 MS: 1 EraseBytes-
+#466	NEW    cov: 363 ft: 728 corp: 42/31Kb lim: 4096 exec/s: 0 rss: 44Mb L: 1599/3516 MS: 5 EraseBytes-ShuffleBytes-InsertByte-InsertByte-CrossOver-
+#481	NEW    cov: 363 ft: 733 corp: 43/32Kb lim: 4096 exec/s: 0 rss: 44Mb L: 1076/3516 MS: 5 ChangeBit-PersAutoDict-InsertRepeatedBytes-EraseBytes-CMP- DE: &#34;\377\377\017\000&#34;-&#34;\001\000\000\000\000\000\001\026&#34;-
+#494	REDUCE cov: 363 ft: 735 corp: 44/32Kb lim: 4096 exec/s: 0 rss: 44Mb L: 19/3516 MS: 3 ChangeBinInt-ShuffleBytes-EraseBytes-
+#565	NEW    cov: 363 ft: 736 corp: 45/34Kb lim: 4096 exec/s: 0 rss: 46Mb L: 1475/3516 MS: 1 CrossOver-
+#568	REDUCE cov: 363 ft: 759 corp: 46/36Kb lim: 4096 exec/s: 0 rss: 46Mb L: 1700/3516 MS: 3 ShuffleBytes-ChangeByte-CrossOver-
+#572	NEW    cov: 363 ft: 760 corp: 47/37Kb lim: 4096 exec/s: 0 rss: 46Mb L: 1039/3516 MS: 4 PersAutoDict-ChangeBinInt-PersAutoDict-CopyPart- DE: &#34;\001\000\000\000\000\000\000\000&#34;-&#34;\001\213&#34;-
+#583	NEW    cov: 363 ft: 761 corp: 48/37Kb lim: 4096 exec/s: 0 rss: 46Mb L: 19/3516 MS: 1 ChangeByte-
+#585	NEW    cov: 367 ft: 766 corp: 49/37Kb lim: 4096 exec/s: 0 rss: 46Mb L: 284/3516 MS: 2 ChangeBit-CMP- DE: &#34;\000\000\000\024&#34;-
+#586	NEW    cov: 380 ft: 789 corp: 50/39Kb lim: 4096 exec/s: 0 rss: 46Mb L: 2202/3516 MS: 1 CrossOver-
+#620
 ...truncated...
-es-EraseBytes- DE: &#34;\377\377\377\015&#34;-
-#63849	NEW    cov: 556 ft: 2195 corp: 313/590Kb lim: 4096 exec/s: 2280 rss: 60Mb L: 2177/4096 MS: 2 EraseBytes-InsertByte-
-#63901	REDUCE cov: 556 ft: 2195 corp: 313/590Kb lim: 4096 exec/s: 2282 rss: 60Mb L: 1206/4096 MS: 2 CopyPart-EraseBytes-
-#63910	REDUCE cov: 556 ft: 2195 corp: 313/590Kb lim: 4096 exec/s: 2282 rss: 60Mb L: 1013/4096 MS: 4 PersAutoDict-ShuffleBytes-EraseBytes-CopyPart- DE: &#34;\377\377\377\377\377\377\377\377&#34;-
-#64423	REDUCE cov: 556 ft: 2195 corp: 313/590Kb lim: 4096 exec/s: 2221 rss: 60Mb L: 9/4096 MS: 3 ChangeBit-ShuffleBytes-EraseBytes-
-#64699	REDUCE cov: 556 ft: 2195 corp: 313/590Kb lim: 4096 exec/s: 2231 rss: 60Mb L: 13/4096 MS: 1 EraseBytes-
-#64879	REDUCE cov: 556 ft: 2195 corp: 313/589Kb lim: 4096 exec/s: 2237 rss: 60Mb L: 3088/4096 MS: 5 InsertByte-ChangeByte-PersAutoDict-ChangeBit-CrossOver- DE: &#34;\000\000\000\000\000\000\000\000&#34;-
-#64935	REDUCE cov: 556 ft: 2195 corp: 313/589Kb lim: 4096 exec/s: 2239 rss: 60Mb L: 86/4096 MS: 1 EraseBytes-
-#64955	REDUCE cov: 556 ft: 2195 corp: 313/589Kb lim: 4096 exec/s: 2239 rss: 60Mb L: 18/4096 MS: 5 CMP-CrossOver-CMP-CrossOver-EraseBytes- DE: &#34;\001\000\000\000\000\000\000\000&#34;-&#34;\000\000\376\340&#34;-
-#65035	REDUCE cov: 556 ft: 2195 corp: 313/589Kb lim: 4096 exec/s: 2242 rss: 60Mb L: 80/4096 MS: 5 ChangeBinInt-EraseBytes-CopyPart-CopyPart-EraseBytes-
-#65067	REDUCE cov: 556 ft: 2195 corp: 313/588Kb lim: 4096 exec/s: 2243 rss: 60Mb L: 2460/4096 MS: 2 ShuffleBytes-EraseBytes-
-#65179	REDUCE cov: 556 ft: 2195 corp: 313/588Kb lim: 4096 exec/s: 2247 rss: 60Mb L: 2121/4096 MS: 2 PersAutoDict-EraseBytes- DE: &#34;\000\000\000\000\000\000\001\033&#34;-
-#65270	REDUCE cov: 556 ft: 2195 corp: 313/587Kb lim: 4096 exec/s: 2250 rss: 60Mb L: 1437/4096 MS: 1 EraseBytes-
-#65277	REDUCE cov: 556 ft: 2195 corp: 313/587Kb lim: 4096 exec/s: 2250 rss: 60Mb L: 1897/4096 MS: 2 ChangeBinInt-EraseBytes-
-#65536	pulse  cov: 556 ft: 2195 corp: 313/587Kb lim: 4096 exec/s: 2259 rss: 60Mb
-#65784	REDUCE cov: 556 ft: 2195 corp: 313/587Kb lim: 4096 exec/s: 2268 rss: 60Mb L: 952/4096 MS: 2 EraseBytes-InsertRepeatedBytes-
-#65824	REDUCE cov: 556 ft: 2195 corp: 313/586Kb lim: 4096 exec/s: 2269 rss: 60Mb L: 1212/4096 MS: 5 InsertByte-InsertRepeatedBytes-ChangeByte-CMP-EraseBytes- DE: &#34;\377\377\017\000&#34;-
-#66425	REDUCE cov: 556 ft: 2195 corp: 313/586Kb lim: 4096 exec/s: 2290 rss: 60Mb L: 156/4096 MS: 1 EraseBytes-
-#66741	REDUCE cov: 556 ft: 2195 corp: 313/586Kb lim: 4096 exec/s: 2301 rss: 60Mb L: 45/4096 MS: 1 EraseBytes-
-#67238	REDUCE cov: 556 ft: 2195 corp: 313/586Kb lim: 4096 exec/s: 2318 rss: 60Mb L: 1470/4096 MS: 2 ChangeBinInt-EraseBytes-
-#67734	REDUCE cov: 556 ft: 2195 corp: 313/586Kb lim: 4096 exec/s: 2257 rss: 60Mb L: 1603/4096 MS: 1 EraseBytes-
-#67845	REDUCE cov: 556 ft: 2195 corp: 313/586Kb lim: 4096 exec/s: 2261 rss: 60Mb L: 1719/4096 MS: 1 EraseBytes-
-#67886	REDUCE cov: 556 ft: 2195 corp: 313/586Kb lim: 4096 exec/s: 2262 rss: 60Mb L: 41/4096 MS: 1 EraseBytes-
-#67889	REDUCE cov: 556 ft: 2195 corp: 313/586Kb lim: 4096 exec/s: 2262 rss: 60Mb L: 49/4096 MS: 3 ChangeBinInt-CopyPart-EraseBytes-
-#68097	REDUCE cov: 556 ft: 2195 corp: 313/585Kb lim: 4096 exec/s: 2269 rss: 60Mb L: 1258/4096 MS: 3 CopyPart-CrossOver-InsertRepeatedBytes-
-#68120	REDUCE cov: 556 ft: 2196 corp: 314/587Kb lim: 4096 exec/s: 2270 rss: 60Mb L: 2254/4096 MS: 3 CopyPart-PersAutoDict-InsertRepeatedBytes- DE: &#34;\000\000\000\000\000\000\001\033&#34;-
-#68181	REDUCE cov: 556 ft: 2196 corp: 314/587Kb lim: 4096 exec/s: 2272 rss: 60Mb L: 62/4096 MS: 1 EraseBytes-
-#68194	REDUCE cov: 556 ft: 2196 corp: 314/587Kb lim: 4096 exec/s: 2273 rss: 60Mb L: 70/4096 MS: 3 InsertRepeatedBytes-ChangeBinInt-EraseBytes-
-#68196	REDUCE cov: 556 ft: 2196 corp: 314/587Kb lim: 4096 exec/s: 2273 rss: 60Mb L: 1880/4096 MS: 2 InsertByte-EraseBytes-
-#68248	REDUCE cov: 556 ft: 2196 corp: 314/587Kb lim: 4096 exec/s: 2274 rss: 60Mb L: 134/4096 MS: 2 CMP-EraseBytes- DE: &#34;\001\000\000\000\000\000\000\000&#34;-
-#68537	NEW    cov: 556 ft: 2201 corp: 315/591Kb lim: 4096 exec/s: 2284 rss: 60Mb L: 3962/4096 MS: 4 InsertRepeatedBytes-CopyPart-InsertRepeatedBytes-CopyPart-
-#68657	REDUCE cov: 556 ft: 2201 corp: 315/590Kb lim: 4096 exec/s: 2288 rss: 60Mb L: 1824/4096 MS: 5 ChangeASCIIInt-ChangeASCIIInt-ChangeBit-CMP-EraseBytes- DE: &#34;&amp;\000\000\000&#34;-
-#69083	REDUCE cov: 556 ft: 2201 corp: 315/590Kb lim: 4096 exec/s: 2302 rss: 60Mb L: 1661/4096 MS: 1 EraseBytes-
-#69173	REDUCE cov: 556 ft: 2202 corp: 316/593Kb lim: 4096 exec/s: 2305 rss: 60Mb L: 3733/4096 MS: 5 ChangeBit-EraseBytes-CopyPart-ChangeASCIIInt-CopyPart-
-#69228	NEW    cov: 556 ft: 2203 corp: 317/596Kb lim: 4096 exec/s: 2307 rss: 60Mb L: 2891/4096 MS: 5 CrossOver-CMP-ChangeASCIIInt-PersAutoDict-EraseBytes- DE: &#34;\217\000\000\000\000\000\000\000&#34;-&#34;\001\200&#34;-
-#69284	REDUCE cov: 556 ft: 2203 corp: 317/596Kb lim: 4096 exec/s: 2309 rss: 60Mb L: 3933/4096 MS: 1 EraseBytes-
-#69482	REDUCE cov: 556 ft: 2203 corp: 317/596Kb lim: 4096 exec/s: 2316 rss: 60Mb L: 2929/4096 MS: 3 ChangeBinInt-EraseBytes-InsertRepeatedBytes-
-#69583	REDUCE cov: 556 ft: 2203 corp: 317/596Kb lim: 4096 exec/s: 2319 rss: 60Mb L: 41/4096 MS: 1 EraseBytes-
-#69747	REDUCE cov: 556 ft: 2203 corp: 317/595Kb lim: 4096 exec/s: 2324 rss: 60Mb L: 512/4096 MS: 4 InsertRepeatedBytes-PersAutoDict-ShuffleBytes-EraseBytes- DE: &#34;\234\005\000\000\000\000\000\000&#34;-
-#69783	REDUCE cov: 556 ft: 2203 corp: 317/595Kb lim: 4096 exec/s: 2326 rss: 60Mb L: 22/4096 MS: 1 EraseBytes-
-#69932	REDUCE cov: 556 ft: 2203 corp: 317/594Kb lim: 4096 exec/s: 2331 rss: 60Mb L: 2575/4096 MS: 4 PersAutoDict-ChangeASCIIInt-ShuffleBytes-EraseBytes- DE: &#34;\353\000\000\000\000\000\000\000&#34;-
-#69982	DONE   cov: 556 ft: 2203 corp: 317/594Kb lim: 4096 exec/s: 2257 rss: 60Mb
+eASCIIInt-ChangeBinInt-EraseBytes-
+#160937	NEW    cov: 547 ft: 2094 corp: 402/357Kb lim: 4096 exec/s: 5364 rss: 60Mb L: 474/4079 MS: 3 PersAutoDict-ShuffleBytes-CopyPart- DE: &#34;4\000\000\000\000\000\000\000&#34;-
+#160943	REDUCE cov: 547 ft: 2094 corp: 402/357Kb lim: 4096 exec/s: 5364 rss: 60Mb L: 448/4079 MS: 1 EraseBytes-
+#161011	REDUCE cov: 547 ft: 2094 corp: 402/357Kb lim: 4096 exec/s: 5367 rss: 60Mb L: 159/4079 MS: 3 ChangeByte-ChangeASCIIInt-EraseBytes-
+#161075	REDUCE cov: 547 ft: 2094 corp: 402/357Kb lim: 4096 exec/s: 5369 rss: 60Mb L: 805/4079 MS: 4 EraseBytes-ChangeBinInt-ShuffleBytes-CrossOver-
+#161076	REDUCE cov: 547 ft: 2094 corp: 402/357Kb lim: 4096 exec/s: 5369 rss: 60Mb L: 125/4079 MS: 1 EraseBytes-
+#161414	REDUCE cov: 547 ft: 2094 corp: 402/357Kb lim: 4096 exec/s: 5380 rss: 60Mb L: 189/4079 MS: 3 ShuffleBytes-ChangeBit-EraseBytes-
+#161483	REDUCE cov: 547 ft: 2094 corp: 402/357Kb lim: 4096 exec/s: 5382 rss: 60Mb L: 190/4079 MS: 4 EraseBytes-EraseBytes-PersAutoDict-CopyPart- DE: &#34;\377\377\377\377\377\377\377W&#34;-
+#162011	REDUCE cov: 547 ft: 2094 corp: 402/357Kb lim: 4096 exec/s: 5400 rss: 60Mb L: 631/4079 MS: 3 EraseBytes-EraseBytes-PersAutoDict- DE: &#34;K\002\000\000\000\000\000\000&#34;-
+#162053	REDUCE cov: 547 ft: 2094 corp: 402/357Kb lim: 4096 exec/s: 5401 rss: 60Mb L: 3205/4079 MS: 2 ChangeASCIIInt-EraseBytes-
+#162263	REDUCE cov: 547 ft: 2094 corp: 402/357Kb lim: 4096 exec/s: 5408 rss: 60Mb L: 273/4079 MS: 5 CrossOver-CopyPart-ChangeBinInt-PersAutoDict-EraseBytes- DE: &#34;\000\000\000\000\000\000\001/&#34;-
+#162318	REDUCE cov: 547 ft: 2094 corp: 402/357Kb lim: 4096 exec/s: 5410 rss: 60Mb L: 3033/4079 MS: 5 PersAutoDict-ChangeByte-ChangeBinInt-PersAutoDict-EraseBytes- DE: &#34;K\000&#34;-&#34;\004\000&#34;-
+#162396	REDUCE cov: 547 ft: 2094 corp: 402/356Kb lim: 4096 exec/s: 5413 rss: 60Mb L: 1443/4079 MS: 3 ShuffleBytes-InsertByte-EraseBytes-
+#162642	REDUCE cov: 547 ft: 2094 corp: 402/356Kb lim: 4096 exec/s: 5421 rss: 60Mb L: 1581/4079 MS: 1 EraseBytes-
+#162908	REDUCE cov: 547 ft: 2094 corp: 402/356Kb lim: 4096 exec/s: 5430 rss: 60Mb L: 3437/4079 MS: 1 EraseBytes-
+#163027	REDUCE cov: 547 ft: 2094 corp: 402/355Kb lim: 4096 exec/s: 5434 rss: 60Mb L: 2282/4079 MS: 4 ChangeByte-ChangeBit-InsertByte-EraseBytes-
+#163235	REDUCE cov: 547 ft: 2094 corp: 402/355Kb lim: 4096 exec/s: 5441 rss: 60Mb L: 258/4079 MS: 3 InsertRepeatedBytes-ChangeASCIIInt-EraseBytes-
+#163311	REDUCE cov: 547 ft: 2094 corp: 402/355Kb lim: 4096 exec/s: 5443 rss: 60Mb L: 229/4079 MS: 1 EraseBytes-
+#163313	REDUCE cov: 547 ft: 2094 corp: 402/354Kb lim: 4096 exec/s: 5443 rss: 60Mb L: 2165/4079 MS: 2 ShuffleBytes-EraseBytes-
+#163332	REDUCE cov: 547 ft: 2094 corp: 402/353Kb lim: 4096 exec/s: 5444 rss: 60Mb L: 811/4079 MS: 4 InsertRepeatedBytes-ShuffleBytes-ChangeBinInt-EraseBytes-
+#163448	NEW    cov: 547 ft: 2096 corp: 403/354Kb lim: 4096 exec/s: 5448 rss: 60Mb L: 304/4079 MS: 1 CopyPart-
+#163648	DONE   cov: 547 ft: 2096 corp: 403/354Kb lim: 4096 exec/s: 5278 rss: 60Mb
 ###### Recommended dictionary. ######
-&#34;\037\000\000\000\000\000\000\000&#34; # Uses: 180
-&#34;abc@&#34; # Uses: 163
-&#34;\377\377\377\377\377\377\377\000&#34; # Uses: 178
-&#34;\000\017\377\377&#34; # Uses: 175
-&#34;\001\000\000\000&#34; # Uses: 192
-&#34;-\000\000\000\000\000\000\000&#34; # Uses: 176
-&#34;\001\000\000\000\000\000\002\236&#34; # Uses: 174
-&#34;\001\000\000\000\000\000\000\000&#34; # Uses: 150
-&#34;\000\000\000\000\000\000\001\033&#34; # Uses: 193
-&#34;\001\000\001)&#34; # Uses: 179
-&#34;\377\377\377\377\377\377\377\377&#34; # Uses: 134
-&#34;+\004\000\000\000\000\000\000&#34; # Uses: 195
-&#34;I\000\000\000\000\000\000\000&#34; # Uses: 163
-&#34;\001\000\000\000\000\000\000\257&#34; # Uses: 146
-&#34;\000\000\020\000&#34; # Uses: 161
-&#34;\000\000\000\001&#34; # Uses: 153
-&#34;\001\000\000\000\000\000\000\024&#34; # Uses: 153
-&#34;\377\377\377\377\377\377\377\007&#34; # Uses: 141
-&#34;\001\000\000\000\000\000\000e&#34; # Uses: 159
-&#34;\015\000\000\000\000\000\000\000&#34; # Uses: 149
-&#34;\001\000&#34; # Uses: 139
-&#34;\377\377\377\377\377\377\377\026&#34; # Uses: 126
-&#34;\001\000\000\000\000\000\000\017&#34; # Uses: 123
-&#34;\000\000\000\000\000\000\011!&#34; # Uses: 152
-&#34;\001 ,\010&#34; # Uses: 134
-&#34;\&#34;\006&#34; # Uses: 139
-&#34;\001\000\000\000\000\000\000&gt;&#34; # Uses: 128
-&#34;\377\016\377\377&#34; # Uses: 122
-&#34;\234\005\000\000\000\000\000\000&#34; # Uses: 120
-&#34; \000\000\000\000\000\000\000&#34; # Uses: 110
-&#34;\000\001&#34; # Uses: 116
-&#34;\000\000\000\000\000\000\000\000&#34; # Uses: 89
-&#34;\002\000\000\000&#34; # Uses: 103
-&#34;\323\006\000\000&#34; # Uses: 106
-&#34;\031\000\000\000&#34; # Uses: 119
-&#34;\377\377&#34; # Uses: 98
-&#34;\376\377\017\000&#34; # Uses: 97
-&#34;&gt;\004\000\000\000\000\000\000&#34; # Uses: 101
-&#34;\001\000\000\000\000\000\000\006&#34; # Uses: 87
-&#34;\331\221\331\204&#34; # Uses: 73
-&#34;\353\000\000\000\000\000\000\000&#34; # Uses: 83
-&#34;\001\000\000\000\000\000\000\206&#34; # Uses: 64
-&#34;\377\377\377\377\377\377\377e&#34; # Uses: 63
-&#34;\006\000\000\000\000\000\000\000&#34; # Uses: 66
-&#34;\001\017\377\377&#34; # Uses: 44
-&#34;\007\000\000\000&#34; # Uses: 63
-&#34;\377\377\017\000&#34; # Uses: 83
-&#34;\000\000\000\002&#34; # Uses: 56
-&#34;\000\000\000\000\000\000\012\374&#34; # Uses: 35
-&#34;\012\000\000\000&#34; # Uses: 35
-&#34;\000\000\000\033&#34; # Uses: 16
-&#34;\001\200&#34; # Uses: 19
-&#34;\377\377\377\015&#34; # Uses: 9
-&#34;\000\000\376\340&#34; # Uses: 3
-&#34;&amp;\000\000\000&#34; # Uses: 3
-&#34;\217\000\000\000\000\000\000\000&#34; # Uses: 1
+&#34;\001\213&#34; # Uses: 224
+&#34;\001\000\000\000\000\000\000\000&#34; # Uses: 239
+&#34;\377\377\017\000&#34; # Uses: 208
+&#34;\005\000\000\000&#34; # Uses: 192
+&#34;\001\000\000\000\000\000\000\234&#34; # Uses: 183
+&#34;\001\000\000\000\000\000\001\026&#34; # Uses: 204
+&#34;\000\000\000\024&#34; # Uses: 220
+&#34;P\000\000\000\000\000\000\000&#34; # Uses: 223
+&#34;\377\377\377\377&#34; # Uses: 184
+&#34;\376\377\017\000&#34; # Uses: 188
+&#34;\255\001\000\000\000\000\000\000&#34; # Uses: 195
+&#34;\000\000\000\000&#34; # Uses: 220
+&#34;\376\377\377\377&#34; # Uses: 187
+&#34;\377\377\377\377\377\377\377\030&#34; # Uses: 207
+&#34;\377\377\377\377\377\377\000i&#34; # Uses: 179
+&#34;\203\001\000\000\000\000\000\000&#34; # Uses: 182
+&#34;\377\377\377\017&#34; # Uses: 187
+&#34;\000\000\000\000\000\000\000\021&#34; # Uses: 193
+&#34;\001\000\000\000\000\000\000q&#34; # Uses: 190
+&#34;\000\000\000\000\000\000\000\177&#34; # Uses: 197
+&#34;\001\000\000\000\000\000\000N&#34; # Uses: 182
+&#34;\000\000\000\000\000\000\002\303&#34; # Uses: 212
+&#34;\001\017\377\377&#34; # Uses: 168
+&#34;\022\000\000\000&#34; # Uses: 177
+&#34;\001\000\000\000\000\000\001\021&#34; # Uses: 147
+&#34;\001\247&#34; # Uses: 210
+&#34;\377\377\377\032&#34; # Uses: 209
+&#34;\036\000\000\000\000\000\000\000&#34; # Uses: 165
+&#34;\000\000\000\000\000\000\000\000&#34; # Uses: 169
+&#34;\377\377\377\377\377\377\377\246&#34; # Uses: 172
+&#34;\377\377\377\377\377\377\377\371&#34; # Uses: 178
+&#34;4\000\000\000\000\000\000\000&#34; # Uses: 187
+&#34;\000\017\377\377&#34; # Uses: 170
+&#34;\013\001\000\000\000\000\000\000&#34; # Uses: 151
+&#34;\006\000\000\000&#34; # Uses: 163
+&#34;\011\000\000\000\000\000\000\000&#34; # Uses: 190
+&#34;\331\216\331\205&#34; # Uses: 164
+&#34;\030\000\000\000\000\000\000\000&#34; # Uses: 165
+&#34;g\000\000\000\000\000\000\000&#34; # Uses: 171
+&#34;\012\000\000\000&#34; # Uses: 181
+&#34;\000\000\000\000\000\000\001\255&#34; # Uses: 166
+&#34;\000\020&#34; # Uses: 155
+&#34;\377\011&#34; # Uses: 137
+&#34;\001\001&#34; # Uses: 132
+&#34;\000\000\000\000\000\000\001/&#34; # Uses: 130
+&#34;\001\021&#34; # Uses: 143
+&#34;\346\355  &#34; # Uses: 156
+&#34;\006\002&#34; # Uses: 169
+&#34;\001\000\000\000\000\000\001\264&#34; # Uses: 135
+&#34;\377\377\377\377\377\377\377&lt;&#34; # Uses: 147
+&#34;\001\000\000\000\000\000\001\215&#34; # Uses: 155
+&#34;\233\000\000\000\000\000\000\000&#34; # Uses: 169
+&#34;\377\377\377\377\377\377\377H&#34; # Uses: 145
+&#34;\001\000\000\000\000\000\0000&#34; # Uses: 143
+&#34;\000\000\020\000&#34; # Uses: 106
+&#34;\377\377\377\003&#34; # Uses: 141
+&#34;\211\000\000\000\000\000\000\000&#34; # Uses: 116
+&#34;\377\016\377\377&#34; # Uses: 135
+&#34;\322\006\000\000&#34; # Uses: 137
+&#34;&#39;\000\000\000\000\000\000\000&#34; # Uses: 105
+&#34;A\001\000\000\000\000\000\000&#34; # Uses: 121
+&#34;\000\000&#34; # Uses: 112
+&#34;\377\377\377\377\377\377\377^&#34; # Uses: 102
+&#34;\033\000\000\000&#34; # Uses: 104
+&#34;\000\001&#34; # Uses: 110
+&#34;\377\377\377\377\377\377\377\377&#34; # Uses: 126
+&#34;\001\000\000\031&#34; # Uses: 121
+&#34;\001\000\000\000\000\000\001W&#34; # Uses: 118
+&#34;\020\000\000\000\000\000\000\000&#34; # Uses: 93
+&#34;(\000&#34; # Uses: 96
+&#34;\377\377\377\377\377\377\000\300&#34; # Uses: 113
+&#34;k\005\000\000\000\000\000\000&#34; # Uses: 109
+&#34;\246\000\000\000\000\000\000\000&#34; # Uses: 89
+&#34;\001\000\000\000&#34; # Uses: 114
+&#34;\000\000\000\000\000\000\000#&#34; # Uses: 114
+&#34;\001\000\000\000\000\000\000!&#34; # Uses: 89
+&#34;\377\377\377\377\377\377\377W&#34; # Uses: 99
+&#34;\000\000\000\000\000\000\000G&#34; # Uses: 114
+&#34;\006\000&#34; # Uses: 111
+&#34;\001\000\000\000\000\000\000Q&#34; # Uses: 94
+&#34;\360\000\000\000\000\000\000\000&#34; # Uses: 95
+&#34;\004\000&#34; # Uses: 80
+&#34;2\000\000\000\000\000\000\000&#34; # Uses: 74
+&#34;\303\001\000\000\000\000\000\000&#34; # Uses: 88
+&#34;-\000\000\000\000\000\000\000&#34; # Uses: 93
+&#34;\000\000\000\000\000\000\001=&#34; # Uses: 79
+&#34;\010\000\000\000&#34; # Uses: 104
+&#34;\001\000\000\026&#34; # Uses: 70
+&#34;\002\000\000\000&#34; # Uses: 63
+&#34;\001\000&#34; # Uses: 66
+&#34;\000\000\000\000\000\000\000e&#34; # Uses: 73
+&#34;\012\000\000\000\000\000\000\000&#34; # Uses: 66
+&#34;K\000&#34; # Uses: 61
+&#34;N\000\000\000\000\000\000\000&#34; # Uses: 49
+&#34;/\000\000\000\000\000\000\000&#34; # Uses: 64
+&#34;\377\377\377\377\377\377\377\\&#34; # Uses: 66
+&#34;\014\000\000\000\000\000\000\000&#34; # Uses: 66
+&#34;\377\377\376\377&#34; # Uses: 68
+&#34;X\000\000\000\000\000\000\000&#34; # Uses: 49
+&#34;\001\000\000\013&#34; # Uses: 64
+&#34;(\376\377\007&#34; # Uses: 61
+&#34;.\001\000\000\000\000\000\000&#34; # Uses: 47
+&#34;\006\001\000\000\000\000\000\000&#34; # Uses: 44
+&#34;\001\000\000\000\000\000\000\336&#34; # Uses: 51
+&#34;s\376\377\007&#34; # Uses: 50
+&#34;\000\000\000\000\000\000\000\017&#34; # Uses: 52
+&#34;\377\377\377\377\377\377\377\003&#34; # Uses: 41
+&#34;0\000\000\000\000\000\000\000&#34; # Uses: 31
+&#34;\013\000\000\000&#34; # Uses: 36
+&#34;\377\377\377\377\377\377\377*&#34; # Uses: 41
+&#34;\034\000\000\000\000\000\000\000&#34; # Uses: 31
+&#34;\377\377\377\377\377\377\377S&#34; # Uses: 32
+&#34;G\000\000\000\000\000\000\000&#34; # Uses: 34
+&#34;\274\000\000\000\000\000\000\000&#34; # Uses: 20
+&#34;K\002\000\000\000\000\000\000&#34; # Uses: 31
+&#34;\000\000\000\003&#34; # Uses: 31
+&#34;\015\000\000\000\000\000\000\000&#34; # Uses: 26
+&#34;1\000\000\000\000\000\000\000&#34; # Uses: 18
+&#34;\377\377\377\377\377\377\377\010&#34; # Uses: 21
+&#34;\001\000\000\000\000\000\000\037&#34; # Uses: 10
+&#34;?\000\000\000\000\000\000\000&#34; # Uses: 15
+&#34;\001\000\000\000\000\000\000_&#34; # Uses: 4
+&#34;\242\000\000\000\000\000\000\000&#34; # Uses: 2
+&#34;\000\000\002=&#34; # Uses: 6
 ###### End of recommended dictionary. ######
-Done 69982 runs in 31 second(s)
-stat::number_of_executed_units: 69982
-stat::average_exec_per_sec:     2257
-stat::new_units_added:          744
+Done 163648 runs in 31 second(s)
+stat::number_of_executed_units: 163648
+stat::average_exec_per_sec:     5278
+stat::new_units_added:          1752
 stat::slowest_unit_time_sec:    0
 stat::peak_rss_mb:              60
 

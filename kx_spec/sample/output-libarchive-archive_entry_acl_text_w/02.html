@@ -40,12 +40,12 @@ tbody tr:nth-child(odd) {
 }
 </style>
 <body>
-    LLM:
-
+    LLM: 
+    
 <h1>output-libarchive-archive_entry_acl_text_w / 02</h1>
 Bug: False
 <br>
-Crash reason: -
+Crash reason: FP_NEAR_INIT_CRASH
 <br>
 <br>
 
@@ -56,6 +56,8 @@ Crash reason: -
 
 <pre>
 #include &lt;fuzzer/FuzzedDataProvider.h&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
 #include &lt;cstdint&gt;
 #include &lt;cstddef&gt;
 #include &lt;cstdlib&gt;
@@ -65,41 +67,46 @@ Crash reason: -
 #include &lt;algorithm&gt;
 #include &lt;iterator&gt;
 #include &lt;cctype&gt;
-#include &lt;cwchar&gt; // For wcslen
 
 extern &#34;C&#34; {
-#include &#34;archive_entry.h&#34;
-#include &#34;archive.h&#34;
+#include &#34;archive_entry.h&#34; // Include the necessary header file for archive_entry and related functions
 }
 
 extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    // Initialize the library or any resources within archive_entry_acl_text_w within libarchive needed for the fuzzing process here.
+    // No specific initialization required for this example
     return 0;
 }
 
 extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+
     FuzzedDataProvider dataProvider(data, size);
 
+    // Create a dummy archive_entry object for testing
     archive_entry *entry = archive_entry_new();
     if (entry == nullptr) {
         return 0;
     }
 
+    // Set up the archive_entry object with some dummy data
+    // Note: This is a simplified example. In practice, you may need to set more fields.
+    std::string pathname = dataProvider.ConsumeRandomLengthString(100);
+    archive_entry_set_pathname(entry, pathname.c_str());
+    archive_entry_set_size(entry, dataProvider.ConsumeIntegral&lt;int64_t&gt;());
+
+    // Generate a random flag value
     int flags = dataProvider.ConsumeIntegral&lt;int&gt;();
 
-    // Create a dummy ACL entry to ensure archive_entry_acl_text_w has something to process
-    int qual = dataProvider.ConsumeIntegral&lt;int&gt;(); // Consuming an integer for the &#39;qual&#39; argument
-    archive_entry_acl_add_entry_w(entry, ARCHIVE_ENTRY_ACL_TYPE_ACCESS, ARCHIVE_ENTRY_ACL_EXECUTE, ARCHIVE_ENTRY_ACL_USER, qual, L&#34;user&#34;);
+    // Call the function under test with the generated data
+    const wchar_t *acl_text = archive_entry_acl_text_w(entry, flags);
 
-    const wchar_t *result = archive_entry_acl_text_w(entry, flags);
-
-    if (result != nullptr) {
-        size_t len = wcslen(result);
-        if (len &gt; 0) {
-            std::wcout &lt;&lt; result &lt;&lt; std::endl;
-        }
-    }
-
+    // Clean up
     archive_entry_free(entry);
+
+    // If acl_text is not null, free the allocated memory
+    if (acl_text != nullptr) {
+        free((void*)acl_text);
+    }
 
     return 0;
 }
@@ -113,6 +120,8 @@ Given the following C++ fuzz harness and its build error message, fix the code t
 
 If there is undeclared identifier or unknown type name error, fix it by finding and including the related libraries.
 
+You MUST wrap the headers with &lt;code&gt;extern &#34;C&#34;&lt;/code&gt; if they are C headers, especially the headers are from the project.
+
 Note that some code may need to be wrapped with &lt;code&gt;extern &#34;C&#34;&lt;/code&gt; as their source is C program.
 
 MUST RETURN THE FULL CODE, INCLUDING UNCHANGED PARTS.
@@ -121,6 +130,8 @@ EXTREMELY IMPORTANT: AVOID USING &lt;code&gt;goto&lt;/code&gt;. If you have to w
 Below is the code needs to be built:
 &lt;code&gt;
 #include &lt;fuzzer/FuzzedDataProvider.h&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
 #include &lt;cstdint&gt;
 #include &lt;cstddef&gt;
 #include &lt;cstdlib&gt;
@@ -132,41 +143,66 @@ Below is the code needs to be built:
 #include &lt;cctype&gt;
 
 extern &#34;C&#34; {
-#include &#34;archive_entry.h&#34;
+#include &#34;archive_entry.h&#34; // Include the necessary header file for archive_entry and related functions
 }
 
 extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    // Initialize the library or any resources within archive_entry_acl_text_w within libarchive needed for the fuzzing process here.
+    // No specific initialization required for this example
     return 0;
 }
 
 extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+
     FuzzedDataProvider dataProvider(data, size);
 
+    // Create a dummy archive_entry object for testing
     archive_entry *entry = archive_entry_new();
     if (entry == nullptr) {
         return 0;
     }
 
-    int flags = dataProvider.ConsumeIntegral&lt;int&gt;();
+    // Set up the archive_entry object with some dummy data
+    // Note: This is a simplified example. In practice, you may need to set more fields.
+    archive_entry_set_pathname(entry, &#34;dummy_path&#34;);
+    archive_entry_set_size(entry, dataProvider.ConsumeIntegral&lt;int64_t&gt;());
 
-    const wchar_t *result = archive_entry_acl_text_w(entry, flags);
-
-    if (result != nullptr) {
-        size_t len = wcslen(result);
-        if (len &gt; 0) {
-            std::wcout &lt;&lt; result &lt;&lt; std::endl;
-        }
-    }
-
-    archive_entry_free(entry);
-
-    return 0;
-}
+    // Generate a random flag value
+    int flags = dataProvider.ConsumeIntegral&lt;int civilisation—
+,+organisation ­ commod....
 &lt;/code&gt;
 
 The code has the following build issues:
 &lt;error&gt;
-
+/src/libarchive_fuzzer.cc:40:62: error: character &lt;U+2014&gt; not allowed in an identifier
+   40 |     int flags = dataProvider.ConsumeIntegral&lt;int civilisation—
+      |                                                              ^
+/src/libarchive_fuzzer.cc:40:50: error: type-id cannot have a name
+   40 |     int flags = dataProvider.ConsumeIntegral&lt;int civilisation—
+      |                                                  ^~~~~~~~~~~~~
+/src/libarchive_fuzzer.cc:41:16: error: unexpected character &lt;U+00AD&gt;
+   41 | ,+organisation ­ commod....
+      |                ^
+/src/libarchive_fuzzer.cc:41:3: error: use of undeclared identifier &#39;organisation&#39;
+   41 | ,+organisation ­ commod....
+      |   ^
+/src/libarchive_fuzzer.cc:41:29: error: expected &#39;&gt;&#39;
+   41 | ,+organisation ­ commod....
+      |                            ^
+/src/libarchive_fuzzer.cc:40:45: note: to match this &#39;&lt;&#39;
+   40 |     int flags = dataProvider.ConsumeIntegral&lt;int civilisation—
+      |                                             ^
+/src/libarchive_fuzzer.cc:41:29: error: expected unqualified-id
+   41 | ,+organisation ­ commod....
+      |                            ^
+/src/libarchive_fuzzer.cc:41:29: error: expected &#39;;&#39; at end of declaration
+   41 | ,+organisation ­ commod....
+      |                            ^
+      |                            ;
+/src/libarchive_fuzzer.cc:41:29: error: expected &#39;}&#39;
+/src/libarchive_fuzzer.cc:24:73: note: to match this &#39;{&#39;
+   24 | extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+      |                                                                         ^
 &lt;/error&gt;
 
 Fix code:
@@ -182,12 +218,12 @@ It&#39;s important to show the complete code, not only the fixed line.
 <h3>Code #1</h3>
 
 <pre>
-To fix the code, we need to address potential undeclared identifier or unknown type name errors by including the necessary libraries. Additionally, since `archive_entry_acl_text_w` and related functions are from a C library, we need to ensure they are correctly wrapped with `extern &#34;C&#34;`.
-
-Here is the full, corrected code:
+Here&#39;s the corrected code with the necessary fixes applied:
 
 ```cpp
 #include &lt;fuzzer/FuzzedDataProvider.h&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
 #include &lt;cstdint&gt;
 #include &lt;cstddef&gt;
 #include &lt;cstdlib&gt;
@@ -197,46 +233,56 @@ Here is the full, corrected code:
 #include &lt;algorithm&gt;
 #include &lt;iterator&gt;
 #include &lt;cctype&gt;
-#include &lt;cwchar&gt; // For wcslen
 
 extern &#34;C&#34; {
-#include &#34;archive_entry.h&#34;
+#include &#34;archive_entry.h&#34; // Include the necessary header file for archive_entry and related functions
 }
 
 extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    // Initialize the library or any resources within archive_entry_acl_text_w within libarchive needed for the fuzzing process here.
+    // No specific initialization required for this example
     return 0;
 }
 
 extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+
     FuzzedDataProvider dataProvider(data, size);
 
+    // Create a dummy archive_entry object for testing
     archive_entry *entry = archive_entry_new();
     if (entry == nullptr) {
         return 0;
     }
 
+    // Set up the archive_entry object with some dummy data
+    // Note: This is a simplified example. In practice, you may need to set more fields.
+    archive_entry_set_pathname(entry, &#34;dummy_path&#34;);
+    archive_entry_set_size(entry, dataProvider.ConsumeIntegral&lt;int64_t&gt;());
+
+    // Generate a random flag value
     int flags = dataProvider.ConsumeIntegral&lt;int&gt;();
 
-    const wchar_t *result = archive_entry_acl_text_w(entry, flags);
+    // Call the function under test with the generated data
+    const wchar_t *acl_text = archive_entry_acl_text_w(entry, flags);
 
-    if (result != nullptr) {
-        size_t len = wcslen(result);
-        if (len &gt; 0) {
-            std::wcout &lt;&lt; result &lt;&lt; std::endl;
-        }
-    }
-
+    // Clean up
     archive_entry_free(entry);
+
+    // If acl_text is not null, free the allocated memory
+    if (acl_text != nullptr) {
+        free((void*)acl_text);
+    }
 
     return 0;
 }
 ```
 
-### Explanation of Changes:
-1. **Include `&lt;cwchar&gt;`**: This header is required for the `wcslen` function.
-2. **Ensure `extern &#34;C&#34;`**: The `archive_entry.h` inclusion is already correctly wrapped with `extern &#34;C&#34;` to ensure C linkage.
+Explanation of the changes:
+1. Removed the erroneous characters and text that were causing build issues.
+2. Ensured that `int flags = dataProvider.ConsumeIntegral&lt;int&gt;();` is correctly defined.
+3. Added a call to `archive_entry_acl_text_w` with the generated data.
+4. Added a check to free the memory allocated for `acl_text` if it is not null.
 
-This should resolve the build issues and allow the fuzz harness to compile and run correctly.
 </pre>
 
 
@@ -247,6 +293,8 @@ Given the following C++ fuzz harness and its build error message, fix the code t
 
 If there is undeclared identifier or unknown type name error, fix it by finding and including the related libraries.
 
+You MUST wrap the headers with &lt;code&gt;extern &#34;C&#34;&lt;/code&gt; if they are C headers, especially the headers are from the project.
+
 Note that some code may need to be wrapped with &lt;code&gt;extern &#34;C&#34;&lt;/code&gt; as their source is C program.
 
 MUST RETURN THE FULL CODE, INCLUDING UNCHANGED PARTS.
@@ -255,6 +303,8 @@ EXTREMELY IMPORTANT: AVOID USING &lt;code&gt;goto&lt;/code&gt;. If you have to w
 Below is the code needs to be built:
 &lt;code&gt;
 #include &lt;fuzzer/FuzzedDataProvider.h&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
 #include &lt;cstdint&gt;
 #include &lt;cstddef&gt;
 #include &lt;cstdlib&gt;
@@ -264,36 +314,45 @@ Below is the code needs to be built:
 #include &lt;algorithm&gt;
 #include &lt;iterator&gt;
 #include &lt;cctype&gt;
-#include &lt;cwchar&gt; // For wcslen
 
 extern &#34;C&#34; {
-#include &#34;archive_entry.h&#34;
+#include &#34;archive_entry.h&#34; // Include the necessary header file for archive_entry and related functions
 }
 
 extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    // Initialize the library or any resources within archive_entry_acl_text_w within libarchive needed for the fuzzing process here.
+    // No specific initialization required for this example
     return 0;
 }
 
 extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+
     FuzzedDataProvider dataProvider(data, size);
 
+    // Create a dummy archive_entry object for testing
     archive_entry *entry = archive_entry_new();
     if (entry == nullptr) {
         return 0;
     }
 
+    // Set up the archive_entry object with some dummy data
+    // Note: This is a simplified example. In practice, you may need to set more fields.
+    archive_entry_set_pathname(entry, &#34;dummy_path&#34;);
+    archive_entry_set_size(entry, dataProvider.ConsumeIntegral&lt;int64_t&gt;());
+
+    // Generate a random flag value
     int flags = dataProvider.ConsumeIntegral&lt;int&gt;();
 
-    const wchar_t *result = archive_entry_acl_text_w(entry, flags);
+    // Call the function under test with the generated data
+    const wchar_t *acl_text = archive_entry_acl_text_w(entry, flags);
 
-    if (result != nullptr) {
-        size_t len = wcslen(result);
-        if (len &gt; 0) {
-            std::wcout &lt;&lt; result &lt;&lt; std::endl;
-        }
-    }
-
+    // Clean up
     archive_entry_free(entry);
+
+    // If acl_text is not null, free the allocated memory
+    if (acl_text != nullptr) {
+        free((void*)acl_text);
+    }
 
     return 0;
 }
@@ -317,10 +376,12 @@ It&#39;s important to show the complete code, not only the fixed line.
 <h3>Code #2</h3>
 
 <pre>
-Below is the fixed code that addresses the build issues:
+Here is the complete code with the necessary fixes applied. The primary issues that needed addressing were ensuring the correct headers were included and properly wrapped with `extern &#34;C&#34;` to handle C linkage.
 
 ```cpp
 #include &lt;fuzzer/FuzzedDataProvider.h&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
 #include &lt;cstdint&gt;
 #include &lt;cstddef&gt;
 #include &lt;cstdlib&gt;
@@ -330,51 +391,57 @@ Below is the fixed code that addresses the build issues:
 #include &lt;algorithm&gt;
 #include &lt;iterator&gt;
 #include &lt;cctype&gt;
-#include &lt;cwchar&gt; // For wcslen
 
 extern &#34;C&#34; {
-#include &#34;archive_entry.h&#34;
+#include &#34;archive_entry.h&#34; // Include the necessary header file for archive_entry and related functions
 }
 
 extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    // Initialize the library or any resources within archive_entry_acl_text_w within libarchive needed for the fuzzing process here.
+    // No specific initialization required for this example
     return 0;
 }
 
 extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+
     FuzzedDataProvider dataProvider(data, size);
 
+    // Create a dummy archive_entry object for testing
     archive_entry *entry = archive_entry_new();
     if (entry == nullptr) {
         return 0;
     }
 
+    // Set up the archive_entry object with some dummy data
+    // Note: This is a simplified example. In practice, you may need to set more fields.
+    archive_entry_set_pathname(entry, &#34;dummy_path&#34;);
+    archive_entry_set_size(entry, dataProvider.ConsumeIntegral&lt;int64_t&gt;());
+
+    // Generate a random flag value
     int flags = dataProvider.ConsumeIntegral&lt;int&gt;();
 
-    // Create a dummy ACL entry to ensure archive_entry_acl_text_w has something to process
-    archive_entry_acl_add_entry_w_len(entry, ARCHIVE_ENTRY_ACL_TYPE_ACCESS, ARCHIVE_ENTRY_ACL_EXECUTE, L&#34;user&#34;, 0, nullptr);
+    // Call the function under test with the generated data
+    const wchar_t *acl_text = archive_entry_acl_text_w(entry, flags);
 
-    const wchar_t *result = archive_entry_acl_text_w(entry, flags);
-
-    if (result != nullptr) {
-        size_t len = wcslen(result);
-        if (len &gt; 0) {
-            std::wcout &lt;&lt; result &lt;&lt; std::endl;
-        }
-    }
-
+    // Clean up
     archive_entry_free(entry);
+
+    // If acl_text is not null, free the allocated memory
+    if (acl_text != nullptr) {
+        free((void*)acl_text);
+    }
 
     return 0;
 }
 ```
 
-### Explanation of Changes:
-1. **Include Necessary Headers:** The original code already included all necessary headers.
-2. **Wrap C Headers with `extern &#34;C&#34;`:** The `archive_entry.h` header is correctly wrapped with `extern &#34;C&#34;`.
-3. **Add Dummy ACL Entry:** To ensure `archive_entry_acl_text_w` has something to process, a dummy ACL entry is added using `archive_entry_acl_add_entry_w_len`.
-4. **Full Code Provided:** The complete code, including unchanged parts, is provided to ensure clarity and completeness.
+In this fixed code:
+1. The necessary headers are included and wrapped with `extern &#34;C&#34;` to ensure proper linkage.
+2. The `LLVMFuzzerInitialize` function is defined to initialize any resources if needed, though in this example, no specific initialization is required.
+3. The `LLVMFuzzerTestOneInput` function uses `FuzzedDataProvider` to generate input data for the `archive_entry` object and calls `archive_entry_acl_text_w` with the generated data.
+4. Proper cleanup is performed by freeing the `archive_entry` object and any allocated memory for `acl_text`.
 
-These changes should resolve the build issues and ensure the fuzz harness functions correctly.
+This should resolve the build issues and allow the code to be used for fuzzing.
 </pre>
 
 
@@ -385,6 +452,8 @@ Given the following C++ fuzz harness and its build error message, fix the code t
 
 If there is undeclared identifier or unknown type name error, fix it by finding and including the related libraries.
 
+You MUST wrap the headers with &lt;code&gt;extern &#34;C&#34;&lt;/code&gt; if they are C headers, especially the headers are from the project.
+
 Note that some code may need to be wrapped with &lt;code&gt;extern &#34;C&#34;&lt;/code&gt; as their source is C program.
 
 MUST RETURN THE FULL CODE, INCLUDING UNCHANGED PARTS.
@@ -393,6 +462,8 @@ EXTREMELY IMPORTANT: AVOID USING &lt;code&gt;goto&lt;/code&gt;. If you have to w
 Below is the code needs to be built:
 &lt;code&gt;
 #include &lt;fuzzer/FuzzedDataProvider.h&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
 #include &lt;cstdint&gt;
 #include &lt;cstddef&gt;
 #include &lt;cstdlib&gt;
@@ -402,39 +473,45 @@ Below is the code needs to be built:
 #include &lt;algorithm&gt;
 #include &lt;iterator&gt;
 #include &lt;cctype&gt;
-#include &lt;cwchar&gt; // For wcslen
 
 extern &#34;C&#34; {
-#include &#34;archive_entry.h&#34;
+#include &#34;archive_entry.h&#34; // Include the necessary header file for archive_entry and related functions
 }
 
 extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    // Initialize the library or any resources within archive_entry_acl_text_w within libarchive needed for the fuzzing process here.
+    // No specific initialization required for this example
     return 0;
 }
 
 extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+
     FuzzedDataProvider dataProvider(data, size);
 
+    // Create a dummy archive_entry object for testing
     archive_entry *entry = archive_entry_new();
     if (entry == nullptr) {
         return 0;
     }
 
+    // Set up the archive_entry object with some dummy data
+    // Note: This is a simplified example. In practice, you may need to set more fields.
+    archive_entry_set_pathname(entry, &#34;dummy_path&#34;);
+    archive_entry_set_size(entry, dataProvider.ConsumeIntegral&lt;int64_t&gt;());
+
+    // Generate a random flag value
     int flags = dataProvider.ConsumeIntegral&lt;int&gt;();
 
-    // Create a dummy ACL entry to ensure archive_entry_acl_text_w has something to process
-    archive_entry_acl_add_entry_w_len(entry, ARCHIVE_ENTRY_ACL_TYPE_ACCESS, ARCHIVE_ENTRY_ACL_EXECUTE, L&#34;user&#34;, 0, nullptr);
+    // Call the function under test with the generated data
+    const wchar_t *acl_text = archive_entry_acl_text_w(entry, flags);
 
-    const wchar_t *result = archive_entry_acl_text_w(entry, flags);
-
-    if (result != nullptr) {
-        size_t len = wcslen(result);
-        if (len &gt; 0) {
-            std::wcout &lt;&lt; result &lt;&lt; std::endl;
-        }
-    }
-
+    // Clean up
     archive_entry_free(entry);
+
+    // If acl_text is not null, free the allocated memory
+    if (acl_text != nullptr) {
+        free((void*)acl_text);
+    }
 
     return 0;
 }
@@ -442,19 +519,7 @@ extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) 
 
 The code has the following build issues:
 &lt;error&gt;
-/src/libarchive_fuzzer.cc:32:5: error: use of undeclared identifier &#39;archive_entry_acl_add_entry_w_len&#39;; did you mean &#39;archive_entry_acl_add_entry_w&#39;?
-   32 |     archive_entry_acl_add_entry_w_len(entry, ARCHIVE_ENTRY_ACL_TYPE_ACCESS, ARCHIVE_ENTRY_ACL_EXECUTE, L&#34;user&#34;, 0, nullptr);
-      |     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-      |     archive_entry_acl_add_entry_w
-../libarchive/archive_entry.h:536:16: note: &#39;archive_entry_acl_add_entry_w&#39; declared here
-  536 | __LA_DECL int    archive_entry_acl_add_entry_w(struct archive_entry *,
-      |                  ^
-/src/libarchive_fuzzer.cc:32:104: error: cannot initialize a parameter of type &#39;int&#39; with an lvalue of type &#39;const wchar_t[5]&#39;
-   32 |     archive_entry_acl_add_entry_w_len(entry, ARCHIVE_ENTRY_ACL_TYPE_ACCESS, ARCHIVE_ENTRY_ACL_EXECUTE, L&#34;user&#34;, 0, nullptr);
-      |                                                                                                        ^~~~~~~
-../libarchive/archive_entry.h:537:54: note: passing argument to parameter here
-  537 |             int /* type */, int /* permset */, int /* tag */,
-      |                                                             ^
+
 &lt;/error&gt;
 
 Fix code:
@@ -470,10 +535,12 @@ It&#39;s important to show the complete code, not only the fixed line.
 <h3>Code #3</h3>
 
 <pre>
-Here is the fixed code:
+Here is the complete code with the necessary fixes applied. I&#39;ve included the necessary headers and ensured that all C headers are wrapped with `extern &#34;C&#34;`. Additionally, I made sure to handle the memory management correctly.
 
 ```cpp
 #include &lt;fuzzer/FuzzedDataProvider.h&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
 #include &lt;cstdint&gt;
 #include &lt;cstddef&gt;
 #include &lt;cstdlib&gt;
@@ -483,50 +550,51 @@ Here is the fixed code:
 #include &lt;algorithm&gt;
 #include &lt;iterator&gt;
 #include &lt;cctype&gt;
-#include &lt;cwchar&gt; // For wcslen
 
 extern &#34;C&#34; {
-#include &#34;archive_entry.h&#34;
+#include &#34;archive_entry.h&#34; // Include the necessary header file for archive_entry and related functions
 }
 
 extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    // Initialize the library or any resources within archive_entry_acl_text_w within libarchive needed for the fuzzing process here.
+    // No specific initialization required for this example
     return 0;
 }
 
 extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+
     FuzzedDataProvider dataProvider(data, size);
 
+    // Create a dummy archive_entry object for testing
     archive_entry *entry = archive_entry_new();
     if (entry == nullptr) {
         return 0;
     }
 
+    // Set up the archive_entry object with some dummy data
+    // Note: This is a simplified example. In practice, you may need to set more fields.
+    archive_entry_set_pathname(entry, &#34;dummy_path&#34;);
+    archive_entry_set_size(entry, dataProvider.ConsumeIntegral&lt;int64_t&gt;());
+
+    // Generate a random flag value
     int flags = dataProvider.ConsumeIntegral&lt;int&gt;();
 
-    // Create a dummy ACL entry to ensure archive_entry_acl_text_w has something to process
-    archive_entry_acl_add_entry_w(entry, ARCHIVE_ENTRY_ACL_TYPE_ACCESS, ARCHIVE_ENTRY_ACL_EXECUTE, ARCHIVE_ENTRY_ACL_USER, L&#34;user&#34;);
+    // Call the function under test with the generated data
+    const wchar_t *acl_text = archive_entry_acl_text_w(entry, flags);
 
-    const wchar_t *result = archive_entry_acl_text_w(entry, flags);
-
-    if (result != nullptr) {
-        size_t len = wcslen(result);
-        if (len &gt; 0) {
-            std::wcout &lt;&lt; result &lt;&lt; std::endl;
-        }
-    }
-
+    // Clean up
     archive_entry_free(entry);
+
+    // If acl_text is not null, free the allocated memory
+    if (acl_text != nullptr) {
+        free((void*)acl_text);
+    }
 
     return 0;
 }
 ```
 
-### Explanation:
-1. **Include necessary headers**: The necessary headers are already included.
-2. **Fix the function call**: The function `archive_entry_acl_add_entry_w_len` does not exist. The correct function is `archive_entry_acl_add_entry_w`.
-3. **Correct the parameters**: The `archive_entry_acl_add_entry_w` function expects an integer for the tag parameter. The correct tag in this context is `ARCHIVE_ENTRY_ACL_USER`.
-
-By making these changes, the code should now compile and run correctly for fuzzing.
+This should resolve any build issues related to undeclared identifiers or unknown type names by including the necessary headers and wrapping them with `extern &#34;C&#34;`. This ensures compatibility with C++ linkage.
 </pre>
 
 
@@ -537,6 +605,8 @@ Given the following C++ fuzz harness and its build error message, fix the code t
 
 If there is undeclared identifier or unknown type name error, fix it by finding and including the related libraries.
 
+You MUST wrap the headers with &lt;code&gt;extern &#34;C&#34;&lt;/code&gt; if they are C headers, especially the headers are from the project.
+
 Note that some code may need to be wrapped with &lt;code&gt;extern &#34;C&#34;&lt;/code&gt; as their source is C program.
 
 MUST RETURN THE FULL CODE, INCLUDING UNCHANGED PARTS.
@@ -545,6 +615,8 @@ EXTREMELY IMPORTANT: AVOID USING &lt;code&gt;goto&lt;/code&gt;. If you have to w
 Below is the code needs to be built:
 &lt;code&gt;
 #include &lt;fuzzer/FuzzedDataProvider.h&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
 #include &lt;cstdint&gt;
 #include &lt;cstddef&gt;
 #include &lt;cstdlib&gt;
@@ -554,39 +626,45 @@ Below is the code needs to be built:
 #include &lt;algorithm&gt;
 #include &lt;iterator&gt;
 #include &lt;cctype&gt;
-#include &lt;cwchar&gt; // For wcslen
 
 extern &#34;C&#34; {
-#include &#34;archive_entry.h&#34;
+#include &#34;archive_entry.h&#34; // Include the necessary header file for archive_entry and related functions
 }
 
 extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    // Initialize the library or any resources within archive_entry_acl_text_w within libarchive needed for the fuzzing process here.
+    // No specific initialization required for this example
     return 0;
 }
 
 extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+
     FuzzedDataProvider dataProvider(data, size);
 
+    // Create a dummy archive_entry object for testing
     archive_entry *entry = archive_entry_new();
     if (entry == nullptr) {
         return 0;
     }
 
+    // Set up the archive_entry object with some dummy data
+    // Note: This is a simplified example. In practice, you may need to set more fields.
+    archive_entry_set_pathname(entry, &#34;dummy_path&#34;);
+    archive_entry_set_size(entry, dataProvider.ConsumeIntegral&lt;int64_t&gt;());
+
+    // Generate a random flag value
     int flags = dataProvider.ConsumeIntegral&lt;int&gt;();
 
-    // Create a dummy ACL entry to ensure archive_entry_acl_text_w has something to process
-    archive_entry_acl_add_entry_w(entry, ARCHIVE_ENTRY_ACL_TYPE_ACCESS, ARCHIVE_ENTRY_ACL_EXECUTE, ARCHIVE_ENTRY_ACL_USER, L&#34;user&#34;);
+    // Call the function under test with the generated data
+    const wchar_t *acl_text = archive_entry_acl_text_w(entry, flags);
 
-    const wchar_t *result = archive_entry_acl_text_w(entry, flags);
-
-    if (result != nullptr) {
-        size_t len = wcslen(result);
-        if (len &gt; 0) {
-            std::wcout &lt;&lt; result &lt;&lt; std::endl;
-        }
-    }
-
+    // Clean up
     archive_entry_free(entry);
+
+    // If acl_text is not null, free the allocated memory
+    if (acl_text != nullptr) {
+        free((void*)acl_text);
+    }
 
     return 0;
 }
@@ -594,16 +672,7 @@ extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) 
 
 The code has the following build issues:
 &lt;error&gt;
-/src/libarchive_fuzzer.cc:32:5: error: no matching function for call to &#39;archive_entry_acl_add_entry_w&#39;
-   32 |     archive_entry_acl_add_entry_w(entry, ARCHIVE_ENTRY_ACL_TYPE_ACCESS, ARCHIVE_ENTRY_ACL_EXECUTE, ARCHIVE_ENTRY_ACL_USER, L&#34;user&#34;);
-      |     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-../libarchive/archive_entry.h:536:16: note: candidate function not viable: requires 6 arguments, but 5 were provided
-  536 | __LA_DECL int    archive_entry_acl_add_entry_w(struct archive_entry *,
-      |                  ^                             ~~~~~~~~~~~~~~~~~~~~~~~
-  537 |             int /* type */, int /* permset */, int /* tag */,
-      |             ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-  538 |             int /* qual */, const wchar_t * /* name */);
-      |             ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 &lt;/error&gt;
 
 Fix code:
@@ -619,12 +688,12 @@ It&#39;s important to show the complete code, not only the fixed line.
 <h3>Code #4</h3>
 
 <pre>
-Sure, let&#39;s fix the code based on the error message provided. The error indicates that the function `archive_entry_acl_add_entry_w` requires 6 arguments, but only 5 were provided. We need to add the missing argument to the function call.
-
-Here&#39;s the fixed code:
+Here is the complete code with the necessary fixes applied:
 
 ```cpp
 #include &lt;fuzzer/FuzzedDataProvider.h&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
 #include &lt;cstdint&gt;
 #include &lt;cstddef&gt;
 #include &lt;cstdlib&gt;
@@ -634,46 +703,57 @@ Here&#39;s the fixed code:
 #include &lt;algorithm&gt;
 #include &lt;iterator&gt;
 #include &lt;cctype&gt;
-#include &lt;cwchar&gt; // For wcslen
 
 extern &#34;C&#34; {
-#include &#34;archive_entry.h&#34;
+#include &#34;archive_entry.h&#34; // Include the necessary header file for archive_entry and related functions
 }
 
 extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    // Initialize the library or any resources within archive_entry_acl_text_w within libarchive needed for the fuzzing process here.
+    // No specific initialization required for this example
     return 0;
 }
 
 extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+
     FuzzedDataProvider dataProvider(data, size);
 
+    // Create a dummy archive_entry object for testing
     archive_entry *entry = archive_entry_new();
     if (entry == nullptr) {
         return 0;
     }
 
+    // Set up the archive_entry object with some dummy data
+    // Note: This is a simplified example. In practice, you may need to set more fields.
+    std::string pathname = dataProvider.ConsumeRandomLengthString(100);
+    archive_entry_set_pathname(entry, pathname.c_str());
+    archive_entry_set_size(entry, dataProvider.ConsumeIntegral&lt;int64_t&gt;());
+
+    // Generate a random flag value
     int flags = dataProvider.ConsumeIntegral&lt;int&gt;();
 
-    // Create a dummy ACL entry to ensure archive_entry_acl_text_w has something to process
-    int qual = dataProvider.ConsumeIntegral&lt;int&gt;(); // Consuming an integer for the &#39;qual&#39; argument
-    archive_entry_acl_add_entry_w(entry, ARCHIVE_ENTRY_ACL_TYPE_ACCESS, ARCHIVE_ENTRY_ACL_EXECUTE, ARCHIVE_ENTRY_ACL_USER, qual, L&#34;user&#34;);
+    // Call the function under test with the generated data
+    const wchar_t *acl_text = archive_entry_acl_text_w(entry, flags);
 
-    const wchar_t *result = archive_entry_acl_text_w(entry, flags);
-
-    if (result != nullptr) {
-        size_t len = wcslen(result);
-        if (len &gt; 0) {
-            std::wcout &lt;&lt; result &lt;&lt; std::endl;
-        }
-    }
-
+    // Clean up
     archive_entry_free(entry);
+
+    // If acl_text is not null, free the allocated memory
+    if (acl_text != nullptr) {
+        free((void*)acl_text);
+    }
 
     return 0;
 }
 ```
 
-In this fixed version of the code, we consume an additional integer from the `FuzzedDataProvider` to use as the `qual` argument in the `archive_entry_acl_add_entry_w` function call. This ensures that the function is called with the correct number of arguments. The rest of the code remains unchanged.
+### Explanation of Fixes:
+1. **Include Necessary Headers**: The `archive_entry.h` header file is included within an `extern &#34;C&#34;` block to ensure proper linkage since it is a C header.
+2. **ConsumeRandomLengthString**: The `pathname` is generated using `ConsumeRandomLengthString` to ensure it is not null and has a variable length, which maximizes the fuzzing input variety.
+3. **Memory Management**: Ensure that if `acl_text` is not null, it is properly freed to avoid memory leaks.
+
+This should resolve any build issues and ensure the code is ready for fuzzing.
 </pre>
 
 
@@ -684,6 +764,8 @@ Given the following C++ fuzz harness and its build error message, fix the code t
 
 If there is undeclared identifier or unknown type name error, fix it by finding and including the related libraries.
 
+You MUST wrap the headers with &lt;code&gt;extern &#34;C&#34;&lt;/code&gt; if they are C headers, especially the headers are from the project.
+
 Note that some code may need to be wrapped with &lt;code&gt;extern &#34;C&#34;&lt;/code&gt; as their source is C program.
 
 MUST RETURN THE FULL CODE, INCLUDING UNCHANGED PARTS.
@@ -692,6 +774,8 @@ EXTREMELY IMPORTANT: AVOID USING &lt;code&gt;goto&lt;/code&gt;. If you have to w
 Below is the code needs to be built:
 &lt;code&gt;
 #include &lt;fuzzer/FuzzedDataProvider.h&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
 #include &lt;cstdint&gt;
 #include &lt;cstddef&gt;
 #include &lt;cstdlib&gt;
@@ -701,40 +785,46 @@ Below is the code needs to be built:
 #include &lt;algorithm&gt;
 #include &lt;iterator&gt;
 #include &lt;cctype&gt;
-#include &lt;cwchar&gt; // For wcslen
 
 extern &#34;C&#34; {
-#include &#34;archive_entry.h&#34;
+#include &#34;archive_entry.h&#34; // Include the necessary header file for archive_entry and related functions
 }
 
 extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    // Initialize the library or any resources within archive_entry_acl_text_w within libarchive needed for the fuzzing process here.
+    // No specific initialization required for this example
     return 0;
 }
 
 extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+
     FuzzedDataProvider dataProvider(data, size);
 
+    // Create a dummy archive_entry object for testing
     archive_entry *entry = archive_entry_new();
     if (entry == nullptr) {
         return 0;
     }
 
+    // Set up the archive_entry object with some dummy data
+    // Note: This is a simplified example. In practice, you may need to set more fields.
+    std::string pathname = dataProvider.ConsumeRandomLengthString(100);
+    archive_entry_set_pathname(entry, pathname.c_str());
+    archive_entry_set_size(entry, dataProvider.ConsumeIntegral&lt;int64_t&gt;());
+
+    // Generate a random flag value
     int flags = dataProvider.ConsumeIntegral&lt;int&gt;();
 
-    // Create a dummy ACL entry to ensure archive_entry_acl_text_w has something to process
-    int qual = dataProvider.ConsumeIntegral&lt;int&gt;(); // Consuming an integer for the &#39;qual&#39; argument
-    archive_entry_acl_add_entry_w(entry, ARCHIVE_ENTRY_ACL_TYPE_ACCESS, ARCHIVE_ENTRY_ACL_EXECUTE, ARCHIVE_ENTRY_ACL_USER, qual, L&#34;user&#34;);
+    // Call the function under test with the generated data
+    const wchar_t *acl_text = archive_entry_acl_text_w(entry, flags);
 
-    const wchar_t *result = archive_entry_acl_text_w(entry, flags);
-
-    if (result != nullptr) {
-        size_t len = wcslen(result);
-        if (len &gt; 0) {
-            std::wcout &lt;&lt; result &lt;&lt; std::endl;
-        }
-    }
-
+    // Clean up
     archive_entry_free(entry);
+
+    // If acl_text is not null, free the allocated memory
+    if (acl_text != nullptr) {
+        free((void*)acl_text);
+    }
 
     return 0;
 }
@@ -762,6 +852,8 @@ Here is the complete fixed code:
 
 ```cpp
 #include &lt;fuzzer/FuzzedDataProvider.h&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
 #include &lt;cstdint&gt;
 #include &lt;cstddef&gt;
 #include &lt;cstdlib&gt;
@@ -771,53 +863,55 @@ Here is the complete fixed code:
 #include &lt;algorithm&gt;
 #include &lt;iterator&gt;
 #include &lt;cctype&gt;
-#include &lt;cwchar&gt; // For wcslen
 
 extern &#34;C&#34; {
-#include &#34;archive_entry.h&#34;
-#include &#34;archive.h&#34;
+#include &#34;archive_entry.h&#34; // Include the necessary header file for archive_entry and related functions
 }
 
 extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    // Initialize the library or any resources within archive_entry_acl_text_w within libarchive needed for the fuzzing process here.
+    // No specific initialization required for this example
     return 0;
 }
 
 extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+
     FuzzedDataProvider dataProvider(data, size);
 
+    // Create a dummy archive_entry object for testing
     archive_entry *entry = archive_entry_new();
     if (entry == nullptr) {
         return 0;
     }
 
+    // Set up the archive_entry object with some dummy data
+    // Note: This is a simplified example. In practice, you may need to set more fields.
+    std::string pathname = dataProvider.ConsumeRandomLengthString(100);
+    archive_entry_set_pathname(entry, pathname.c_str());
+    archive_entry_set_size(entry, dataProvider.ConsumeIntegral&lt;int64_t&gt;());
+
+    // Generate a random flag value
     int flags = dataProvider.ConsumeIntegral&lt;int&gt;();
 
-    // Create a dummy ACL entry to ensure archive_entry_acl_text_w has something to process
-    int qual = dataProvider.ConsumeIntegral&lt;int&gt;(); // Consuming an integer for the &#39;qual&#39; argument
-    archive_entry_acl_add_entry_w(entry, ARCHIVE_ENTRY_ACL_TYPE_ACCESS, ARCHIVE_ENTRY_ACL_EXECUTE, ARCHIVE_ENTRY_ACL_USER, qual, L&#34;user&#34;);
+    // Call the function under test with the generated data
+    const wchar_t *acl_text = archive_entry_acl_text_w(entry, flags);
 
-    const wchar_t *result = archive_entry_acl_text_w(entry, flags);
-
-    if (result != nullptr) {
-        size_t len = wcslen(result);
-        if (len &gt; 0) {
-            std::wcout &lt;&lt; result &lt;&lt; std::endl;
-        }
-    }
-
+    // Clean up
     archive_entry_free(entry);
+
+    // If acl_text is not null, free the allocated memory
+    if (acl_text != nullptr) {
+        free((void*)acl_text);
+    }
 
     return 0;
 }
 ```
 
-Explanation of the fixes:
-
-1. **Include the `archive.h` header**: This header is necessary for the `archive_entry_acl_add_entry_w` and `archive_entry_acl_text_w` functions to be recognized. Without this header, the compiler would not know about these functions, leading to undeclared identifier errors.
-
-2. **Wrap the C library includes with `extern &#34;C&#34;`**: Since the `archive_entry.h` and `archive.h` headers are from a C library, they need to be wrapped with `extern &#34;C&#34;` to prevent name mangling when included in a C++ program. This ensures that the linker can correctly link the C functions called from the C++ code.
-
-By making these changes, the code should now compile and run correctly, allowing the fuzzing harness to test the `archive_entry_acl_text_w` function with various inputs.
+Explanation of the changes:
+1. The `extern &#34;C&#34;` block is used to include the `archive_entry.h` header file, ensuring that the C functions are correctly linked.
+2. The rest of the code remains unchanged as it correctly sets up the `archive_entry` object, generates random data using `FuzzedDataProvider`, and calls the `archive_entry_acl_text_w` function with the generated data.
+3. The code ensures proper cleanup of resources by freeing the `archive_entry` object and the `acl_text` if it is not null.
 </pre>
 
 
@@ -828,12 +922,82 @@ Fixing /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-libarchive-archive_entr
 Fixing /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-libarchive-archive_entry_acl_text_w/fixed_targets/02.cc with gpt-4o, attempt 3.
 Fixing /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-libarchive-archive_entry_acl_text_w/fixed_targets/02.cc with gpt-4o, attempt 4.
 Fixing /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-libarchive-archive_entry_acl_text_w/fixed_targets/02.cc with gpt-4o, attempt 5.
-Failed to build /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-libarchive-archive_entry_acl_text_w/fixed_targets/02.cc with gpt-4o in 5 iterations of fixing.
+Successfully built /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-libarchive-archive_entry_acl_text_w/fixed_targets/02.cc with gpt-4o in 5 iterations of fixing.
+Warning: Failed to fix semantic error FP_NEAR_INIT_CRASH in libarchive-archive_entry_acl_text_w-02.
 
 </pre>
 
 <h2>Run logs</h2>
 <pre>
+INFO:__main__:Running: docker run --rm --privileged --shm-size=2g --platform linux/amd64 -e FUZZING_ENGINE=libfuzzer -e SANITIZER=address -e RUN_FUZZER_MODE=interactive -e HELPER=True -v /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-libarchive-archive_entry_acl_text_w/corpora/02.cc:/tmp/libarchive_fuzzer_corpus -v /tmp/tmpk31m_hoq/build/out/libarchive-archive_entry_acl_text_w-02:/out -t gcr.io/oss-fuzz-base/base-runner run_fuzzer libarchive_fuzzer -print_final_stats=1 -max_total_time=30 -len_control=0 -timeout=30.
+vm.mmap_rnd_bits = 28
+rm: cannot remove &#39;/tmp/libarchive_fuzzer_corpus&#39;: Device or resource busy
+Using seed corpus: libarchive_fuzzer_seed_corpus.zip
+/out/libarchive_fuzzer -rss_limit_mb=2560 -timeout=25 -print_final_stats=1 -max_total_time=30 -len_control=0 -timeout=30 /tmp/libarchive_fuzzer_corpus &lt; /dev/null
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 658126935
+INFO: Loaded 1 modules   (2615 inline 8-bit counters): 2615 [0x561a6ff1a588, 0x561a6ff1afbf), 
+INFO: Loaded 1 PC tables (2615 PCs): 2615 [0x561a6ff1afc0,0x561a6ff25330), 
+INFO:      965 files found in /tmp/libarchive_fuzzer_corpus
+INFO: -max_len is not provided; libFuzzer will not generate inputs larger than 1048576 bytes
+INFO: seed corpus: files: 965 min: 2b max: 27570880b total: 104912470b rss: 32Mb
+=================================================================
+[1m[31m==13==ERROR: AddressSanitizer: attempting double-free on 0x50c000000340 in thread T0:
+[1m[0mSCARINESS: 42 (double-free)
+    #0 0x561a6fdff856 in free /src/llvm-project/compiler-rt/lib/asan/asan_malloc_linux.cpp:52:3
+    #1 0x561a6fe3ef6a in LLVMFuzzerTestOneInput /src/libarchive_fuzzer.cc:51:9
+    #2 0x561a6fcf1560 in fuzzer::Fuzzer::ExecuteCallback(unsigned char const*, unsigned long) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:614:13
+    #3 0x561a6fcf0d85 in fuzzer::Fuzzer::RunOne(unsigned char const*, unsigned long, bool, fuzzer::InputInfo*, bool, bool*) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:516:7
+    #4 0x561a6fcf2d12 in fuzzer::Fuzzer::ReadAndExecuteSeedCorpora(std::__Fuzzer::vector&lt;fuzzer::SizedFile, std::__Fuzzer::allocator&lt;fuzzer::SizedFile&gt;&gt;&amp;) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:829:7
+    #5 0x561a6fcf3047 in fuzzer::Fuzzer::Loop(std::__Fuzzer::vector&lt;fuzzer::SizedFile, std::__Fuzzer::allocator&lt;fuzzer::SizedFile&gt;&gt;&amp;) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:867:3
+    #6 0x561a6fce1656 in fuzzer::FuzzerDriver(int*, char***, int (*)(unsigned char const*, unsigned long)) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerDriver.cpp:914:6
+    #7 0x561a6fd0db82 in main /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerMain.cpp:20:10
+    #8 0x7f0a342dd082 in __libc_start_main (/lib/x86_64-linux-gnu/libc.so.6+0x24082) (BuildId: 0702430aef5fa3dda43986563e9ffcc47efbd75e)
+    #9 0x561a6fcd27cd in _start (/out/libarchive_fuzzer+0x567cd)
+
+DEDUP_TOKEN: __interceptor_free--LLVMFuzzerTestOneInput--fuzzer::Fuzzer::ExecuteCallback(unsigned char const*, unsigned long)
+[1m[32m0x50c000000340 is located 0 bytes inside of 128-byte region [0x50c000000340,0x50c0000003c0)
+[1m[0m[1m[35mfreed by thread T0 here:[1m[0m
+    #0 0x561a6fdff856 in free /src/llvm-project/compiler-rt/lib/asan/asan_malloc_linux.cpp:52:3
+    #1 0x561a6fe60fd5 in archive_acl_clear /src/libarchive/libarchive/archive_acl.c:140:2
+    #2 0x561a6fe3fb55 in archive_entry_clear /src/libarchive/libarchive/archive_entry.c:165:2
+    #3 0x561a6fe404d7 in archive_entry_free /src/libarchive/libarchive/archive_entry.c:251:2
+    #4 0x561a6fe3ef4f in LLVMFuzzerTestOneInput /src/libarchive_fuzzer.cc:47:5
+    #5 0x561a6fcf1560 in fuzzer::Fuzzer::ExecuteCallback(unsigned char const*, unsigned long) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:614:13
+    #6 0x561a6fcf0d85 in fuzzer::Fuzzer::RunOne(unsigned char const*, unsigned long, bool, fuzzer::InputInfo*, bool, bool*) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:516:7
+    #7 0x561a6fcf2d12 in fuzzer::Fuzzer::ReadAndExecuteSeedCorpora(std::__Fuzzer::vector&lt;fuzzer::SizedFile, std::__Fuzzer::allocator&lt;fuzzer::SizedFile&gt;&gt;&amp;) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:829:7
+    #8 0x561a6fcf3047 in fuzzer::Fuzzer::Loop(std::__Fuzzer::vector&lt;fuzzer::SizedFile, std::__Fuzzer::allocator&lt;fuzzer::SizedFile&gt;&gt;&amp;) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:867:3
+    #9 0x561a6fce1656 in fuzzer::FuzzerDriver(int*, char***, int (*)(unsigned char const*, unsigned long)) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerDriver.cpp:914:6
+    #10 0x561a6fd0db82 in main /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerMain.cpp:20:10
+    #11 0x7f0a342dd082 in __libc_start_main (/lib/x86_64-linux-gnu/libc.so.6+0x24082) (BuildId: 0702430aef5fa3dda43986563e9ffcc47efbd75e)
+
+DEDUP_TOKEN: __interceptor_free--archive_acl_clear--archive_entry_clear
+[1m[35mpreviously allocated by thread T0 here:[1m[0m
+    #0 0x561a6fdffafe in malloc /src/llvm-project/compiler-rt/lib/asan/asan_malloc_linux.cpp:69:3
+    #1 0x561a6fe6308b in archive_acl_to_text_w /src/libarchive/libarchive/archive_acl.c:696:23
+    #2 0x561a6fe48582 in archive_entry_acl_text_w /src/libarchive/libarchive/archive_entry.c:1773:27
+    #3 0x561a6fe3ef3e in LLVMFuzzerTestOneInput /src/libarchive_fuzzer.cc:44:31
+    #4 0x561a6fcf1560 in fuzzer::Fuzzer::ExecuteCallback(unsigned char const*, unsigned long) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:614:13
+    #5 0x561a6fcf0d85 in fuzzer::Fuzzer::RunOne(unsigned char const*, unsigned long, bool, fuzzer::InputInfo*, bool, bool*) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:516:7
+    #6 0x561a6fcf2d12 in fuzzer::Fuzzer::ReadAndExecuteSeedCorpora(std::__Fuzzer::vector&lt;fuzzer::SizedFile, std::__Fuzzer::allocator&lt;fuzzer::SizedFile&gt;&gt;&amp;) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:829:7
+    #7 0x561a6fcf3047 in fuzzer::Fuzzer::Loop(std::__Fuzzer::vector&lt;fuzzer::SizedFile, std::__Fuzzer::allocator&lt;fuzzer::SizedFile&gt;&gt;&amp;) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:867:3
+    #8 0x561a6fce1656 in fuzzer::FuzzerDriver(int*, char***, int (*)(unsigned char const*, unsigned long)) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerDriver.cpp:914:6
+    #9 0x561a6fd0db82 in main /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerMain.cpp:20:10
+    #10 0x7f0a342dd082 in __libc_start_main (/lib/x86_64-linux-gnu/libc.so.6+0x24082) (BuildId: 0702430aef5fa3dda43986563e9ffcc47efbd75e)
+
+DEDUP_TOKEN: __interceptor_malloc--archive_acl_to_text_w--archive_entry_acl_text_w
+SUMMARY: AddressSanitizer: double-free /src/llvm-project/compiler-rt/lib/asan/asan_malloc_linux.cpp:52:3 in free
+==13==ABORTING
+MS: 0 ; base unit: 0000000000000000000000000000000000000000
+0x52,0x61,0x72,0x21,0x1a,0x7,0x0,0xcf,0x90,0x73,0x0,0x0,0xd,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0xb9,0x9a,0x74,0x20,0x90,0x2d,0x0,0x4,0x0,0x0,0x0,0x4,0x0,0x0,0x0,0x2,0xa1,0x34,0x21,0x98,0x14,0x99,0x32,0x50,0x1d,0x30,0x8,0x0,0x20,0x0,0x0,0x0,0x72,0x61,0x72,0x34,0x2e,0x74,0x78,0x74,0x0,0xb0,0xba,0x5c,0x90,0x52,0x41,0x52,0x34,0xc4,0x3d,0x7b,0x0,0x40,0x7,0x0,
+Rar!\032\007\000\317\220s\000\000\015\000\000\000\000\000\000\000\271\232t \220-\000\004\000\000\000\004\000\000\000\002\2414!\230\024\2312P\0350\010\000 \000\000\000rar4.txt\000\260\272\\\220RAR4\304={\000@\007\000
+artifact_prefix=&#39;./&#39;; Test unit written to ./crash-a536208a7685703be746797c8cc381dbb0ef8e0a
+Base64: UmFyIRoHAM+QcwAADQAAAAAAAAC5mnQgkC0ABAAAAAQAAAACoTQhmBSZMlAdMAgAIAAAAHJhcjQudHh0ALC6XJBSQVI0xD17AEAHAA==
+stat::number_of_executed_units: 85
+stat::average_exec_per_sec:     85
+stat::new_units_added:          0
+stat::slowest_unit_time_sec:    0
+stat::peak_rss_mb:              35
 
 </pre>
 
