@@ -125,7 +125,7 @@ class LLM:
                     prompt: prompts.Prompt,
                     response_dir: str,
                     log_output: bool = False,
-                    generate_spec: bool = False) -> None:
+                    build_spec: bool = False) -> None:
     """Generates fuzz targets to the |response_dir|."""
 
   @abstractmethod
