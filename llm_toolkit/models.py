@@ -227,13 +227,13 @@ class GPT(LLM):
                     prompt: prompts.Prompt,
                     response_dir: str,
                     log_output: bool = False,
-                    spec=False) -> None:
+                    build_spec=False) -> None:
     """Generates code with OpenAI's API."""
     if self.ai_binary:
       print(f'OpenAI does not use local AI binary: {self.ai_binary}')
     client = openai.OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
 
-    if spec:
+    if build_spec:
       completion = self.with_retry_on_error(
           lambda: client.chat.completions.create(messages=prompt.get(),
                                                  model=self.name,

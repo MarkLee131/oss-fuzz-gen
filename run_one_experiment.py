@@ -322,18 +322,18 @@ def run(benchmark: Benchmark,
 
     # if not dry_run:
     spec_filepath_list = generate_spec(benchmark,
-                         model,
-                         planning_prompt,
-                         work_dirs,
-                         builder,
-                         debug=debug)  # list
+                                       model,
+                                       planning_prompt,
+                                       work_dirs,
+                                       builder,
+                                       debug=debug)  # list
 
     ## after that, we need to use another prompt to generate targets
     ## so we need to discard the prompt content above, and use the new prompt
 
     # builder = prompt_builder.DefaultTemplateBuilder(model, template_dir)
 
-    prompt = builder.build_from_spec(planning_prompt, spec_filepath_list)
+    prompt = builder.build_from_spec(spec_filepath_list)
     prompt.save(work_dirs.prompt)
 
     if dry_run:
