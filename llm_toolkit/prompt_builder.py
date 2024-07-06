@@ -146,10 +146,9 @@ class DefaultTemplateBuilder(PromptBuilder):
     self.fixer_problem_template_file = self._find_template(
         template_dir, 'fixer_problem.txt')
     self.fixer_context_template_file = self._find_template(
+        template_dir, 'fixer_context.txt')
     self.spec_guided_template_file = self._find_template(
         template_dir, 'spec_guide.txt')
-
-        template_dir, 'fixer_context.txt')
     self.fixer_instruction_template_file = self._find_template(
         template_dir, 'fixer_instruction.txt')
     self.triager_priming_template_file = self._find_template(
@@ -157,8 +156,7 @@ class DefaultTemplateBuilder(PromptBuilder):
     self.triager_problem_template_file = self._find_template(
         template_dir, 'triager_problem.txt')
 
-  def _format_priming(self, target_file_type: FileType,
-                      function_signature: str,
+  def _format_priming(self, target_file_type: FileType, function_signature: str,
                       needs_extern: bool) -> str:
     """Formats a priming based on the prompt template."""
     priming = self._get_template(self.priming_template_file)
@@ -306,7 +304,8 @@ class DefaultTemplateBuilder(PromptBuilder):
       project_context_content: Optional[dict] = None) -> prompts.Prompt:
     """Constructs a prompt using the templates in |self| and saves it."""
     priming = self._format_priming(benchmark.file_type,
-                                   benchmark.function_signature)
+                                   benchmark.function_signature,
+                                   benchmark.needs_extern)
     final_problem = self.format_problem(benchmark.function_signature)
 
     if project_context_content:
@@ -360,6 +359,7 @@ class DefaultTemplateBuilder(PromptBuilder):
 
   def build_from_spec(
       self,
+      # context_prompt: str,
       spec_list: list[str],
   ) -> prompts.Prompt:
     """Constructs a prompt using the templates in |self| and saves it."""
@@ -397,7 +397,9 @@ class DefaultTemplateBuilder(PromptBuilder):
   #                        project_example_content)
   #   return self._prompt
 
-  def build_fixer_prompt(self, benchmark: Benchmark, raw_code: str,
+  def build_fixer_prompt(self,
+                         benchmark: Benchmark,
+                         raw_code: str,
                          error_desc: Optional[str],
                          errors: list[str],
                          context: str = '',

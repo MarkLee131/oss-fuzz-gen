@@ -84,13 +84,15 @@ def generate_spec(benchmark: Benchmark,
                   work_dirs: WorkDirs,
                   builder: prompt_builder.PromptBuilder,
                   debug: bool = DEBUG) -> list[str]:
-  """Generates specification with LLM."""
+  """Generates specification with LLM.
+  Returns a filepath list of generated specifications
+  """
   print(f'Generating targets for {benchmark.project} '
         f'{benchmark.function_signature} using {model.name}..')
   model.generate_code(prompt,
                       response_dir=work_dirs.raw_specification_dir,
                       log_output=debug,
-                      spec=True)
+                      generate_spec=True)
 
   generated_specs = []
   for file in os.listdir(work_dirs.raw_specification_dir):
@@ -319,7 +321,7 @@ def run(benchmark: Benchmark,
     # prompt.save(work_dirs.prompt)
 
     # if not dry_run:
-    spec = generate_spec(benchmark,
+    spec_filepath_list = generate_spec(benchmark,
                          model,
                          planning_prompt,
                          work_dirs,
@@ -329,9 +331,9 @@ def run(benchmark: Benchmark,
     ## after that, we need to use another prompt to generate targets
     ## so we need to discard the prompt content above, and use the new prompt
 
-    builder = prompt_builder.DefaultTemplateBuilder(model, template_dir)
+    # builder = prompt_builder.DefaultTemplateBuilder(model, template_dir)
 
-    prompt = builder.build_from_spec(spec)
+    prompt = builder.build_from_spec(planning_prompt, spec_filepath_list)
     prompt.save(work_dirs.prompt)
 
     if dry_run:
