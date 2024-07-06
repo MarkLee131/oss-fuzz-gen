@@ -17,6 +17,7 @@ Prompt building tools.
 
 import logging
 import os
+import re
 from abc import abstractmethod
 from typing import Optional, Tuple
 
@@ -40,6 +41,10 @@ FDP_EXAMPLE_1_PROBLEM = os.path.join(EXAMPLE_PATH, 'gdImageString-problem.txt')
 FDP_EXAMPLE_1_SOLUTION = os.path.join(EXAMPLE_PATH, 'gdImageString-solution.cc')
 FDP_EXAMPLE_2_PROBLEM = os.path.join(EXAMPLE_PATH, 'mpg123_decode-problem.txt')
 FDP_EXAMPLE_2_SOLUTION = os.path.join(EXAMPLE_PATH, 'mpg123_decode-solution.cc')
+C_EXAMPLE_1_PROBLEM = os.path.join(EXAMPLE_PATH, 'fuzzerPolygonToCells.txt')
+C_EXAMPLE_1_SOLUTION = os.path.join(EXAMPLE_PATH, 'fuzzerPolygonToCells.c')
+C_EXAMPLE_2_PROBLEM = os.path.join(EXAMPLE_PATH, 'dns_message_parse.txt')
+C_EXAMPLE_2_SOLUTION = os.path.join(EXAMPLE_PATH, 'dns_message_parse.c')
 FDP_JVM_EXAMPLE_1_PROBLEM = os.path.join(EXAMPLE_PATH, 'joni_regex-problem.txt')
 FDP_JVM_EXAMPLE_1_SOLUTION = os.path.join(EXAMPLE_PATH,
                                           'joni_regex-solution.java')
@@ -54,8 +59,8 @@ EXAMPLES = {
         [FDP_EXAMPLE_2_PROBLEM, FDP_EXAMPLE_2_SOLUTION],
     ],
     'c': [
-        [FDP_EXAMPLE_1_PROBLEM, FDP_EXAMPLE_1_SOLUTION],
-        [FDP_EXAMPLE_2_PROBLEM, FDP_EXAMPLE_2_SOLUTION],
+        [C_EXAMPLE_1_PROBLEM, C_EXAMPLE_1_SOLUTION],
+        [C_EXAMPLE_2_PROBLEM, C_EXAMPLE_2_SOLUTION],
     ],
     'jvm': [
         [FDP_JVM_EXAMPLE_1_PROBLEM, FDP_JVM_EXAMPLE_1_SOLUTION],
@@ -65,11 +70,6 @@ EXAMPLES = {
 
 BUILD_ERROR_SUMMARY = 'The code has the following build issues:'
 FUZZ_ERROR_SUMMARY = 'The code can build successfully but has a runtime issue: '
-
-# The following strings identify errors when the fuzz target is built with clang
-# and cannot be built with clang++, which should be removed.
-FALSE_FUZZED_DATA_PROVIDER_ERROR = 'include/fuzzer/FuzzedDataProvider.h:16:10:'
-FALSE_EXTERN_KEYWORD_ERROR = 'expected identifier or \'(\'\nextern "C"'
 
 C_PROMPT_HEADERS_TO_ALWAYS_INCLUDES = ['stdio.h', 'stdlib.h', 'stdint.h']
 
@@ -109,6 +109,11 @@ class PromptBuilder:
                          errors: list[str]) -> prompts.Prompt:
     """Builds a fixer prompt."""
 
+  @abstractmethod
+  def build_triager_prompt(self, benchmark: Benchmark, driver_code: str,
+                           crash_info: str, crash_func: dict) -> prompts.Prompt:
+    """Builds a triager prompt."""
+
   def post_process_generated_code(self, generated_code: str) -> str:
     """Allows prompt builder to adjust the generated code."""
     # return the same by default
@@ -140,15 +145,34 @@ class DefaultTemplateBuilder(PromptBuilder):
         template_dir, 'fixer_priming.txt')
     self.fixer_problem_template_file = self._find_template(
         template_dir, 'fixer_problem.txt')
-
+    self.fixer_context_template_file = self._find_template(
     self.spec_guided_template_file = self._find_template(
         template_dir, 'spec_guide.txt')
 
+        template_dir, 'fixer_context.txt')
+    self.fixer_instruction_template_file = self._find_template(
+        template_dir, 'fixer_instruction.txt')
+    self.triager_priming_template_file = self._find_template(
+        template_dir, 'triager_priming.txt')
+    self.triager_problem_template_file = self._find_template(
+        template_dir, 'triager_problem.txt')
+
   def _format_priming(self, target_file_type: FileType,
-                      function_signature: str) -> str:
+                      function_signature: str,
+                      needs_extern: bool) -> str:
     """Formats a priming based on the prompt template."""
     priming = self._get_template(self.priming_template_file)
-    if target_file_type in [FileType.C, FileType.CPP]:
+    priming = priming.replace('{LANGUAGE}', target_file_type.value)
+    # TODO(Dongge): Add project name and fuzz target file path.
+    if needs_extern:
+      priming += (
+          'IMPORTANT: The fuzz target is written in C++, whereas the '
+          'project-under-test is written in C. All headers, functions, and code'
+          'from the project must be consistently wrapped in '
+          '<code>extern "C"</code> to ensure error-free compilation and linkage'
+          'between C and C++:\n<code>\nextern "C" {\n    //Include necessary C '
+          'headers, source files, functions, and code here.\n}\n</code>\n')
+    if target_file_type == FileType.CPP:
       type_specific_priming = self._get_template(self.cpp_priming_filler_file)
     else:
       type_specific_priming = ''
@@ -375,19 +399,26 @@ class DefaultTemplateBuilder(PromptBuilder):
 
   def build_fixer_prompt(self, benchmark: Benchmark, raw_code: str,
                          error_desc: Optional[str],
-                         errors: list[str]) -> prompts.Prompt:
+                         errors: list[str],
+                         context: str = '',
+                         instruction: str = '') -> prompts.Prompt:
     """Prepares the code-fixing prompt."""
-    priming, priming_weight = self._format_fixer_priming()
+    priming, priming_weight = self._format_fixer_priming(benchmark)
     problem = self._format_fixer_problem(raw_code, error_desc, errors,
-                                         priming_weight)
+                                         priming_weight, context, instruction)
 
     self._prepare_prompt(priming, problem)
     return self._prompt
 
-  def _format_fixer_priming(self) -> Tuple[str, int]:
+  def _format_fixer_priming(self, benchmark: Benchmark) -> Tuple[str, int]:
     """Formats a priming for code fixer based on the template."""
     with open(self.fixer_priming_template_file) as f:
       priming = f.read().strip() + '\n'
+    priming = priming.replace('{LANGUAGE}', benchmark.file_type.value)
+    if benchmark.needs_extern:
+      priming += ('\nNote that some code may need to be wrapped with '
+                  '<code>extern "C"</code> because the project under test is '
+                  'written in C but the fuzz target is in C++.\n')
     priming_prompt = self._prompt.create_prompt_piece(priming, 'system')
     priming_weight = self._model.estimate_token_num(priming_prompt)
     # NOTE: We need to return the priming _as text_ and the weight. Otherwise,
@@ -395,7 +426,8 @@ class DefaultTemplateBuilder(PromptBuilder):
     return priming, priming_weight
 
   def _format_fixer_problem(self, raw_code: str, error_desc: Optional[str],
-                            errors: list[str], priming_weight: int) -> str:
+                            errors: list[str], priming_weight: int,
+                            context: str, instruction: str) -> str:
     """Formats a problem for code fixer based on the template."""
     with open(self.fixer_problem_template_file) as f:
       problem = f.read().strip()
@@ -406,6 +438,18 @@ class DefaultTemplateBuilder(PromptBuilder):
       # Build error does not pass error desc.
       error_summary = BUILD_ERROR_SUMMARY
     problem = problem.replace('{ERROR_SUMMARY}', error_summary)
+
+    if context:
+      with open(self.fixer_context_template_file) as f:
+        context_template = f.read().strip()
+      context = context_template.replace('{CONTEXT_SOURCE_CODE}', context)
+    problem = problem.replace('{CONTEXT}', context)
+
+    if instruction:
+      with open(self.fixer_instruction_template_file) as f:
+        instruction_template = f.read().strip()
+      instruction = instruction_template.replace('{INSTRUCTION}', instruction)
+    problem = problem.replace('{INSTRUCTION}', instruction)
 
     problem_prompt = self._prompt.create_prompt_piece(problem, 'user')
     template_piece = self._prompt.create_prompt_piece('{ERROR_MESSAGES}',
@@ -423,13 +467,6 @@ class DefaultTemplateBuilder(PromptBuilder):
     # We are adding errors one by one until we reach the maximum prompt size
     selected_errors = []
     for error in errors:
-      # Skip C only errors.
-      # TODO(Dongge): Fix JCC to address this.
-      # https://github.com/google/oss-fuzz-gen/pull/208/files/a0c0db2fd5860e6e4d434467c5ec9f949ee2cff1#r1571651507
-      if (FALSE_EXTERN_KEYWORD_ERROR in error or
-          FALSE_FUZZED_DATA_PROVIDER_ERROR in error):
-        continue
-
       error_prompt = self._prompt.create_prompt_piece(error, 'user')
       error_token_num = self._model.estimate_token_num(error_prompt)
       if prompt_size + error_token_num >= self._model.context_window:
@@ -457,6 +494,83 @@ class DefaultTemplateBuilder(PromptBuilder):
         str(error_desc))
     return problem.replace('{ERROR_MESSAGES}', error_message)
 
+  def build_triager_prompt(self, benchmark: Benchmark, driver_code: str,
+                           crash_info: str, crash_func: dict) -> prompts.Prompt:
+    """Prepares the crash-triaging prompt."""
+    priming, priming_weight = self._format_triager_priming()
+    problem = self._format_triager_problem(benchmark, driver_code, crash_info,
+                                           crash_func, priming_weight)
+
+    self._prepare_prompt(priming, problem)
+    return self._prompt
+
+  def _format_triager_priming(self) -> Tuple[str, int]:
+    """Formats a priming for crash triage based on the template."""
+    with open(self.triager_priming_template_file) as f:
+      priming = f.read().strip() + '\n'
+    priming_prompt = self._prompt.create_prompt_piece(priming, 'system')
+    priming_weight = self._model.estimate_token_num(priming_prompt)
+    # NOTE: We need to return the priming _as text_ and the weight. Otherwise,
+    # in the case of structured prompts, we will create nested structures.
+    return priming, priming_weight
+
+  def _format_triager_problem(self, benchmark: Benchmark, driver_code: str,
+                              crash_info: str, crash_func: dict,
+                              priming_weight: int) -> str:
+    """Formats a problem for crash triage based on the template."""
+    all_func_code = []
+    for func_name, line_number in crash_func.items():
+      if func_name == 'LLVMFuzzerTestOneInput':
+        driver_code = self._slice_driver_code(benchmark.project, driver_code,
+                                              line_number)
+      else:
+        func_code = self._slice_func_code(benchmark.project, func_name,
+                                          line_number)
+        all_func_code.append(func_code)
+
+    with open(self.triager_problem_template_file) as f:
+      problem = f.read().strip()
+    problem = problem.replace('{CRASH_REPORT}', crash_info.strip())\
+                     .replace('{DRIVER_CODE}', driver_code.strip())
+
+    problem_prompt = self._prompt.create_prompt_piece(problem, 'user')
+    template_piece = self._prompt.create_prompt_piece('{PROJECT_FUNCTION_CODE}',
+                                                      'user')
+
+    problem_weight = self._model.estimate_token_num(problem_prompt)
+    template_weight = self._model.estimate_token_num(template_piece)
+
+    prompt_size = priming_weight + problem_weight - template_weight
+    # Add extra 20-tokens redundancy
+    prompt_size += 20
+
+    # Add function code one by one until we reach the maximum prompt size
+    selected_func_code = []
+    for func_code in all_func_code:
+      func_code_prompt = self._prompt.create_prompt_piece(func_code, 'user')
+      func_code_token_num = self._model.estimate_token_num(func_code_prompt)
+      if prompt_size + func_code_token_num >= self._model.context_window:
+        # The estimation is inaccurate, if an example's size equals to
+        # the limit, it's safer to not include the example.
+        logging.warning('Breaking because adding this function code \
+              would exceed context window')
+        break
+      prompt_size += func_code_token_num
+      selected_func_code.append(func_code)
+
+    # Compose the problem part of the prompt
+    project_function_code = '\n'.join(selected_func_code)
+    if project_function_code.strip():
+      return problem.replace('{PROJECT_FUNCTION_CODE}',
+                             project_function_code.strip())
+
+    logging.warning(
+        'Empty project function code in triage prompt for project: %s, \
+          function name: %s', benchmark.project, benchmark.function_name)
+
+    return problem.replace('{PROJECT_FUNCTION_CODE}', \
+                           'No relevant project function code')
+
   def _prepare_prompt(
       self,
       priming: str,
@@ -473,20 +587,64 @@ class DefaultTemplateBuilder(PromptBuilder):
       self._add_examples(example_pair, final_problem, project_example_content)
     self._prompt.add_problem(final_problem)
 
+  def _slice_driver_code(self, project: str, driver_code: str,
+                         target_lines: set) -> str:
+    """Slice the driver code up to the target line."""
+    target_line = max(target_lines)
+    lines = driver_code.split('\n')
+
+    if target_line > len(lines):
+      logging.warning(
+          'Driver target line exceed maxium limit in Project: %s, \
+                      try to use whole driver code in trigae prompt', project)
+      return driver_code
+
+    code_snippet = '\n'.join(lines[:target_line])
+    result = f'\nLine 1 - {target_line}:\n{code_snippet}'
+    return result
+
+  def _slice_func_code(self, project: str, func_name: str,
+                       target_lines: set) -> str:
+    """Slice target line and four preceding lines from function code."""
+    func_sig = introspector.query_introspector_function_signature(
+        project, func_name)
+    func_code = introspector.query_introspector_function_source(
+        project, func_sig)
+    begin_line, end_line = introspector.query_introspector_function_line(
+        project, func_sig)
+
+    if begin_line != 0 and end_line != 0 and all(
+        begin_line <= line <= end_line for line in target_lines):
+      lines = func_code.split('\n')
+      output_lines = set()
+      result = []
+      for line in sorted(target_lines):
+        start = max(line - 4, begin_line)
+        end = line
+        if not any(l in output_lines for l in range(start, end + 1)):
+          code_snippet = '\n'.join(lines[(start -
+                                          begin_line):(end - begin_line) + 1])
+          result.append(f'\nFunction Name:\n{func_name}\n\
+                Line {start} - {end}:\n{code_snippet}')
+          output_lines.update(range(start, end + 1))
+      return '\n'.join(result)
+
+    logging.warning('Failed to slice Project: %s Function: %s at Lines: %s',
+                    project, func_name, target_lines)
+    return ''
+
 
 class DefaultJvmTemplateBuilder(PromptBuilder):
   """Default builder for JVM projects."""
 
   def __init__(self,
                model: models.LLM,
-               project_name: str,
-               function_args: list[dict[str, str]],
+               benchmark: Benchmark,
                template_dir: str = DEFAULT_TEMPLATE_DIR):
     super().__init__(model)
     self._template_dir = template_dir
-    self.project_name = project_name
-    self.project_url = self._find_project_url(project_name)
-    self.function_args = function_args
+    self.benchmark = benchmark
+    self.project_url = self._find_project_url(self.benchmark.project)
 
     # Load templates.
     self.base_template_file = self._find_template(template_dir, 'jvm_base.txt')
@@ -539,13 +697,6 @@ class DefaultJvmTemplateBuilder(PromptBuilder):
     with open(template_file) as file:
       return file.read()
 
-  def _format_base(self) -> str:
-    """Formats a priming based on the prompt template."""
-    base = self._get_template(self.base_template_file)
-    base = base.replace("{PROJECT_NAME}", self.project_name)
-    base = base.replace("{PROJECT_URL}", self.project_url)
-    return base
-
   def _format_target_constructor(self, signature: str) -> str:
     """Formats a constructor based on the prompt template."""
     class_name = signature.split('].')[0][1:]
@@ -563,9 +714,21 @@ class DefaultJvmTemplateBuilder(PromptBuilder):
 
     return method
 
+  def _format_exceptions(self) -> str:
+    """Formats the exception thrown from this method or constructor."""
+    if self.benchmark.exceptions:
+      return '<exceptions>' + '\n'.join(
+          self.benchmark.exceptions) + '</exceptions>'
+
+    return ''
+
   def _format_import_mapping(self, full_class_name: str) -> str:
     """Formats the import mapping row on the prompt template."""
+    # full_class_name format: <package>.<class_name>$<inner_class_name>
+    # For example, the inner class Inner in class Test of package
+    # a.b.c will have a full_class_name of a.b.c.Test$Inner
     class_name = full_class_name.rsplit('.')[-1]
+    full_class_name = full_class_name.split('$')[0]
 
     mapping = self._get_template(self.import_template_file)
     mapping = mapping.replace('{CLASS_NAME}', class_name)
@@ -586,7 +749,7 @@ class DefaultJvmTemplateBuilder(PromptBuilder):
 
   def _format_general_argument(self, count: int, arg_type: str) -> str:
     """Formats general argument description."""
-    argument = self._get_template(self.generic_arg_description_template_file)
+    argument = self._get_template(self.arg_description_template_file)
     argument = argument.replace('{ARG_COUNT}', str(count))
     argument = argument.replace('{ARG_TYPE}', arg_type)
 
@@ -609,7 +772,7 @@ class DefaultJvmTemplateBuilder(PromptBuilder):
     if self._need_import(class_name):
       classes.append(class_name)
 
-    for arg_dict in self.function_args:
+    for arg_dict in self.benchmark.params:
       arg_type = arg_dict['type'].split('<')[0]
       if self._need_import(arg_type):
         classes.append(arg_type)
@@ -619,6 +782,13 @@ class DefaultJvmTemplateBuilder(PromptBuilder):
 
     requirement = self._get_template(self.requirement_template_file)
     requirement = requirement.replace('{IMPORT_MAPPINGS}', '\n'.join(mappings))
+
+    harness_name = os.path.basename(self.benchmark.target_path).replace(
+        '.java', '')
+    if harness_name:
+      requirement = requirement.replace('{HARNESS_NAME}', harness_name)
+    else:
+      requirement = requirement.replace('{HARNESS_NAME}', 'Fuzz')
 
     return requirement
 
@@ -631,7 +801,7 @@ class DefaultJvmTemplateBuilder(PromptBuilder):
     """Formats a list of argument descriptions."""
     argument_descriptions = []
 
-    for count, function_arg in enumerate(self.function_args):
+    for count, function_arg in enumerate(self.benchmark.params):
       arg_type = function_arg['type']
       if self._has_generic(arg_type):
         argument = self._format_generic_argument(count, arg_type)
@@ -640,22 +810,46 @@ class DefaultJvmTemplateBuilder(PromptBuilder):
 
       argument_descriptions.append(argument)
 
-    return '\n'.join(argument_descriptions)
+    return '<arguments>' + '\n'.join(argument_descriptions) + '</arguments>'
+
+  def _format_source_reference(self, signature: str) -> Tuple[str, str]:
+    """Formats the source code reference for this target."""
+    # Query for source code of the target method
+    source_code = introspector.query_introspector_function_source(
+        self.benchmark.project, signature)
+
+    # Query for source code of target method callsites
+    xref_source_list = []
+    for xref_source in introspector.query_introspector_cross_references(
+        self.benchmark.project, signature):
+      if xref_source:
+        xref_source_list.append(xref_source)
+
+    return source_code, '\n'.join(xref_source_list)
 
   def _format_problem(self, signature: str) -> str:
     """Formats a problem based on the prompt template."""
-    problem = self._get_template(self.problem_template_file)
+    base = self._get_template(self.base_template_file)
+    problem = base + self._get_template(self.problem_template_file)
     problem = problem.replace('{TARGET}', self._format_target(signature))
     problem = problem.replace('{REQUIREMENTS}',
                               self._format_requirement(signature))
     problem = problem.replace('{DATA_MAPPING}', self._format_data_filler())
     problem = problem.replace('{ARGUMENTS}', self._format_arguments())
+    problem = problem.replace('{EXCEPTIONS}', self._format_exceptions())
+
+    self_source, cross_source = self._format_source_reference(signature)
+    problem = problem.replace('{SELF_SOURCE}', self_source)
+    problem = problem.replace('{CROSS_SOURCE}', cross_source)
+
+    problem = problem.replace("{PROJECT_NAME}", self.benchmark.project)
+    problem = problem.replace("{PROJECT_URL}", self.project_url)
+
     return problem
 
-  def _prepare_prompt(self, base: str, final_problem: str):
+  def _prepare_prompt(self, prompt_str: str):
     """Constructs a prompt using the parameters and saves it."""
-    self._prompt.add_priming(base)
-    self._prompt.add_problem(final_problem)
+    self._prompt.add_priming(prompt_str)
 
   def _has_generic(self, arg: str) -> bool:
     """Determine if the argument type contains generic type."""
@@ -670,14 +864,14 @@ class DefaultJvmTemplateBuilder(PromptBuilder):
             target_file_type: FileType,
             example_pair: list[list[str]],
             project_example_content: Optional[list[list[str]]] = None,
-            project_context_content: Optional[dict] = None) -> prompts.Prompt:
+            project_context_content: Optional[dict] = None,
+            needs_extern: bool = False) -> prompts.Prompt:
     """Constructs a prompt using the templates in |self| and saves it.
        Ignore target_file_type, project_example_content
        and project_context_content parameters.
     """
-    base = self._format_base()
     final_problem = self._format_problem(function_signature)
-    self._prepare_prompt(base, final_problem)
+    self._prepare_prompt(final_problem)
     return self._prompt
 
   def build_fixer_prompt(self, benchmark: Benchmark, raw_code: str,
@@ -686,6 +880,37 @@ class DefaultJvmTemplateBuilder(PromptBuilder):
     """Builds a fixer prompt."""
     # Do nothing for jvm project now.
     return self._prompt
+
+  def build_triager_prompt(self, benchmark: Benchmark, driver_code: str,
+                           crash_info: str, crash_func: dict) -> prompts.Prompt:
+    """Builds a triager prompt."""
+    # Do nothing for jvm project now.
+    return self._prompt
+
+  def post_process_generated_code(self, generated_code: str) -> str:
+    """Allows prompt builder to adjust the generated code."""
+    # From observation, the LLM model keeps using wrong method calls including
+    # FuzzedDataProvider::consumeObject() or FuzzedDataProvider::getObject() or
+    # FuzzedDataProvider::consumeInt(int) to generate random Object / Integer
+    # instance. These methods are not valid in FuzzedDataProvider.
+
+    # The fixes here change the calling of data.consumeObject() and
+    # data.getObject() to data.consumeString(int)
+    generated_code = generated_code.replace(
+        'data.consumeObject()', 'data.consumeString(data.remainingBytes()/2)')
+    generated_code = generated_code.replace(
+        'data.getObject()', 'data.consumeString(data.remainingBytes()/2)')
+
+    # The fixes here change the calling of data.consumeInt(int) to
+    # data.consumeInt(0, int). For example, data.consumeInt(12345) will
+    # be replaced by data.consumeInt(0, 12345)
+    for wrong_method_call in re.findall(r'(data\.consumeInt\(([0-9]+)\))',
+                                        generated_code):
+      old_method_call = wrong_method_call[0]
+      new_method_call = f'data.consumeInt(0, {wrong_method_call[1]})'
+      generated_code = generated_code.replace(old_method_call, new_method_call)
+
+    return generated_code
 
 
 class CSpecificBuilder(PromptBuilder):
@@ -723,7 +948,8 @@ class CSpecificBuilder(PromptBuilder):
             target_file_type: FileType,
             example_pair: list[list[str]],
             project_example_content: Optional[list[list[str]]] = None,
-            project_context_content: Optional[dict] = None) -> prompts.Prompt:
+            project_context_content: Optional[dict] = None,
+            needs_extern: bool = False) -> prompts.Prompt:
     """Constructs a prompt using the templates in |self| and saves it."""
 
     with open(self.priming_template_file, 'r') as f:
@@ -741,8 +967,9 @@ class CSpecificBuilder(PromptBuilder):
                                       function_source)
 
     # Set header inclusion string if there are any headers.
-    headers_to_include = introspector.query_introspector_header_files(
-        self.benchmark.project)
+    headers_to_include = \
+        introspector.query_introspector_header_files_to_include(
+        self.benchmark.project, self.benchmark.function_signature)
     header_inclusion_string = ''
     if headers_to_include:
       header_inclusion_string = ', '.join(headers_to_include)
@@ -793,6 +1020,11 @@ class CSpecificBuilder(PromptBuilder):
                          error_desc: Optional[str],
                          errors: list[str]) -> prompts.Prompt:
     """Prepares the code-fixing prompt."""
+    return self._prompt
+
+  def build_triager_prompt(self, benchmark: Benchmark, driver_code: str,
+                           crash_info: str, crash_func: dict) -> prompts.Prompt:
+    """Builds a triager prompt."""
     return self._prompt
 
   def post_proces_generated_code(self, generated_code: str) -> str:
