@@ -1,0 +1,1173 @@
+<!doctype html>
+
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Experiment results</title>
+<style>
+* {
+    box-sizing: border-box;
+}
+
+html {
+    line-height: 1.15;
+}
+
+body {
+    font-family: sans-serif;
+    font-size: 16px;
+}
+
+table {
+    border-collapse: collapse;
+    border-spacing: 0;
+}
+
+td, th {
+    border-right: 1px #dedede solid;
+    border-bottom: 1px #dedede solid;
+    padding: 5px;
+    text-align: left;
+}
+td:first-child, th:first-child {
+    border-left: 1px #dedede solid;
+}
+th {
+    border-top: 1px #dedede solid;
+}
+
+tbody tr:nth-child(odd) {
+    background-color: #f4f5ff;
+}
+</style>
+<body>
+    LLM: 
+    
+<h1>output-avahi-avahi_dns_packet_new_reply / 02</h1>
+Bug: False
+<br>
+Crash reason: FP_NEAR_INIT_CRASH
+<br>
+<br>
+
+<h2>Triage</h2>
+<pre>
+Crash is caused by bug in fuzz driver.
+
+The crash occurs due to a heap-buffer-overflow when reading from the `data` field of the `AvahiDnsPacket` structure. The `avahi_dns_packet_get_field` function assumes that the `data` field contains at least `AVAHI_DNS_PACKET_HEADER_SIZE` elements. The fuzz driver does not ensure that the allocated `data` field meets this requirement, leading to a potential out-of-bounds read.
+</pre>
+<br>
+
+
+
+
+
+<h3>Final code</h3>
+
+<pre>
+#include &lt;fuzzer/FuzzedDataProvider.h&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+#include &lt;cstdint&gt;
+#include &lt;cstddef&gt;
+#include &lt;cstdlib&gt;
+#include &lt;cstring&gt;
+#include &lt;iostream&gt;
+#include &lt;sstream&gt;
+#include &lt;algorithm&gt;
+#include &lt;iterator&gt;
+#include &lt;cctype&gt;
+
+extern &#34;C&#34; {
+#include &#34;avahi-common/malloc.h&#34;
+#include &#34;avahi-core/dns.h&#34;
+#include &#34;avahi-core/rr.h&#34;
+#include &#34;avahi-core/log.h&#34;
+#include &#34;avahi-core/hashmap.h&#34;
+#include &#34;avahi-common/address.h&#34;
+#include &#34;avahi-common/strlst.h&#34;
+}
+
+extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    return 0;
+}
+
+extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    FuzzedDataProvider dataProvider(data, size);
+
+    AvahiDnsPacket *p = static_cast&lt;AvahiDnsPacket *&gt;(malloc(sizeof(AvahiDnsPacket)));
+    if (!p) return 0;
+
+    // Initialize the AvahiDnsPacket structure to avoid undefined behavior
+    memset(p, 0, sizeof(AvahiDnsPacket));
+
+    // Ensure that the rindex is within a valid range
+    p-&gt;rindex = dataProvider.ConsumeIntegralInRange&lt;unsigned int&gt;(0, 65535);
+
+    // Allocate and initialize the data field of the packet
+    p-&gt;data = static_cast&lt;uint8_t *&gt;(malloc(size));
+    if (!p-&gt;data) {
+        free(p);
+        return 0;
+    }
+    memcpy(p-&gt;data, data, size);
+    p-&gt;size = size;
+
+    unsigned int mtu = dataProvider.ConsumeIntegralInRange&lt;unsigned int&gt;(512, 1500); // Typical MTU range for DNS
+    int copy_queries = dataProvider.ConsumeBool() ? 1 : 0;
+    int aa = dataProvider.ConsumeBool() ? 1 : 0;
+
+    // Ensure the packet is well-formed before passing it to avahi_dns_packet_new_reply
+    if (p-&gt;size &gt; 0 &amp;&amp; p-&gt;data != nullptr) {
+        AvahiDnsPacket *result = avahi_dns_packet_new_reply(p, mtu, copy_queries, aa);
+        if (result) {
+            free(result-&gt;data); // Free the data field of the result packet
+            free(result);
+        }
+    }
+
+    free(p-&gt;data);
+    free(p);
+
+    return 0;
+}
+</pre>
+
+
+<h3>Fixer prompt #1</h3>
+<pre>
+
+Given the following C++ fuzz harness and its build error message, fix the code to make it build for fuzzing.
+
+If there is undeclared identifier or unknown type name error, fix it by finding and including the related libraries.
+
+You MUST wrap the headers with &lt;code&gt;extern &#34;C&#34;&lt;/code&gt; if they are C headers, especially the headers are from the project.
+
+Note that some code may need to be wrapped with &lt;code&gt;extern &#34;C&#34;&lt;/code&gt; as their source is C program.
+
+MUST RETURN THE FULL CODE, INCLUDING UNCHANGED PARTS.
+EXTREMELY IMPORTANT: AVOID USING &lt;code&gt;goto&lt;/code&gt;. If you have to write code using &lt;code&gt;goto&lt;/code&gt;, you MUST MUST also declare all variables BEFORE the &lt;code&gt;goto&lt;/code&gt;. Never introduce new variables after the &lt;code&gt;goto&lt;/code&gt;.
+
+Below is the code needs to be built:
+&lt;code&gt;
+#include &lt;fuzzer/FuzzedDataProvider.h&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+#include &lt;cstdint&gt;
+#include &lt;cstddef&gt;
+#include &lt;cstdlib&gt;
+#include &lt;cstring&gt;
+#include &lt;iostream&gt;
+#include &lt;sstream&gt;
+#include &lt;algorithm&gt;
+#include &lt;iterator&gt;
+#include &lt;cctype&gt;
+
+extern &#34;C&#34; {
+#include &#34;avahi-common/malloc.h&#34;
+#include &#34;avahi-core/dns.h&#34;
+#include &#34;avahi-core/rr.h&#34;
+#include &#34;avahi-core/log.h&#34;
+#include &#34;avahi-core/hashmap.h&#34;
+#include &#34;avahi-common/address.h&#34;
+#include &#34;avahi-common/strlst.h&#34;
+}
+
+extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    return 0;
+}
+
+extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+  FuzzedDataProvider dataProvider(data, size);
+
+  AvahiDnsPacket *p = static_cast&lt;AvahiDnsPacket *&gt;(malloc(sizeof(AvahiDnsPacket)));
+  if (!p) return 0;
+
+  p-&gt;rindex = dataProvider.ConsumeIntegral&lt;unsigned int&gt;();
+
+  unsigned int mtu = dataProvider.ConsumeIntegral&lt;unsigned int&gt;();
+  int copy_queries = dataProvider.ConsumeBool() ? 1 : 0;
+  int aa = dataProvider.ConsumeBool() ? 1 : 0;
+
+  AvahiDnsPacket *result = avahi_dns_packet_new_reply(p, mtu, copy_queries, aa);
+
+  free(p);
+
+  if (result) {
+    free(result);
+  }
+
+  return 0;
+}
+&lt;/code&gt;
+
+The code can build successfully but has a runtime issue: Fuzzing crashed immediately at runtime (ASAN-ERROR: AddressSanitizer: SEGV on unknown address (pc 0x5631153ae8c6 bp 0x7ffce51a81f0 sp 0x7ffce51a8140 T0)), indicating fuzz target code for invoking the function under test is incorrect or unrobust.
+&lt;error&gt;
+Crash stacks:
+Stack 0:
+#0 0x5631153ae8c6 in avahi_dns_packet_get_field /src/avahi/avahi-core/dns.c:145:12
+#1 0x5631153ae8c6 in avahi_dns_packet_new_reply /src/avahi/avahi-core/dns.c:115:55
+#2 0x5631153add96 in LLVMFuzzerTestOneInput /src/avahi/fuzz/fuzz-consume-record.cpp:40:28
+#3 0x5631152604a0 in fuzzer::Fuzzer::ExecuteCallback(unsigned char const*, unsigned long) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:614:13
+#4 0x5631152619a1 in fuzzer::Fuzzer::ReadAndExecuteSeedCorpora(std::__Fuzzer::vector&lt;fuzzer::SizedFile, std::__Fuzzer::allocator&lt;fuzzer::SizedFile&gt;&gt;&amp;) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:807:3
+#5 0x563115261f87 in fuzzer::Fuzzer::Loop(std::__Fuzzer::vector&lt;fuzzer::SizedFile, std::__Fuzzer::allocator&lt;fuzzer::SizedFile&gt;&gt;&amp;) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:867:3
+#6 0x563115250596 in fuzzer::FuzzerDriver(int*, char***, int (*)(unsigned char const*, unsigned long)) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerDriver.cpp:914:6
+#7 0x56311527cac2 in main /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerMain.cpp:20:10
+#8 0x7f04bded7082 in __libc_start_main (/lib/x86_64-linux-gnu/libc.so.6+0x24082) (BuildId: 0702430aef5fa3dda43986563e9ffcc47efbd75e)
+#9 0x56311524170d in _start (/out/fuzz-consume-record+0x4d70d)
+&lt;/error&gt;
+
+Fix code:
+1. Consider possible solutions for the issues listed above.
+2. Choose a solution that can maximize fuzzing result, which is utilizing the function under test and feeding it not null input.
+3. Apply the solutions to the original code.
+It&#39;s important to show the complete code, not only the fixed line.
+&lt;solution&gt;
+</pre>
+
+
+
+<h3>Code #1</h3>
+
+<pre>
+To fix the runtime issue, we need to ensure that the `AvahiDnsPacket` structure is properly initialized. The crash is likely due to accessing uninitialized or invalid data within the `AvahiDnsPacket` structure. We will initialize the `AvahiDnsPacket` structure with some default values before passing it to the `avahi_dns_packet_new_reply` function.
+
+Here is the full corrected code:
+
+```cpp
+#include &lt;fuzzer/FuzzedDataProvider.h&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+#include &lt;cstdint&gt;
+#include &lt;cstddef&gt;
+#include &lt;cstdlib&gt;
+#include &lt;cstring&gt;
+#include &lt;iostream&gt;
+#include &lt;sstream&gt;
+#include &lt;algorithm&gt;
+#include &lt;iterator&gt;
+#include &lt;cctype&gt;
+
+extern &#34;C&#34; {
+#include &#34;avahi-common/malloc.h&#34;
+#include &#34;avahi-core/dns.h&#34;
+#include &#34;avahi-core/rr.h&#34;
+#include &#34;avahi-core/log.h&#34;
+#include &#34;avahi-core/hashmap.h&#34;
+#include &#34;avahi-common/address.h&#34;
+#include &#34;avahi-common/strlst.h&#34;
+}
+
+extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    return 0;
+}
+
+extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    FuzzedDataProvider dataProvider(data, size);
+
+    AvahiDnsPacket *p = static_cast&lt;AvahiDnsPacket *&gt;(malloc(sizeof(AvahiDnsPacket)));
+    if (!p) return 0;
+
+    // Initialize the AvahiDnsPacket structure to avoid undefined behavior
+    memset(p, 0, sizeof(AvahiDnsPacket));
+
+    p-&gt;rindex = dataProvider.ConsumeIntegral&lt;unsigned int&gt;();
+
+    unsigned int mtu = dataProvider.ConsumeIntegral&lt;unsigned int&gt;();
+    int copy_queries = dataProvider.ConsumeBool() ? 1 : 0;
+    int aa = dataProvider.ConsumeBool() ? 1 : 0;
+
+    AvahiDnsPacket *result = avahi_dns_packet_new_reply(p, mtu, copy_queries, aa);
+
+    free(p);
+
+    if (result) {
+        free(result);
+    }
+
+    return 0;
+}
+```
+
+Changes made:
+1. Added `memset(p, 0, sizeof(AvahiDnsPacket));` to initialize the `AvahiDnsPacket` structure to zero, ensuring that all fields are initialized to a known state before use.
+2. Kept the rest of the code unchanged to ensure the fuzzing logic remains intact.
+
+This should prevent the segmentation fault caused by accessing uninitialized memory within the `AvahiDnsPacket` structure.
+</pre>
+
+
+<h3>Fixer prompt #2</h3>
+<pre>
+
+Given the following C++ fuzz harness and its build error message, fix the code to make it build for fuzzing.
+
+If there is undeclared identifier or unknown type name error, fix it by finding and including the related libraries.
+
+You MUST wrap the headers with &lt;code&gt;extern &#34;C&#34;&lt;/code&gt; if they are C headers, especially the headers are from the project.
+
+Note that some code may need to be wrapped with &lt;code&gt;extern &#34;C&#34;&lt;/code&gt; as their source is C program.
+
+MUST RETURN THE FULL CODE, INCLUDING UNCHANGED PARTS.
+EXTREMELY IMPORTANT: AVOID USING &lt;code&gt;goto&lt;/code&gt;. If you have to write code using &lt;code&gt;goto&lt;/code&gt;, you MUST MUST also declare all variables BEFORE the &lt;code&gt;goto&lt;/code&gt;. Never introduce new variables after the &lt;code&gt;goto&lt;/code&gt;.
+
+Below is the code needs to be built:
+&lt;code&gt;
+#include &lt;fuzzer/FuzzedDataProvider.h&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+#include &lt;cstdint&gt;
+#include &lt;cstddef&gt;
+#include &lt;cstdlib&gt;
+#include &lt;cstring&gt;
+#include &lt;iostream&gt;
+#include &lt;sstream&gt;
+#include &lt;algorithm&gt;
+#include &lt;iterator&gt;
+#include &lt;cctype&gt;
+
+extern &#34;C&#34; {
+#include &#34;avahi-common/malloc.h&#34;
+#include &#34;avahi-core/dns.h&#34;
+#include &#34;avahi-core/rr.h&#34;
+#include &#34;avahi-core/log.h&#34;
+#include &#34;avahi-core/hashmap.h&#34;
+#include &#34;avahi-common/address.h&#34;
+#include &#34;avahi-common/strlst.h&#34;
+}
+
+extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    return 0;
+}
+
+extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    FuzzedDataProvider dataProvider(data, size);
+
+    AvahiDnsPacket *p = static_cast&lt;AvahiDnsPacket *&gt;(malloc(sizeof(AvahiDnsPacket)));
+    if (!p) return 0;
+
+    // Initialize the AvahiDnsPacket structure to avoid undefined behavior
+    memset(p, 0, sizeof(AvahiDnsPacket));
+
+    p-&gt;rindex = dataProvider.ConsumeIntegral&lt;unsigned int&gt;();
+
+    unsigned int mtu = dataProvider.ConsumeIntegral&lt;unsigned int&gt;();
+    int copy_queries = dataProvider.ConsumeBool() ? 1 : 0;
+    int aa = dataProvider.ConsumeBool() ? 1 : 0;
+
+    AvahiDnsPacket *result = avahi_dns_packet_new_reply(p, mtu, copy_queries, aa);
+
+    free(p);
+
+    if (result) {
+        free(result);
+    }
+
+    return 0;
+}
+&lt;/code&gt;
+
+The code can build successfully but has a runtime issue: Fuzzing crashed immediately at runtime (ASAN-ERROR: AddressSanitizer: heap-buffer-overflow on address 0x504000000140 at pc 0x560edbb56a83 bp 0x7ffcc63ff270 sp 0x7ffcc63ff268), indicating fuzz target code for invoking the function under test is incorrect or unrobust.
+&lt;error&gt;
+Crash stacks:
+Stack 0:
+#0 0x560edbb56a82 in avahi_dns_packet_get_field /src/avahi/avahi-core/dns.c:145:12
+#1 0x560edbb56a82 in avahi_dns_packet_new_reply /src/avahi/avahi-core/dns.c:115:55
+#2 0x560edbb55da6 in LLVMFuzzerTestOneInput /src/avahi/fuzz/fuzz-consume-record.cpp:43:30
+#3 0x560edba084a0 in fuzzer::Fuzzer::ExecuteCallback(unsigned char const*, unsigned long) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:614:13
+#4 0x560edba099a1 in fuzzer::Fuzzer::ReadAndExecuteSeedCorpora(std::__Fuzzer::vector&lt;fuzzer::SizedFile, std::__Fuzzer::allocator&lt;fuzzer::SizedFile&gt;&gt;&amp;) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:807:3
+#5 0x560edba09f87 in fuzzer::Fuzzer::Loop(std::__Fuzzer::vector&lt;fuzzer::SizedFile, std::__Fuzzer::allocator&lt;fuzzer::SizedFile&gt;&gt;&amp;) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:867:3
+#6 0x560edb9f8596 in fuzzer::FuzzerDriver(int*, char***, int (*)(unsigned char const*, unsigned long)) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerDriver.cpp:914:6
+#7 0x560edba24ac2 in main /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerMain.cpp:20:10
+#8 0x7f6d6e815082 in __libc_start_main (/lib/x86_64-linux-gnu/libc.so.6+0x24082) (BuildId: 0702430aef5fa3dda43986563e9ffcc47efbd75e)
+#9 0x560edb9e970d in _start (/out/fuzz-consume-record+0x4d70d)
+Stack 1:
+#0 0x560edbb16a3e in malloc /src/llvm-project/compiler-rt/lib/asan/asan_malloc_linux.cpp:69:3
+#1 0x560edbb55af7 in LLVMFuzzerTestOneInput /src/avahi/fuzz/fuzz-consume-record.cpp:31:55
+#2 0x560edba084a0 in fuzzer::Fuzzer::ExecuteCallback(unsigned char const*, unsigned long) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:614:13
+#3 0x560edba099a1 in fuzzer::Fuzzer::ReadAndExecuteSeedCorpora(std::__Fuzzer::vector&lt;fuzzer::SizedFile, std::__Fuzzer::allocator&lt;fuzzer::SizedFile&gt;&gt;&amp;) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:807:3
+#4 0x560edba09f87 in fuzzer::Fuzzer::Loop(std::__Fuzzer::vector&lt;fuzzer::SizedFile, std::__Fuzzer::allocator&lt;fuzzer::SizedFile&gt;&gt;&amp;) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:867:3
+#5 0x560edb9f8596 in fuzzer::FuzzerDriver(int*, char***, int (*)(unsigned char const*, unsigned long)) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerDriver.cpp:914:6
+#6 0x560edba24ac2 in main /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerMain.cpp:20:10
+#7 0x7f6d6e815082 in __libc_start_main (/lib/x86_64-linux-gnu/libc.so.6+0x24082) (BuildId: 0702430aef5fa3dda43986563e9ffcc47efbd75e)
+&lt;/error&gt;
+
+Fix code:
+1. Consider possible solutions for the issues listed above.
+2. Choose a solution that can maximize fuzzing result, which is utilizing the function under test and feeding it not null input.
+3. Apply the solutions to the original code.
+It&#39;s important to show the complete code, not only the fixed line.
+&lt;solution&gt;
+</pre>
+
+
+
+<h3>Code #2</h3>
+
+<pre>
+Certainly! The issue seems to be related to the `avahi_dns_packet_new_reply` function, which is likely accessing uninitialized or invalid memory. To address this, we should ensure that the `AvahiDnsPacket` structure is properly initialized and that the fields it depends on are correctly set up. Additionally, we should make sure that the buffer sizes and other parameters are within valid ranges.
+
+Here&#39;s the fixed code:
+
+```cpp
+#include &lt;fuzzer/FuzzedDataProvider.h&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+#include &lt;cstdint&gt;
+#include &lt;cstddef&gt;
+#include &lt;cstdlib&gt;
+#include &lt;cstring&gt;
+#include &lt;iostream&gt;
+#include &lt;sstream&gt;
+#include &lt;algorithm&gt;
+#include &lt;iterator&gt;
+#include &lt;cctype&gt;
+
+extern &#34;C&#34; {
+#include &#34;avahi-common/malloc.h&#34;
+#include &#34;avahi-core/dns.h&#34;
+#include &#34;avahi-core/rr.h&#34;
+#include &#34;avahi-core/log.h&#34;
+#include &#34;avahi-core/hashmap.h&#34;
+#include &#34;avahi-common/address.h&#34;
+#include &#34;avahi-common/strlst.h&#34;
+}
+
+extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    return 0;
+}
+
+extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    FuzzedDataProvider dataProvider(data, size);
+
+    AvahiDnsPacket *p = static_cast&lt;AvahiDnsPacket *&gt;(malloc(sizeof(AvahiDnsPacket)));
+    if (!p) return 0;
+
+    // Initialize the AvahiDnsPacket structure to avoid undefined behavior
+    memset(p, 0, sizeof(AvahiDnsPacket));
+
+    // Ensure that the rindex is within a valid range
+    p-&gt;rindex = dataProvider.ConsumeIntegralInRange&lt;unsigned int&gt;(0, 65535);
+
+    unsigned int mtu = dataProvider.ConsumeIntegralInRange&lt;unsigned int&gt;(512, 1500); // Typical MTU range for DNS
+    int copy_queries = dataProvider.ConsumeBool() ? 1 : 0;
+    int aa = dataProvider.ConsumeBool() ? 1 : 0;
+
+    AvahiDnsPacket *result = avahi_dns_packet_new_reply(p, mtu, copy_queries, aa);
+
+    free(p);
+
+    if (result) {
+        free(result);
+    }
+
+    return 0;
+}
+```
+
+### Explanation of Changes:
+1. **Range Constraints for `rindex` and `mtu`:** Added constraints to ensure that `rindex` and `mtu` values are within valid ranges. This helps prevent out-of-bounds errors.
+2. **Initialization of `AvahiDnsPacket`:** Ensured that the `AvahiDnsPacket` structure is zero-initialized using `memset`. This avoids undefined behavior due to uninitialized fields.
+3. **Validation of Input Data:** Used `ConsumeIntegralInRange` to limit the values to reasonable ranges for `rindex` and `mtu`.
+
+These changes should help in preventing the heap-buffer-overflow error by ensuring that the inputs to `avahi_dns_packet_new_reply` are valid and within expected ranges. This should make the fuzz target more robust and capable of handling a wider range of inputs without crashing.
+</pre>
+
+
+<h3>Fixer prompt #3</h3>
+<pre>
+
+Given the following C++ fuzz harness and its build error message, fix the code to make it build for fuzzing.
+
+If there is undeclared identifier or unknown type name error, fix it by finding and including the related libraries.
+
+You MUST wrap the headers with &lt;code&gt;extern &#34;C&#34;&lt;/code&gt; if they are C headers, especially the headers are from the project.
+
+Note that some code may need to be wrapped with &lt;code&gt;extern &#34;C&#34;&lt;/code&gt; as their source is C program.
+
+MUST RETURN THE FULL CODE, INCLUDING UNCHANGED PARTS.
+EXTREMELY IMPORTANT: AVOID USING &lt;code&gt;goto&lt;/code&gt;. If you have to write code using &lt;code&gt;goto&lt;/code&gt;, you MUST MUST also declare all variables BEFORE the &lt;code&gt;goto&lt;/code&gt;. Never introduce new variables after the &lt;code&gt;goto&lt;/code&gt;.
+
+Below is the code needs to be built:
+&lt;code&gt;
+#include &lt;fuzzer/FuzzedDataProvider.h&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+#include &lt;cstdint&gt;
+#include &lt;cstddef&gt;
+#include &lt;cstdlib&gt;
+#include &lt;cstring&gt;
+#include &lt;iostream&gt;
+#include &lt;sstream&gt;
+#include &lt;algorithm&gt;
+#include &lt;iterator&gt;
+#include &lt;cctype&gt;
+
+extern &#34;C&#34; {
+#include &#34;avahi-common/malloc.h&#34;
+#include &#34;avahi-core/dns.h&#34;
+#include &#34;avahi-core/rr.h&#34;
+#include &#34;avahi-core/log.h&#34;
+#include &#34;avahi-core/hashmap.h&#34;
+#include &#34;avahi-common/address.h&#34;
+#include &#34;avahi-common/strlst.h&#34;
+}
+
+extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    return 0;
+}
+
+extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    FuzzedDataProvider dataProvider(data, size);
+
+    AvahiDnsPacket *p = static_cast&lt;AvahiDnsPacket *&gt;(malloc(sizeof(AvahiDnsPacket)));
+    if (!p) return 0;
+
+    // Initialize the AvahiDnsPacket structure to avoid undefined behavior
+    memset(p, 0, sizeof(AvahiDnsPacket));
+
+    // Ensure that the rindex is within a valid range
+    p-&gt;rindex = dataProvider.ConsumeIntegralInRange&lt;unsigned int&gt;(0, 65535);
+
+    unsigned int mtu = dataProvider.ConsumeIntegralInRange&lt;unsigned int&gt;(512, 1500); // Typical MTU range for DNS
+    int copy_queries = dataProvider.ConsumeBool() ? 1 : 0;
+    int aa = dataProvider.ConsumeBool() ? 1 : 0;
+
+    AvahiDnsPacket *result = avahi_dns_packet_new_reply(p, mtu, copy_queries, aa);
+
+    free(p);
+
+    if (result) {
+        free(result);
+    }
+
+    return 0;
+}
+&lt;/code&gt;
+
+The code can build successfully but has a runtime issue: Fuzzing crashed immediately at runtime (ASAN-ERROR: AddressSanitizer: heap-buffer-overflow on address 0x504000000140 at pc 0x5588e9fc7af3 bp 0x7fffc2583490 sp 0x7fffc2583488), indicating fuzz target code for invoking the function under test is incorrect or unrobust.
+&lt;error&gt;
+Crash stacks:
+Stack 0:
+#0 0x5588e9fc7af2 in avahi_dns_packet_get_field /src/avahi/avahi-core/dns.c:145:12
+#1 0x5588e9fc7af2 in avahi_dns_packet_new_reply /src/avahi/avahi-core/dns.c:115:55
+#2 0x5588e9fc6e0d in LLVMFuzzerTestOneInput /src/avahi/fuzz/fuzz-consume-record.cpp:44:30
+#3 0x5588e9e794a0 in fuzzer::Fuzzer::ExecuteCallback(unsigned char const*, unsigned long) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:614:13
+#4 0x5588e9e7a9a1 in fuzzer::Fuzzer::ReadAndExecuteSeedCorpora(std::__Fuzzer::vector&lt;fuzzer::SizedFile, std::__Fuzzer::allocator&lt;fuzzer::SizedFile&gt;&gt;&amp;) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:807:3
+#5 0x5588e9e7af87 in fuzzer::Fuzzer::Loop(std::__Fuzzer::vector&lt;fuzzer::SizedFile, std::__Fuzzer::allocator&lt;fuzzer::SizedFile&gt;&gt;&amp;) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:867:3
+#6 0x5588e9e69596 in fuzzer::FuzzerDriver(int*, char***, int (*)(unsigned char const*, unsigned long)) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerDriver.cpp:914:6
+#7 0x5588e9e95ac2 in main /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerMain.cpp:20:10
+#8 0x7f323cdc9082 in __libc_start_main (/lib/x86_64-linux-gnu/libc.so.6+0x24082) (BuildId: 0702430aef5fa3dda43986563e9ffcc47efbd75e)
+#9 0x5588e9e5a70d in _start (/out/fuzz-consume-record+0x4d70d)
+Stack 1:
+#0 0x5588e9f87a3e in malloc /src/llvm-project/compiler-rt/lib/asan/asan_malloc_linux.cpp:69:3
+#1 0x5588e9fc6af7 in LLVMFuzzerTestOneInput /src/avahi/fuzz/fuzz-consume-record.cpp:31:55
+#2 0x5588e9e794a0 in fuzzer::Fuzzer::ExecuteCallback(unsigned char const*, unsigned long) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:614:13
+#3 0x5588e9e7a9a1 in fuzzer::Fuzzer::ReadAndExecuteSeedCorpora(std::__Fuzzer::vector&lt;fuzzer::SizedFile, std::__Fuzzer::allocator&lt;fuzzer::SizedFile&gt;&gt;&amp;) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:807:3
+#4 0x5588e9e7af87 in fuzzer::Fuzzer::Loop(std::__Fuzzer::vector&lt;fuzzer::SizedFile, std::__Fuzzer::allocator&lt;fuzzer::SizedFile&gt;&gt;&amp;) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:867:3
+#5 0x5588e9e69596 in fuzzer::FuzzerDriver(int*, char***, int (*)(unsigned char const*, unsigned long)) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerDriver.cpp:914:6
+#6 0x5588e9e95ac2 in main /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerMain.cpp:20:10
+#7 0x7f323cdc9082 in __libc_start_main (/lib/x86_64-linux-gnu/libc.so.6+0x24082) (BuildId: 0702430aef5fa3dda43986563e9ffcc47efbd75e)
+&lt;/error&gt;
+
+Fix code:
+1. Consider possible solutions for the issues listed above.
+2. Choose a solution that can maximize fuzzing result, which is utilizing the function under test and feeding it not null input.
+3. Apply the solutions to the original code.
+It&#39;s important to show the complete code, not only the fixed line.
+&lt;solution&gt;
+</pre>
+
+
+
+<h3>Code #3</h3>
+
+<pre>
+To address the runtime issue of the fuzz target crashing due to a heap-buffer-overflow, we need to ensure that the `AvahiDnsPacket` structure is correctly initialized and that the data being passed to `avahi_dns_packet_new_reply` is valid. The crash is occurring because the function `avahi_dns_packet_get_field` is accessing memory that it shouldn&#39;t, which suggests that the packet data is not properly set up.
+
+Here is the fixed code:
+
+```cpp
+#include &lt;fuzzer/FuzzedDataProvider.h&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+#include &lt;cstdint&gt;
+#include &lt;cstddef&gt;
+#include &lt;cstdlib&gt;
+#include &lt;cstring&gt;
+#include &lt;iostream&gt;
+#include &lt;sstream&gt;
+#include &lt;algorithm&gt;
+#include &lt;iterator&gt;
+#include &lt;cctype&gt;
+
+extern &#34;C&#34; {
+#include &#34;avahi-common/malloc.h&#34;
+#include &#34;avahi-core/dns.h&#34;
+#include &#34;avahi-core/rr.h&#34;
+#include &#34;avahi-core/log.h&#34;
+#include &#34;avahi-core/hashmap.h&#34;
+#include &#34;avahi-common/address.h&#34;
+#include &#34;avahi-common/strlst.h&#34;
+}
+
+extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    return 0;
+}
+
+extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    FuzzedDataProvider dataProvider(data, size);
+
+    AvahiDnsPacket *p = static_cast&lt;AvahiDnsPacket *&gt;(malloc(sizeof(AvahiDnsPacket)));
+    if (!p) return 0;
+
+    // Initialize the AvahiDnsPacket structure to avoid undefined behavior
+    memset(p, 0, sizeof(AvahiDnsPacket));
+
+    // Ensure that the rindex is within a valid range
+    p-&gt;rindex = dataProvider.ConsumeIntegralInRange&lt;unsigned int&gt;(0, 65535);
+
+    // Allocate and initialize the data field of the packet
+    p-&gt;data = static_cast&lt;uint8_t *&gt;(malloc(size));
+    if (!p-&gt;data) {
+        free(p);
+        return 0;
+    }
+    memcpy(p-&gt;data, data, size);
+    p-&gt;size = size;
+
+    unsigned int mtu = dataProvider.ConsumeIntegralInRange&lt;unsigned int&gt;(512, 1500); // Typical MTU range for DNS
+    int copy_queries = dataProvider.ConsumeBool() ? 1 : 0;
+    int aa = dataProvider.ConsumeBool() ? 1 : 0;
+
+    AvahiDnsPacket *result = avahi_dns_packet_new_reply(p, mtu, copy_queries, aa);
+
+    free(p-&gt;data);
+    free(p);
+
+    if (result) {
+        free(result);
+    }
+
+    return 0;
+}
+```
+
+### Explanation of Fixes:
+1. **Initialization of `AvahiDnsPacket` Structure**: The `AvahiDnsPacket` structure is properly initialized using `memset` to avoid undefined behavior.
+2. **Setting Up Packet Data**: The `data` field of the `AvahiDnsPacket` is allocated and initialized with the input data. This ensures that the packet has valid data that can be processed by `avahi_dns_packet_new_reply`.
+3. **Memory Management**: Properly free the allocated memory for both `p-&gt;data` and `p` to avoid memory leaks. If `result` is not null, it is also freed.
+
+These changes ensure that the input data is correctly set up and that the function under test (`avahi_dns_packet_new_reply`) receives valid input, thus preventing the heap-buffer-overflow error.
+</pre>
+
+
+<h3>Fixer prompt #4</h3>
+<pre>
+
+Given the following C++ fuzz harness and its build error message, fix the code to make it build for fuzzing.
+
+If there is undeclared identifier or unknown type name error, fix it by finding and including the related libraries.
+
+You MUST wrap the headers with &lt;code&gt;extern &#34;C&#34;&lt;/code&gt; if they are C headers, especially the headers are from the project.
+
+Note that some code may need to be wrapped with &lt;code&gt;extern &#34;C&#34;&lt;/code&gt; as their source is C program.
+
+MUST RETURN THE FULL CODE, INCLUDING UNCHANGED PARTS.
+EXTREMELY IMPORTANT: AVOID USING &lt;code&gt;goto&lt;/code&gt;. If you have to write code using &lt;code&gt;goto&lt;/code&gt;, you MUST MUST also declare all variables BEFORE the &lt;code&gt;goto&lt;/code&gt;. Never introduce new variables after the &lt;code&gt;goto&lt;/code&gt;.
+
+Below is the code needs to be built:
+&lt;code&gt;
+#include &lt;fuzzer/FuzzedDataProvider.h&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+#include &lt;cstdint&gt;
+#include &lt;cstddef&gt;
+#include &lt;cstdlib&gt;
+#include &lt;cstring&gt;
+#include &lt;iostream&gt;
+#include &lt;sstream&gt;
+#include &lt;algorithm&gt;
+#include &lt;iterator&gt;
+#include &lt;cctype&gt;
+
+extern &#34;C&#34; {
+#include &#34;avahi-common/malloc.h&#34;
+#include &#34;avahi-core/dns.h&#34;
+#include &#34;avahi-core/rr.h&#34;
+#include &#34;avahi-core/log.h&#34;
+#include &#34;avahi-core/hashmap.h&#34;
+#include &#34;avahi-common/address.h&#34;
+#include &#34;avahi-common/strlst.h&#34;
+}
+
+extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    return 0;
+}
+
+extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    FuzzedDataProvider dataProvider(data, size);
+
+    AvahiDnsPacket *p = static_cast&lt;AvahiDnsPacket *&gt;(malloc(sizeof(AvahiDnsPacket)));
+    if (!p) return 0;
+
+    // Initialize the AvahiDnsPacket structure to avoid undefined behavior
+    memset(p, 0, sizeof(AvahiDnsPacket));
+
+    // Ensure that the rindex is within a valid range
+    p-&gt;rindex = dataProvider.ConsumeIntegralInRange&lt;unsigned int&gt;(0, 65535);
+
+    // Allocate and initialize the data field of the packet
+    p-&gt;data = static_cast&lt;uint8_t *&gt;(malloc(size));
+    if (!p-&gt;data) {
+        free(p);
+        return 0;
+    }
+    memcpy(p-&gt;data, data, size);
+    p-&gt;size = size;
+
+    unsigned int mtu = dataProvider.ConsumeIntegralInRange&lt;unsigned int&gt;(512, 1500); // Typical MTU range for DNS
+    int copy_queries = dataProvider.ConsumeBool() ? 1 : 0;
+    int aa = dataProvider.ConsumeBool() ? 1 : 0;
+
+    AvahiDnsPacket *result = avahi_dns_packet_new_reply(p, mtu, copy_queries, aa);
+
+    free(p-&gt;data);
+    free(p);
+
+    if (result) {
+        free(result);
+    }
+
+    return 0;
+}
+&lt;/code&gt;
+
+The code can build successfully but has a runtime issue: Fuzzing crashed immediately at runtime (ASAN-ERROR: AddressSanitizer: heap-buffer-overflow on address 0x5020000000b0 at pc 0x564f7b270b83 bp 0x7ffdf53d2c10 sp 0x7ffdf53d2c08), indicating fuzz target code for invoking the function under test is incorrect or unrobust.
+&lt;error&gt;
+Crash stacks:
+Stack 0:
+#0 0x564f7b270b82 in avahi_dns_packet_get_field /src/avahi/avahi-core/dns.c:145:12
+#1 0x564f7b270b82 in avahi_dns_packet_new_reply /src/avahi/avahi-core/dns.c:115:55
+#2 0x564f7b26fe6c in LLVMFuzzerTestOneInput /src/avahi/fuzz/fuzz-consume-record.cpp:53:30
+#3 0x564f7b1224a0 in fuzzer::Fuzzer::ExecuteCallback(unsigned char const*, unsigned long) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:614:13
+#4 0x564f7b1239a1 in fuzzer::Fuzzer::ReadAndExecuteSeedCorpora(std::__Fuzzer::vector&lt;fuzzer::SizedFile, std::__Fuzzer::allocator&lt;fuzzer::SizedFile&gt;&gt;&amp;) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:807:3
+#5 0x564f7b123f87 in fuzzer::Fuzzer::Loop(std::__Fuzzer::vector&lt;fuzzer::SizedFile, std::__Fuzzer::allocator&lt;fuzzer::SizedFile&gt;&gt;&amp;) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:867:3
+#6 0x564f7b112596 in fuzzer::FuzzerDriver(int*, char***, int (*)(unsigned char const*, unsigned long)) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerDriver.cpp:914:6
+#7 0x564f7b13eac2 in main /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerMain.cpp:20:10
+#8 0x7f6ae34a2082 in __libc_start_main (/lib/x86_64-linux-gnu/libc.so.6+0x24082) (BuildId: 0702430aef5fa3dda43986563e9ffcc47efbd75e)
+#9 0x564f7b10370d in _start (/out/fuzz-consume-record+0x4d70d)
+Stack 1:
+#0 0x564f7b230a3e in malloc /src/llvm-project/compiler-rt/lib/asan/asan_malloc_linux.cpp:69:3
+#1 0x564f7b26fc00 in LLVMFuzzerTestOneInput /src/avahi/fuzz/fuzz-consume-record.cpp:41:38
+#2 0x564f7b1224a0 in fuzzer::Fuzzer::ExecuteCallback(unsigned char const*, unsigned long) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:614:13
+#3 0x564f7b1239a1 in fuzzer::Fuzzer::ReadAndExecuteSeedCorpora(std::__Fuzzer::vector&lt;fuzzer::SizedFile, std::__Fuzzer::allocator&lt;fuzzer::SizedFile&gt;&gt;&amp;) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:807:3
+#4 0x564f7b123f87 in fuzzer::Fuzzer::Loop(std::__Fuzzer::vector&lt;fuzzer::SizedFile, std::__Fuzzer::allocator&lt;fuzzer::SizedFile&gt;&gt;&amp;) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:867:3
+#5 0x564f7b112596 in fuzzer::FuzzerDriver(int*, char***, int (*)(unsigned char const*, unsigned long)) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerDriver.cpp:914:6
+#6 0x564f7b13eac2 in main /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerMain.cpp:20:10
+#7 0x7f6ae34a2082 in __libc_start_main (/lib/x86_64-linux-gnu/libc.so.6+0x24082) (BuildId: 0702430aef5fa3dda43986563e9ffcc47efbd75e)
+&lt;/error&gt;
+
+Fix code:
+1. Consider possible solutions for the issues listed above.
+2. Choose a solution that can maximize fuzzing result, which is utilizing the function under test and feeding it not null input.
+3. Apply the solutions to the original code.
+It&#39;s important to show the complete code, not only the fixed line.
+&lt;solution&gt;
+</pre>
+
+
+
+<h3>Code #4</h3>
+
+<pre>
+Here is the fixed code with the necessary changes to address the runtime issue:
+
+```cpp
+#include &lt;fuzzer/FuzzedDataProvider.h&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+#include &lt;cstdint&gt;
+#include &lt;cstddef&gt;
+#include &lt;cstdlib&gt;
+#include &lt;cstring&gt;
+#include &lt;iostream&gt;
+#include &lt;sstream&gt;
+#include &lt;algorithm&gt;
+#include &lt;iterator&gt;
+#include &lt;cctype&gt;
+
+extern &#34;C&#34; {
+#include &#34;avahi-common/malloc.h&#34;
+#include &#34;avahi-core/dns.h&#34;
+#include &#34;avahi-core/rr.h&#34;
+#include &#34;avahi-core/log.h&#34;
+#include &#34;avahi-core/hashmap.h&#34;
+#include &#34;avahi-common/address.h&#34;
+#include &#34;avahi-common/strlst.h&#34;
+}
+
+extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    return 0;
+}
+
+extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    FuzzedDataProvider dataProvider(data, size);
+
+    AvahiDnsPacket *p = static_cast&lt;AvahiDnsPacket *&gt;(malloc(sizeof(AvahiDnsPacket)));
+    if (!p) return 0;
+
+    // Initialize the AvahiDnsPacket structure to avoid undefined behavior
+    memset(p, 0, sizeof(AvahiDnsPacket));
+
+    // Ensure that the rindex is within a valid range
+    p-&gt;rindex = dataProvider.ConsumeIntegralInRange&lt;unsigned int&gt;(0, 65535);
+
+    // Allocate and initialize the data field of the packet
+    p-&gt;data = static_cast&lt;uint8_t *&gt;(malloc(size));
+    if (!p-&gt;data) {
+        free(p);
+        return 0;
+    }
+    memcpy(p-&gt;data, data, size);
+    p-&gt;size = size;
+
+    unsigned int mtu = dataProvider.ConsumeIntegralInRange&lt;unsigned int&gt;(512, 1500); // Typical MTU range for DNS
+    int copy_queries = dataProvider.ConsumeBool() ? 1 : 0;
+    int aa = dataProvider.ConsumeBool() ? 1 : 0;
+
+    // Ensure the packet is well-formed before passing it to avahi_dns_packet_new_reply
+    if (p-&gt;size &gt; 0 &amp;&amp; p-&gt;data != nullptr) {
+        AvahiDnsPacket *result = avahi_dns_packet_new_reply(p, mtu, copy_queries, aa);
+        if (result) {
+            free(result);
+        }
+    }
+
+    free(p-&gt;data);
+    free(p);
+
+    return 0;
+}
+```
+
+### Explanation of the Fixes:
+1. **Initialization of `AvahiDnsPacket`**:
+   - The `memset` function is used to initialize the `AvahiDnsPacket` structure to avoid undefined behavior.
+
+2. **Validation of Packet Data**:
+   - Before calling `avahi_dns_packet_new_reply`, the code checks if the packet size is greater than 0 and if the data pointer is not null. This ensures that the packet is well-formed and prevents potential buffer overflows.
+
+3. **Memory Management**:
+   - The code ensures that allocated memory for `p-&gt;data` and `p` is freed properly to avoid memory leaks.
+
+By implementing these changes, the code should now handle the input data more robustly, preventing the immediate crashes observed during fuzzing.
+</pre>
+
+
+<h3>Fixer prompt #5</h3>
+<pre>
+
+Given the following C++ fuzz harness and its build error message, fix the code to make it build for fuzzing.
+
+If there is undeclared identifier or unknown type name error, fix it by finding and including the related libraries.
+
+You MUST wrap the headers with &lt;code&gt;extern &#34;C&#34;&lt;/code&gt; if they are C headers, especially the headers are from the project.
+
+Note that some code may need to be wrapped with &lt;code&gt;extern &#34;C&#34;&lt;/code&gt; as their source is C program.
+
+MUST RETURN THE FULL CODE, INCLUDING UNCHANGED PARTS.
+EXTREMELY IMPORTANT: AVOID USING &lt;code&gt;goto&lt;/code&gt;. If you have to write code using &lt;code&gt;goto&lt;/code&gt;, you MUST MUST also declare all variables BEFORE the &lt;code&gt;goto&lt;/code&gt;. Never introduce new variables after the &lt;code&gt;goto&lt;/code&gt;.
+
+Below is the code needs to be built:
+&lt;code&gt;
+#include &lt;fuzzer/FuzzedDataProvider.h&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+#include &lt;cstdint&gt;
+#include &lt;cstddef&gt;
+#include &lt;cstdlib&gt;
+#include &lt;cstring&gt;
+#include &lt;iostream&gt;
+#include &lt;sstream&gt;
+#include &lt;algorithm&gt;
+#include &lt;iterator&gt;
+#include &lt;cctype&gt;
+
+extern &#34;C&#34; {
+#include &#34;avahi-common/malloc.h&#34;
+#include &#34;avahi-core/dns.h&#34;
+#include &#34;avahi-core/rr.h&#34;
+#include &#34;avahi-core/log.h&#34;
+#include &#34;avahi-core/hashmap.h&#34;
+#include &#34;avahi-common/address.h&#34;
+#include &#34;avahi-common/strlst.h&#34;
+}
+
+extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    return 0;
+}
+
+extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    FuzzedDataProvider dataProvider(data, size);
+
+    AvahiDnsPacket *p = static_cast&lt;AvahiDnsPacket *&gt;(malloc(sizeof(AvahiDnsPacket)));
+    if (!p) return 0;
+
+    // Initialize the AvahiDnsPacket structure to avoid undefined behavior
+    memset(p, 0, sizeof(AvahiDnsPacket));
+
+    // Ensure that the rindex is within a valid range
+    p-&gt;rindex = dataProvider.ConsumeIntegralInRange&lt;unsigned int&gt;(0, 65535);
+
+    // Allocate and initialize the data field of the packet
+    p-&gt;data = static_cast&lt;uint8_t *&gt;(malloc(size));
+    if (!p-&gt;data) {
+        free(p);
+        return 0;
+    }
+    memcpy(p-&gt;data, data, size);
+    p-&gt;size = size;
+
+    unsigned int mtu = dataProvider.ConsumeIntegralInRange&lt;unsigned int&gt;(512, 1500); // Typical MTU range for DNS
+    int copy_queries = dataProvider.ConsumeBool() ? 1 : 0;
+    int aa = dataProvider.ConsumeBool() ? 1 : 0;
+
+    // Ensure the packet is well-formed before passing it to avahi_dns_packet_new_reply
+    if (p-&gt;size &gt; 0 &amp;&amp; p-&gt;data != nullptr) {
+        AvahiDnsPacket *result = avahi_dns_packet_new_reply(p, mtu, copy_queries, aa);
+        if (result) {
+            free(result);
+        }
+    }
+
+    free(p-&gt;data);
+    free(p);
+
+    return 0;
+}
+&lt;/code&gt;
+
+The code can build successfully but has a runtime issue: Fuzzing crashed immediately at runtime (ASAN-ERROR: AddressSanitizer: heap-buffer-overflow on address 0x502000000110 at pc 0x55e082b7bbd3 bp 0x7ffe5391b2f0 sp 0x7ffe5391b2e8), indicating fuzz target code for invoking the function under test is incorrect or unrobust.
+&lt;error&gt;
+Crash stacks:
+Stack 0:
+#0 0x55e082b7bbd2 in avahi_dns_packet_get_field /src/avahi/avahi-core/dns.c:145:12
+#1 0x55e082b7bbd2 in avahi_dns_packet_new_reply /src/avahi/avahi-core/dns.c:115:55
+#2 0x55e082b7aebc in LLVMFuzzerTestOneInput /src/avahi/fuzz/fuzz-consume-record.cpp:55:34
+#3 0x55e082a2d4a0 in fuzzer::Fuzzer::ExecuteCallback(unsigned char const*, unsigned long) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:614:13
+#4 0x55e082a2ccc5 in fuzzer::Fuzzer::RunOne(unsigned char const*, unsigned long, bool, fuzzer::InputInfo*, bool, bool*) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:516:7
+#5 0x55e082a2eb16 in fuzzer::Fuzzer::ReadAndExecuteSeedCorpora(std::__Fuzzer::vector&lt;fuzzer::SizedFile, std::__Fuzzer::allocator&lt;fuzzer::SizedFile&gt;&gt;&amp;) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:812:5
+#6 0x55e082a2ef87 in fuzzer::Fuzzer::Loop(std::__Fuzzer::vector&lt;fuzzer::SizedFile, std::__Fuzzer::allocator&lt;fuzzer::SizedFile&gt;&gt;&amp;) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:867:3
+#7 0x55e082a1d596 in fuzzer::FuzzerDriver(int*, char***, int (*)(unsigned char const*, unsigned long)) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerDriver.cpp:914:6
+#8 0x55e082a49ac2 in main /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerMain.cpp:20:10
+#9 0x7f11d8c99082 in __libc_start_main (/lib/x86_64-linux-gnu/libc.so.6+0x24082) (BuildId: 0702430aef5fa3dda43986563e9ffcc47efbd75e)
+#10 0x55e082a0e70d in _start (/out/fuzz-consume-record+0x4d70d)
+Stack 1:
+#0 0x55e082b3ba3e in malloc /src/llvm-project/compiler-rt/lib/asan/asan_malloc_linux.cpp:69:3
+#1 0x55e082b7ac13 in LLVMFuzzerTestOneInput /src/avahi/fuzz/fuzz-consume-record.cpp:41:38
+#2 0x55e082a2d4a0 in fuzzer::Fuzzer::ExecuteCallback(unsigned char const*, unsigned long) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:614:13
+#3 0x55e082a2ccc5 in fuzzer::Fuzzer::RunOne(unsigned char const*, unsigned long, bool, fuzzer::InputInfo*, bool, bool*) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:516:7
+#4 0x55e082a2eb16 in fuzzer::Fuzzer::ReadAndExecuteSeedCorpora(std::__Fuzzer::vector&lt;fuzzer::SizedFile, std::__Fuzzer::allocator&lt;fuzzer::SizedFile&gt;&gt;&amp;) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:812:5
+#5 0x55e082a2ef87 in fuzzer::Fuzzer::Loop(std::__Fuzzer::vector&lt;fuzzer::SizedFile, std::__Fuzzer::allocator&lt;fuzzer::SizedFile&gt;&gt;&amp;) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:867:3
+#6 0x55e082a1d596 in fuzzer::FuzzerDriver(int*, char***, int (*)(unsigned char const*, unsigned long)) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerDriver.cpp:914:6
+#7 0x55e082a49ac2 in main /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerMain.cpp:20:10
+&lt;/error&gt;
+
+Fix code:
+1. Consider possible solutions for the issues listed above.
+2. Choose a solution that can maximize fuzzing result, which is utilizing the function under test and feeding it not null input.
+3. Apply the solutions to the original code.
+It&#39;s important to show the complete code, not only the fixed line.
+&lt;solution&gt;
+</pre>
+
+
+
+<h3>Code #5</h3>
+
+<pre>
+Here is the complete code with the necessary fixes to avoid the heap-buffer-overflow issue and ensure robust fuzzing:
+
+```cpp
+#include &lt;fuzzer/FuzzedDataProvider.h&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+#include &lt;cstdint&gt;
+#include &lt;cstddef&gt;
+#include &lt;cstdlib&gt;
+#include &lt;cstring&gt;
+#include &lt;iostream&gt;
+#include &lt;sstream&gt;
+#include &lt;algorithm&gt;
+#include &lt;iterator&gt;
+#include &lt;cctype&gt;
+
+extern &#34;C&#34; {
+#include &#34;avahi-common/malloc.h&#34;
+#include &#34;avahi-core/dns.h&#34;
+#include &#34;avahi-core/rr.h&#34;
+#include &#34;avahi-core/log.h&#34;
+#include &#34;avahi-core/hashmap.h&#34;
+#include &#34;avahi-common/address.h&#34;
+#include &#34;avahi-common/strlst.h&#34;
+}
+
+extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    return 0;
+}
+
+extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    FuzzedDataProvider dataProvider(data, size);
+
+    AvahiDnsPacket *p = static_cast&lt;AvahiDnsPacket *&gt;(malloc(sizeof(AvahiDnsPacket)));
+    if (!p) return 0;
+
+    // Initialize the AvahiDnsPacket structure to avoid undefined behavior
+    memset(p, 0, sizeof(AvahiDnsPacket));
+
+    // Ensure that the rindex is within a valid range
+    p-&gt;rindex = dataProvider.ConsumeIntegralInRange&lt;unsigned int&gt;(0, 65535);
+
+    // Allocate and initialize the data field of the packet
+    p-&gt;data = static_cast&lt;uint8_t *&gt;(malloc(size));
+    if (!p-&gt;data) {
+        free(p);
+        return 0;
+    }
+    memcpy(p-&gt;data, data, size);
+    p-&gt;size = size;
+
+    unsigned int mtu = dataProvider.ConsumeIntegralInRange&lt;unsigned int&gt;(512, 1500); // Typical MTU range for DNS
+    int copy_queries = dataProvider.ConsumeBool() ? 1 : 0;
+    int aa = dataProvider.ConsumeBool() ? 1 : 0;
+
+    // Ensure the packet is well-formed before passing it to avahi_dns_packet_new_reply
+    if (p-&gt;size &gt; 0 &amp;&amp; p-&gt;data != nullptr) {
+        AvahiDnsPacket *result = avahi_dns_packet_new_reply(p, mtu, copy_queries, aa);
+        if (result) {
+            free(result-&gt;data); // Free the data field of the result packet
+            free(result);
+        }
+    }
+
+    free(p-&gt;data);
+    free(p);
+
+    return 0;
+}
+```
+
+### Explanation of Fixes:
+1. **Memory Initialization**: The `memset(p, 0, sizeof(AvahiDnsPacket));` ensures that the `AvahiDnsPacket` structure is initialized to zero, avoiding undefined behavior.
+2. **Memory Allocation Check**: Added checks to ensure that memory allocation for `p-&gt;data` is successful.
+3. **Freeing Allocated Memory**: Ensured that the `data` field of the `result` packet is also freed before freeing the `result` packet itself to avoid memory leaks.
+4. **Validating Packet Size**: Added a check to ensure that `p-&gt;size` is greater than 0 and `p-&gt;data` is not `nullptr` before calling `avahi_dns_packet_new_reply`.
+
+These changes ensure that the fuzzing harness is robust and avoids heap-buffer-overflow issues.
+</pre>
+
+
+<h2>Logs</h2>
+<pre>
+Fixing /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-avahi-avahi_dns_packet_new_reply/fixed_targets/02.c with gpt-4o, attempt 1.
+Fixing /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-avahi-avahi_dns_packet_new_reply/fixed_targets/02.c with gpt-4o, attempt 2.
+Fixing /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-avahi-avahi_dns_packet_new_reply/fixed_targets/02.c with gpt-4o, attempt 3.
+Fixing /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-avahi-avahi_dns_packet_new_reply/fixed_targets/02.c with gpt-4o, attempt 4.
+Fixing /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-avahi-avahi_dns_packet_new_reply/fixed_targets/02.c with gpt-4o, attempt 5.
+Successfully built /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-avahi-avahi_dns_packet_new_reply/fixed_targets/02.c with gpt-4o in 5 iterations of fixing.
+Triaging the crash related to /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-avahi-avahi_dns_packet_new_reply/fixed_targets/02.c with gpt-4o.
+Warning: Failed to fix semantic error FP_NEAR_INIT_CRASH in avahi-avahi_dns_packet_new_reply-02.
+
+</pre>
+
+<h2>Run logs</h2>
+<pre>
+INFO:__main__:Running: docker run --rm --privileged --shm-size=2g --platform linux/amd64 -e FUZZING_ENGINE=libfuzzer -e SANITIZER=address -e RUN_FUZZER_MODE=interactive -e HELPER=True -v /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-avahi-avahi_dns_packet_new_reply/corpora/02.c:/tmp/fuzz-consume-record_corpus -v /tmp/tmpqe63huln/build/out/avahi-avahi_dns_packet_new_reply-02:/out -t gcr.io/oss-fuzz-base/base-runner run_fuzzer fuzz-consume-record -print_final_stats=1 -max_total_time=30 -len_control=0 -timeout=30.
+vm.mmap_rnd_bits = 28
+rm: cannot remove &#39;/tmp/fuzz-consume-record_corpus&#39;: Device or resource busy
+/out/fuzz-consume-record -rss_limit_mb=2560 -timeout=25 -print_final_stats=1 -max_total_time=30 -len_control=0 -timeout=30 /tmp/fuzz-consume-record_corpus &lt; /dev/null
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 639976657
+INFO: Loaded 1 modules   (1841 inline 8-bit counters): 1841 [0x55ddacb9b1b0, 0x55ddacb9b8e1), 
+INFO: Loaded 1 PC tables (1841 PCs): 1841 [0x55ddacb9b8e8,0x55ddacba2bf8), 
+INFO:        0 files found in /tmp/fuzz-consume-record_corpus
+INFO: -max_len is not provided; libFuzzer will not generate inputs larger than 4096 bytes
+INFO: A corpus is not provided, starting from an empty corpus
+=================================================================
+[1m[31m==12==ERROR: AddressSanitizer: heap-buffer-overflow on address 0x502000000110 at pc 0x55ddacb0ac03 bp 0x7ffff0f0f370 sp 0x7ffff0f0f368
+[1m[0m[1m[34mREAD of size 2 at 0x502000000110 thread T0[1m[0m
+SCARINESS: 14 (2-byte-read-heap-buffer-overflow)
+    #0 0x55ddacb0ac02 in avahi_dns_packet_get_field /src/avahi/avahi-core/dns.c:145:12
+    #1 0x55ddacb0ac02 in avahi_dns_packet_new_reply /src/avahi/avahi-core/dns.c:115:55
+    #2 0x55ddacb09ebc in LLVMFuzzerTestOneInput /src/avahi/fuzz/fuzz-consume-record.cpp:55:34
+    #3 0x55ddac9bc4a0 in fuzzer::Fuzzer::ExecuteCallback(unsigned char const*, unsigned long) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:614:13
+    #4 0x55ddac9bbcc5 in fuzzer::Fuzzer::RunOne(unsigned char const*, unsigned long, bool, fuzzer::InputInfo*, bool, bool*) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:516:7
+    #5 0x55ddac9bdb16 in fuzzer::Fuzzer::ReadAndExecuteSeedCorpora(std::__Fuzzer::vector&lt;fuzzer::SizedFile, std::__Fuzzer::allocator&lt;fuzzer::SizedFile&gt;&gt;&amp;) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:812:5
+    #6 0x55ddac9bdf87 in fuzzer::Fuzzer::Loop(std::__Fuzzer::vector&lt;fuzzer::SizedFile, std::__Fuzzer::allocator&lt;fuzzer::SizedFile&gt;&gt;&amp;) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:867:3
+    #7 0x55ddac9ac596 in fuzzer::FuzzerDriver(int*, char***, int (*)(unsigned char const*, unsigned long)) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerDriver.cpp:914:6
+    #8 0x55ddac9d8ac2 in main /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerMain.cpp:20:10
+    #9 0x7fab97652082 in __libc_start_main (/lib/x86_64-linux-gnu/libc.so.6+0x24082) (BuildId: 0702430aef5fa3dda43986563e9ffcc47efbd75e)
+    #10 0x55ddac99d70d in _start (/out/fuzz-consume-record+0x4d70d)
+
+DEDUP_TOKEN: avahi_dns_packet_get_field--avahi_dns_packet_new_reply--LLVMFuzzerTestOneInput
+[1m[32m0x502000000111 is located 0 bytes after 1-byte region [0x502000000110,0x502000000111)
+[1m[0m[1m[35mallocated by thread T0 here:[1m[0m
+    #0 0x55ddacacaa3e in malloc /src/llvm-project/compiler-rt/lib/asan/asan_malloc_linux.cpp:69:3
+    #1 0x55ddacb09c10 in LLVMFuzzerTestOneInput /src/avahi/fuzz/fuzz-consume-record.cpp:41:38
+    #2 0x55ddac9bc4a0 in fuzzer::Fuzzer::ExecuteCallback(unsigned char const*, unsigned long) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:614:13
+    #3 0x55ddac9bbcc5 in fuzzer::Fuzzer::RunOne(unsigned char const*, unsigned long, bool, fuzzer::InputInfo*, bool, bool*) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:516:7
+    #4 0x55ddac9bdb16 in fuzzer::Fuzzer::ReadAndExecuteSeedCorpora(std::__Fuzzer::vector&lt;fuzzer::SizedFile, std::__Fuzzer::allocator&lt;fuzzer::SizedFile&gt;&gt;&amp;) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:812:5
+    #5 0x55ddac9bdf87 in fuzzer::Fuzzer::Loop(std::__Fuzzer::vector&lt;fuzzer::SizedFile, std::__Fuzzer::allocator&lt;fuzzer::SizedFile&gt;&gt;&amp;) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:867:3
+    #6 0x55ddac9ac596 in fuzzer::FuzzerDriver(int*, char***, int (*)(unsigned char const*, unsigned long)) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerDriver.cpp:914:6
+    #7 0x55ddac9d8ac2 in main /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerMain.cpp:20:10
+    #8 0x7fab97652082 in __libc_start_main (/lib/x86_64-linux-gnu/libc.so.6+0x24082) (BuildId: 0702430aef5fa3dda43986563e9ffcc47efbd75e)
+
+DEDUP_TOKEN: __interceptor_malloc--LLVMFuzzerTestOneInput--fuzzer::Fuzzer::ExecuteCallback(unsigned char const*, unsigned long)
+SUMMARY: AddressSanitizer: heap-buffer-overflow /src/avahi/avahi-core/dns.c:145:12 in avahi_dns_packet_get_field
+Shadow bytes around the buggy address:
+  0x501ffffffe80: [1m[0m00[1m[0m [1m[0m00[1m[0m [1m[0m00[1m[0m [1m[0m00[1m[0m [1m[0m00[1m[0m [1m[0m00[1m[0m [1m[0m00[1m[0m [1m[0m00[1m[0m [1m[0m00[1m[0m [1m[0m00[1m[0m [1m[0m00[1m[0m [1m[0m00[1m[0m [1m[0m00[1m[0m [1m[0m00[1m[0m [1m[0m00[1m[0m [1m[0m00[1m[0m
+  0x501fffffff00: [1m[0m00[1m[0m [1m[0m00[1m[0m [1m[0m00[1m[0m [1m[0m00[1m[0m [1m[0m00[1m[0m [1m[0m00[1m[0m [1m[0m00[1m[0m [1m[0m00[1m[0m [1m[0m00[1m[0m [1m[0m00[1m[0m [1m[0m00[1m[0m [1m[0m00[1m[0m [1m[0m00[1m[0m [1m[0m00[1m[0m [1m[0m00[1m[0m [1m[0m00[1m[0m
+  0x501fffffff80: [1m[0m00[1m[0m [1m[0m00[1m[0m [1m[0m00[1m[0m [1m[0m00[1m[0m [1m[0m00[1m[0m [1m[0m00[1m[0m [1m[0m00[1m[0m [1m[0m00[1m[0m [1m[0m00[1m[0m [1m[0m00[1m[0m [1m[0m00[1m[0m [1m[0m00[1m[0m [1m[0m00[1m[0m [1m[0m00[1m[0m [1m[0m00[1m[0m [1m[0m00[1m[0m
+  0x502000000000: [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[0m00[1m[0m [1m[0m00[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[0m00[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[0m00[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[0m00[1m[0m [1m[31mfa[1m[0m
+  0x502000000080: [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[35mfd[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[35mfd[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[0m01[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[0m01[1m[0m [1m[31mfa[1m[0m
+=&gt;0x502000000100: [1m[31mfa[1m[0m [1m[31mfa[1m[0m[[1m[0m01[1m[0m][1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m
+  0x502000000180: [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m
+  0x502000000200: [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m
+  0x502000000280: [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m
+  0x502000000300: [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m
+  0x502000000380: [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m [1m[31mfa[1m[0m
+Shadow byte legend (one shadow byte represents 8 application bytes):
+  Addressable:           [1m[0m00[1m[0m
+  Partially addressable: [1m[0m01[1m[0m [1m[0m02[1m[0m [1m[0m03[1m[0m [1m[0m04[1m[0m [1m[0m05[1m[0m [1m[0m06[1m[0m [1m[0m07[1m[0m 
+  Heap left redzone:       [1m[31mfa[1m[0m
+  Freed heap region:       [1m[35mfd[1m[0m
+  Stack left redzone:      [1m[31mf1[1m[0m
+  Stack mid redzone:       [1m[31mf2[1m[0m
+  Stack right redzone:     [1m[31mf3[1m[0m
+  Stack after return:      [1m[35mf5[1m[0m
+  Stack use after scope:   [1m[35mf8[1m[0m
+  Global redzone:          [1m[31mf9[1m[0m
+  Global init order:       [1m[36mf6[1m[0m
+  Poisoned by user:        [1m[34mf7[1m[0m
+  Container overflow:      [1m[34mfc[1m[0m
+  Array cookie:            [1m[31mac[1m[0m
+  Intra object redzone:    [1m[33mbb[1m[0m
+  ASan internal:           [1m[33mfe[1m[0m
+  Left alloca redzone:     [1m[34mca[1m[0m
+  Right alloca redzone:    [1m[34mcb[1m[0m
+==12==ABORTING
+MS: 0 ; base unit: 0000000000000000000000000000000000000000
+0xa,
+\012
+artifact_prefix=&#39;./&#39;; Test unit written to ./crash-adc83b19e793491b1c6ea0fd8b46cd9f32e592fc
+Base64: Cg==
+stat::number_of_executed_units: 2
+stat::average_exec_per_sec:     0
+stat::new_units_added:          0
+stat::slowest_unit_time_sec:    0
+stat::peak_rss_mb:              30
+
+</pre>
+
+
+</body>

@@ -1,0 +1,692 @@
+<!doctype html>
+
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Experiment results</title>
+<style>
+* {
+    box-sizing: border-box;
+}
+
+html {
+    line-height: 1.15;
+}
+
+body {
+    font-family: sans-serif;
+    font-size: 16px;
+}
+
+table {
+    border-collapse: collapse;
+    border-spacing: 0;
+}
+
+td, th {
+    border-right: 1px #dedede solid;
+    border-bottom: 1px #dedede solid;
+    padding: 5px;
+    text-align: left;
+}
+td:first-child, th:first-child {
+    border-left: 1px #dedede solid;
+}
+th {
+    border-top: 1px #dedede solid;
+}
+
+tbody tr:nth-child(odd) {
+    background-color: #f4f5ff;
+}
+</style>
+<body>
+    LLM: 
+    
+<h1>output-hunspell-hunspell_suggest / 05</h1>
+Bug: False
+<br>
+Crash reason: NO_SEMANTIC_ERR
+<br>
+<br>
+
+<h2>Triage</h2>
+<pre>
+
+</pre>
+<br>
+
+
+
+
+
+<h3>Final code</h3>
+
+<pre>
+#include &lt;fuzzer/FuzzedDataProvider.h&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+#include &lt;cstdint&gt;
+#include &lt;cstddef&gt;
+#include &lt;cstdlib&gt;
+#include &lt;cstring&gt;
+#include &lt;iostream&gt;
+#include &lt;sstream&gt;
+#include &lt;algorithm&gt;
+#include &lt;iterator&gt;
+#include &lt;cctype&gt;
+
+extern &#34;C&#34; {
+#include &lt;hunspell/hunspell.h&gt;  // Corrected the include path for Hunspell
+}
+
+extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    // Initialize the library or any resources within Hunspell needed for the fuzzing process here.
+    // Typically, Hunspell initialization might involve loading dictionaries, etc.
+    // For fuzzing, we can skip actual dictionary loading to focus on API robustness.
+    return 0;
+}
+
+extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    // Create a FuzzedDataProvider to parse the input data
+    FuzzedDataProvider dataProvider(data, size);
+
+    // Generate a dummy Hunspell instance (mock or dummy, as actual dictionary loading is skipped)
+    Hunhandle* pHunspell = Hunspell_create(&#34;en_US.aff&#34;, &#34;en_US.dic&#34;); // In actual fuzzing, this should be a valid instance
+
+    // Generate a random word from the input data
+    std::string word = dataProvider.ConsumeRandomLengthString(size);
+    const char* c_word = word.c_str();
+
+    // Prepare the suggestions list pointer
+    char** suggestions = nullptr;
+
+    // Call the function under test
+    int result = Hunspell_suggest(pHunspell, &amp;suggestions, c_word);
+
+    // Free the allocated suggestions (if any)
+    if (suggestions) {
+        for (int i = 0; i &lt; result; ++i) {
+            free(suggestions[i]);
+        }
+        free(suggestions);
+    }
+
+    // Destroy the Hunspell instance
+    Hunspell_destroy(pHunspell);
+
+    return 0;
+}
+</pre>
+
+
+<h3>Fixer prompt #1</h3>
+<pre>
+
+Given the following C++ fuzz harness and its build error message, fix the code to make it build for fuzzing.
+
+If there is undeclared identifier or unknown type name error, fix it by finding and including the related libraries.
+
+You MUST wrap the headers with &lt;code&gt;extern &#34;C&#34;&lt;/code&gt; if they are C headers, especially the headers are from the project.
+
+Note that some code may need to be wrapped with &lt;code&gt;extern &#34;C&#34;&lt;/code&gt; as their source is C program.
+
+MUST RETURN THE FULL CODE, INCLUDING UNCHANGED PARTS.
+EXTREMELY IMPORTANT: AVOID USING &lt;code&gt;goto&lt;/code&gt;. If you have to write code using &lt;code&gt;goto&lt;/code&gt;, you MUST MUST also declare all variables BEFORE the &lt;code&gt;goto&lt;/code&gt;. Never introduce new variables after the &lt;code&gt;goto&lt;/code&gt;.
+
+Below is the code needs to be built:
+&lt;code&gt;
+#include &lt;fuzzer/FuzzedDataProvider.h&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+#include &lt;cstdint&gt;
+#include &lt;cstddef&gt;
+#include &lt;cstdlib&gt;
+#include &lt;cstring&gt;
+#include &lt;iostream&gt;
+#include &lt;sstream&gt;
+#include &lt;algorithm&gt;
+#include &lt;iterator&gt;
+#include &lt;cctype&gt;
+
+extern &#34;C&#34; {
+#include &#34;hunspell.h&#34;  // Include the necessary header file for Hunspell
+}
+
+extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    // Initialize the library or any resources within Hunspell needed for the fuzzing process here.
+    // Typically, Hunspell initialization might involve loading dictionaries, etc.
+    // For fuzzing, we can skip actual dictionary loading to focus on API robustness.
+    return 0;
+}
+
+extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    // Create a FuzzedDataProvider to parse the input data
+    FuzzedDataProvider dataProvider(data, size);
+
+    // Generate a dummy Hunspell instance (mock or dummy, as actual dictionary loading is skipped)
+    Hunhandle* pHunspell = nullptr; // In actual fuzzing, this should be a valid instance
+
+    // Generate a random word from the input data
+    std::string word = dataProvider.ConsumeRandomLengthString(size);
+    const char* c_word = word.c_str();
+
+    // Prepare the suggestions list pointer
+    char** suggestions = nullptr;
+
+    // Call the function under test
+    int result = Hunspell_suggest(pHunspell, &amp;suggestions, c_word);
+
+    // Free the allocated suggestions (if any)
+    if (suggestions) {
+        for (int i = 0; i &lt; result; ++i) {
+            free(suggestions[i]);
+        }
+        free(suggestions);
+    }
+
+    return 0;
+}
+&lt;/code&gt;
+
+The code has the following build issues:
+&lt;error&gt;
+./src/tools/fuzzer.cxx:15:10: fatal error: &#39;hunspell.h&#39; file not found
+   15 | #include &#34;hunspell.h&#34;  // Include the necessary header file for Hunspell
+      |          ^~~~~~~~~~~~
+&lt;/error&gt;
+
+Fix code:
+1. Consider possible solutions for the issues listed above.
+2. Choose a solution that can maximize fuzzing result, which is utilizing the function under test and feeding it not null input.
+3. Apply the solutions to the original code.
+It&#39;s important to show the complete code, not only the fixed line.
+&lt;solution&gt;
+</pre>
+
+
+
+<h3>Code #1</h3>
+
+<pre>
+Here is the corrected code with the necessary changes:
+
+```cpp
+#include &lt;fuzzer/FuzzedDataProvider.h&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+#include &lt;cstdint&gt;
+#include &lt;cstddef&gt;
+#include &lt;cstdlib&gt;
+#include &lt;cstring&gt;
+#include &lt;iostream&gt;
+#include &lt;sstream&gt;
+#include &lt;algorithm&gt;
+#include &lt;iterator&gt;
+#include &lt;cctype&gt;
+
+extern &#34;C&#34; {
+#include &lt;hunspell/hunspell.h&gt;  // Corrected the include path for Hunspell
+}
+
+extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    // Initialize the library or any resources within Hunspell needed for the fuzzing process here.
+    // Typically, Hunspell initialization might involve loading dictionaries, etc.
+    // For fuzzing, we can skip actual dictionary loading to focus on API robustness.
+    return 0;
+}
+
+extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    // Create a FuzzedDataProvider to parse the input data
+    FuzzedDataProvider dataProvider(data, size);
+
+    // Generate a dummy Hunspell instance (mock or dummy, as actual dictionary loading is skipped)
+    Hunhandle* pHunspell = Hunspell_create(&#34;en_US.aff&#34;, &#34;en_US.dic&#34;); // In actual fuzzing, this should be a valid instance
+
+    // Generate a random word from the input data
+    std::string word = dataProvider.ConsumeRandomLengthString(size);
+    const char* c_word = word.c_str();
+
+    // Prepare the suggestions list pointer
+    char** suggestions = nullptr;
+
+    // Call the function under test
+    int result = Hunspell_suggest(pHunspell, &amp;suggestions, c_word);
+
+    // Free the allocated suggestions (if any)
+    if (suggestions) {
+        for (int i = 0; i &lt; result; ++i) {
+            free(suggestions[i]);
+        }
+        free(suggestions);
+    }
+
+    // Destroy the Hunspell instance
+    Hunspell_destroy(pHunspell);
+
+    return 0;
+}
+```
+
+### Explanation of Changes:
+1. **Include Path Correction**: The path for the Hunspell header file has been corrected to `&lt;hunspell/hunspell.h&gt;`. This is the typical installation path for Hunspell headers.
+2. **Hunspell Instance Creation**: A valid Hunspell instance is created using `Hunspell_create()`. This ensures that the `Hunspell_suggest` function operates on a valid instance. Note that for actual fuzzing, you would need to ensure the dictionary files (`en_US.aff` and `en_US.dic`) are available.
+3. **Hunspell Instance Destruction**: The Hunspell instance is destroyed using `Hunspell_destroy()` to prevent memory leaks.
+
+By making these changes, the code should now compile and run correctly for fuzzing.
+</pre>
+
+
+<h2>Logs</h2>
+<pre>
+Fixing /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-hunspell-hunspell_suggest/fixed_targets/05.cxx with gpt-4o, attempt 1.
+Successfully built /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-hunspell-hunspell_suggest/fixed_targets/05.cxx with gpt-4o in 1 iterations of fixing.
+Triaging the crash related to /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-hunspell-hunspell_suggest/fixed_targets/05.cxx with gpt-4o.
+Warning: no crash info in hunspell-hunspell_suggest-05.
+Result for hunspell-hunspell_suggest-05: crashes=False, coverage=0.07610535223185953 (1439/18908), coverage diff=0.005680119581464873 (57/10035)
+
+</pre>
+
+<h2>Run logs</h2>
+<pre>
+INFO:__main__:Running: docker run --rm --privileged --shm-size=2g --platform linux/amd64 -e FUZZING_ENGINE=libfuzzer -e SANITIZER=address -e RUN_FUZZER_MODE=interactive -e HELPER=True -v /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-hunspell-hunspell_suggest/corpora/05.cxx:/tmp/fuzzer_corpus -v /tmp/tmpqe63huln/build/out/hunspell-hunspell_suggest-05:/out -t gcr.io/oss-fuzz-base/base-runner run_fuzzer fuzzer -print_final_stats=1 -max_total_time=30 -len_control=0 -timeout=30.
+vm.mmap_rnd_bits = 28
+rm: cannot remove &#39;/tmp/fuzzer_corpus&#39;: Device or resource busy
+/out/fuzzer -rss_limit_mb=2560 -timeout=25 -print_final_stats=1 -max_total_time=30 -len_control=0 -timeout=30 /tmp/fuzzer_corpus -max_len=262144 &lt; /dev/null
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 4101267805
+INFO: Loaded 1 modules   (18908 inline 8-bit counters): 18908 [0x557e63d6ec18, 0x557e63d735f4), 
+INFO: Loaded 1 PC tables (18908 PCs): 18908 [0x557e63d735f8,0x557e63dbd3b8), 
+INFO:        0 files found in /tmp/fuzzer_corpus
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+INFO: A corpus is not provided, starting from an empty corpus
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+#2	INITED cov: 584 ft: 585 corp: 1/1b exec/s: 0 rss: 34Mb
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+	NEW_FUNC[1/3]: 0x557e63b3b6e0 in AffixMgr::get_reptable() const /src/hunspell/src/hunspell/affixmgr.cxx:3510
+	NEW_FUNC[2/3]: 0x557e63b70040 in AffixMgr::get_maptable() const /src/hunspell/src/hunspell/affixmgr.cxx:3536
+#3	NEW    cov: 635 ft: 697 corp: 2/3b lim: 262144 exec/s: 0 rss: 35Mb L: 2/2 MS: 1 CrossOver-
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+	NEW_FUNC[1/4]: 0x557e63a9f0a0 in HunspellImpl::mkallsmall2(std::__1::basic_string&lt;char, std::__1::char_traits&lt;char&gt;, std::__1::allocator&lt;char&gt;&gt;&amp;, std::__1::vector&lt;w_char, std::__1::allocator&lt;w_char&gt;&gt;&amp;) /src/hunspell/src/hunspell/hunspell.cxx:385
+	NEW_FUNC[2/4]: 0x557e63aa9a90 in HunspellImpl::mkinitcap2(std::__1::basic_string&lt;char, std::__1::char_traits&lt;char&gt;, std::__1::allocator&lt;char&gt;&gt;&amp;, std::__1::vector&lt;w_char, std::__1::allocator&lt;w_char&gt;&gt;&amp;) /src/hunspell/src/hunspell/hunspell.cxx:1460
+#6	NEW    cov: 683 ft: 967 corp: 3/5b lim: 262144 exec/s: 0 rss: 36Mb L: 2/2 MS: 3 ChangeBit-InsertByte-ChangeByte-
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+	NEW_FUNC[1/5]: 0x557e63aa0550 in HunspellImpl::checkword(std::__1::basic_string&lt;char, std::__1::char_traits&lt;char&gt;, std::__1::allocator&lt;char&gt;&gt; const&amp;, int*, std::__1::basic_string&lt;char, std::__1::char_traits&lt;char&gt;, std::__1::allocator&lt;char&gt;&gt;*) /src/hunspell/src/hunspell/hunspell.cxx:812
+	NEW_FUNC[2/5]: 0x557e63aa3550 in HunspellImpl::spell(std::__1::basic_string&lt;char, std::__1::char_traits&lt;char&gt;, std::__1::allocator&lt;char&gt;&gt; const&amp;, std::__1::vector&lt;std::__1::basic_string&lt;char, std::__1::char_traits&lt;char&gt;, std::__1::allocator&lt;char&gt;&gt;, std::__1::allocator&lt;std::__1::basic_string&lt;char, std::__1::char_traits&lt;char&gt;, std::__1::allocator&lt;char&gt;&gt;&gt;&gt;&amp;, int*, std::__1::basic_string&lt;char, std::__1::char_traits&lt;char&gt;, std::__1::allocator&lt;char&gt;&gt;*) /src/hunspell/src/hunspell/hunspell.cxx:441
+#7	NEW    cov: 823 ft: 1229 corp: 4/8b lim: 262144 exec/s: 0 rss: 37Mb L: 3/3 MS: 1 InsertByte-
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+#8	NEW    cov: 841 ft: 1295 corp: 5/12b lim: 262144 exec/s: 0 rss: 37Mb L: 4/4 MS: 1 CrossOver-
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+#9	NEW    cov: 841 ft: 1305 corp: 6/14b lim: 262144 exec/s: 0 rss: 38Mb L: 2/4 MS: 1 ChangeByte-
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+#10	NEW    cov: 855 ft: 1379 corp: 7/18b lim: 262144 exec/s: 0 rss: 38Mb L: 4/4 MS: 1 ChangeByte-
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+#11	NEW    cov: 871 ft: 1401 corp: 8/132b lim: 262144 exec/s: 0 rss: 38Mb L: 114/114 MS: 1 InsertRepeatedBytes-
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+#14	NEW    cov: 871 ft: 1404 corp: 9/136b lim: 262144 exec/s: 0 rss: 39Mb L: 4/114 MS: 3 ShuffleBytes-ChangeBit-ChangeBit-
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+	NEW_FUNC[1/4]: 0x557e63b14550 in std::__1::__wrap_iter&lt;char*&gt; std::__1::basic_string&lt;char, std::__1::char_traits&lt;char&gt;, std::__1::allocator&lt;char&gt;&gt;::__insert_with_size&lt;std::__1::__wrap_iter&lt;char const*&gt;, std::__1::__wrap_iter&lt;char const*&gt;&gt;(std::__1::__wrap_iter&lt;char const*&gt;, std::__1::__wrap_iter&lt;char const*&gt;, std::__1::__wrap_iter&lt;char const*&gt;, unsigned long) /usr/local/bin/../include/c++/v1/string:2916
+	NEW_FUNC[2/4]: 0x557e63b14b10 in std::__1::__wrap_iter&lt;char*&gt; std::__1::basic_string&lt;char, std::__1::char_traits&lt;char&gt;, std::__1::allocator&lt;char&gt;&gt;::__insert_from_safe_copy[abi:v180000]&lt;std::__1::__wrap_iter&lt;char const*&gt;, std::__1::__wrap_iter&lt;char const*&gt;&gt;(unsigned long, unsigned long, std::__1::__wrap_iter&lt;char const*&gt;, std::__1::__wrap_iter&lt;char const*&gt;) /usr/local/bin/../include/c++/v1/string:1781
+#15	NEW    cov: 911 ft: 1501 corp: 10/250b lim: 262144 exec/s: 0 rss: 39Mb L: 114/114 MS: 1 CMP- DE: &#34;\000\000\000\000&#34;-
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+#20	REDUCE cov: 911 ft: 1501 corp: 10/216b lim: 262144 exec/s: 0 rss: 40Mb L: 80/114 MS: 5 InsertByte-CMP-InsertByte-CrossOver-EraseBytes- DE: &#34;\011\000&#34;-
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+#21	NEW    cov: 912 ft: 1504 corp: 11/218b lim: 262144 exec/s: 0 rss: 40Mb L: 2/114 MS: 1 ChangeBit-
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+#23	NEW    cov: 1029 ft: 1679 corp: 12/306b lim: 262144 exec/s: 0 rss: 40Mb L: 88/114 MS: 2 InsertByte-EraseBytes-
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+#24	REDUCE cov: 1029 ft: 1679 corp: 12/305b lim: 262144 exec/s: 0 rss: 40Mb L: 3/114 MS: 1 EraseBytes-
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+#26	REDUCE cov: 1029 ft: 1683 corp: 13/452b lim: 262144 exec/s: 0 rss: 41Mb L: 147/147 MS: 2 ShuffleBytes-CopyPart-
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+#28	NEW    cov: 1029 ft: 1684 corp: 14/456b lim: 262144 exec/s: 0 rss: 41Mb L: 4/147 MS: 2 ChangeBit-CMP- DE: &#34;\002\000&#34;-
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+#30	NEW    cov: 1029 ft: 1685 corp: 15/460b lim: 262144 exec/s: 0 rss: 41Mb L: 4/147 MS: 2 ShuffleBytes-CopyPart-
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+#32	REDUCE cov: 1029 ft: 1702 corp: 16/467b lim: 262144 exec/s: 0 rss: 41
+...truncated...
+n
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+#24499	DONE   cov: 1439 ft: 5491 corp: 394/20Kb lim: 262144 exec/s: 790 rss: 52Mb
+###### Recommended dictionary. ######
+&#34;\000\000\000\000&#34; # Uses: 74
+&#34;\011\000&#34; # Uses: 57
+&#34;\002\000&#34; # Uses: 59
+&#34;\377\377\377\377&#34; # Uses: 53
+&#34;\021\000\000\000&#34; # Uses: 47
+&#34;\001\024&#34; # Uses: 47
+&#34;\376\377\377\377&#34; # Uses: 65
+&#34;\013\252\252\252\252\252\252\252&#34; # Uses: 56
+&#34;\377;&#34; # Uses: 59
+&#34;\3774&#34; # Uses: 60
+&#34;\000\000\000\000\000\000\000*&#34; # Uses: 53
+&#34;&lt;?xml&#34; # Uses: 49
+&#34;\000\000&#34; # Uses: 51
+&#34;\001\000\000\000\000\000\000\027&#34; # Uses: 49
+&#34;,$$$&amp;&#34; # Uses: 40
+&#34;\000\000\000\000\000\000\000\011&#34; # Uses: 51
+&#34;3\000\000\000\000\000\000\000&#34; # Uses: 41
+&#34;\377\377\377\377\377\377\377\357&#34; # Uses: 58
+&#34;AAA&#34; # Uses: 49
+&#34;\377\377\377\377\377\033\2418&#34; # Uses: 29
+&#34;&lt;?&#34; # Uses: 53
+&#34;\377\002&#34; # Uses: 44
+&#34;\001\000&#34; # Uses: 43
+&#34;\012z&#34; # Uses: 37
+&#34;\030\000&#34; # Uses: 37
+&#34;-$&#34; # Uses: 39
+&#34;\034\000\000\000\000\000\000\000&#34; # Uses: 47
+&#34;^-&#34; # Uses: 30
+&#34;-\377&#34; # Uses: 40
+&#34;CA&#34; # Uses: 40
+&#34;\000\000\000\000\000\000\000\002&#34; # Uses: 32
+&#34;\000\000\000\000\000\000\000\000&#34; # Uses: 35
+&#34;-\230&#34; # Uses: 36
+&#34;\254\345&#34; # Uses: 36
+&#34;||&#34; # Uses: 20
+&#34;&lt;?xm&#34; # Uses: 33
+&#34;\001\000\000\000\000\000\000\000&#34; # Uses: 25
+&#34;\024\000\000\000\000\000\000\000&#34; # Uses: 22
+&#34;\377\377\3771&#34; # Uses: 31
+&#34;4\000\000\000&#34; # Uses: 27
+&#34;$\000\000\000&#34; # Uses: 25
+&#34;\377\377\377\033&#34; # Uses: 27
+&#34;-`&#34; # Uses: 20
+&#34;\000\000\000\000\000\000\000\360&#34; # Uses: 26
+&#34;\010\000\000\000\000\000\000\000&#34; # Uses: 25
+&#34;\002\000\000\000&#34; # Uses: 15
+&#34;\001\027&#34; # Uses: 21
+&#34;\000\000\000\033&#34; # Uses: 25
+&#34;#\000\000\000\000\000\000\000&#34; # Uses: 19
+&#34;-o\314\000\000\000\000\000&#34; # Uses: 17
+&#34;\001\000\000\000\000\000\000\034&#34; # Uses: 16
+&#34;\274U\012\012\012&#34; # Uses: 17
+&#34;\377\021&#34; # Uses: 17
+&#34;&lt;?xml?&gt;&#34; # Uses: 20
+&#34;A`=&#34; # Uses: 16
+&#34;\377\377\377\002&#34; # Uses: 14
+&#34;\236\000\000\000\000\000\000\000&#34; # Uses: 11
+&#34;-\032&#34; # Uses: 22
+&#34;-.&#34; # Uses: 12
+&#34;\376\377\377\377\377\377\377\357&#34; # Uses: 10
+&#34;-p&#34; # Uses: 10
+&#34;&gt;M\012&#34; # Uses: 12
+&#34;\030\000\000\000\000\000\000\000&#34; # Uses: 8
+&#34;\001\000\000\000&#34; # Uses: 7
+&#34;-ZZZZ&#34; # Uses: 10
+&#34;0\000&#34; # Uses: 6
+&#34;\377\377\377\321&#34; # Uses: 1
+###### End of recommended dictionary. ######
+Done 24499 runs in 31 second(s)
+stat::number_of_executed_units: 24499
+stat::average_exec_per_sec:     790
+stat::new_units_added:          695
+stat::slowest_unit_time_sec:    0
+stat::peak_rss_mb:              52
+
+</pre>
+
+
+</body>

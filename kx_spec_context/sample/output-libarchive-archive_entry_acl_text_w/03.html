@@ -1,0 +1,602 @@
+<!doctype html>
+
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Experiment results</title>
+<style>
+* {
+    box-sizing: border-box;
+}
+
+html {
+    line-height: 1.15;
+}
+
+body {
+    font-family: sans-serif;
+    font-size: 16px;
+}
+
+table {
+    border-collapse: collapse;
+    border-spacing: 0;
+}
+
+td, th {
+    border-right: 1px #dedede solid;
+    border-bottom: 1px #dedede solid;
+    padding: 5px;
+    text-align: left;
+}
+td:first-child, th:first-child {
+    border-left: 1px #dedede solid;
+}
+th {
+    border-top: 1px #dedede solid;
+}
+
+tbody tr:nth-child(odd) {
+    background-color: #f4f5ff;
+}
+</style>
+<body>
+    LLM: 
+    
+<h1>output-libarchive-archive_entry_acl_text_w / 03</h1>
+Bug: False
+<br>
+Crash reason: NO_SEMANTIC_ERR
+<br>
+<br>
+
+<h2>Triage</h2>
+<pre>
+
+</pre>
+<br>
+
+
+
+
+
+<h3>Final code</h3>
+
+<pre>
+#include &lt;fuzzer/FuzzedDataProvider.h&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+#include &lt;cstdint&gt;
+#include &lt;cstddef&gt;
+#include &lt;cstdlib&gt;
+#include &lt;cstring&gt;
+#include &lt;iostream&gt;
+#include &lt;sstream&gt;
+#include &lt;algorithm&gt;
+#include &lt;iterator&gt;
+#include &lt;cctype&gt;
+
+extern &#34;C&#34; {
+#include &#34;archive_entry.h&#34;
+}
+
+extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    return 0;
+}
+
+extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    // Ensure there is enough data to consume
+    if (size &lt; sizeof(int)) {
+        return 0;
+    }
+
+    FuzzedDataProvider fuzzed_data(data, size);
+
+    archive_entry *entry = archive_entry_new();
+    if (entry == nullptr) {
+        return 0;
+    }
+
+    // Consume an integer for the flags
+    int flags = fuzzed_data.ConsumeIntegral&lt;int&gt;();
+
+    // Consume a string for the pathname
+    std::string pathname = fuzzed_data.ConsumeRandomLengthString();
+    if (pathname.empty()) {
+        pathname = &#34;default_path&#34;;
+    }
+    archive_entry_set_pathname(entry, pathname.c_str());
+
+    // Consume an integer for the size
+    int64_t size_value = fuzzed_data.ConsumeIntegral&lt;int64_t&gt;();
+    archive_entry_set_size(entry, size_value);
+
+    // Call the function under test with the non-null input
+    const wchar_t *result = archive_entry_acl_text_w(entry, flags);
+
+    if (result != nullptr) {
+        size_t length = wcslen(result);
+        (void)length;
+    }
+
+    archive_entry_free(entry);
+
+    return 0;
+}
+</pre>
+
+
+<h3>Fixer prompt #1</h3>
+<pre>
+
+Given the following C++ fuzz harness and its build error message, fix the code to make it build for fuzzing.
+
+If there is undeclared identifier or unknown type name error, fix it by finding and including the related libraries.
+
+You MUST wrap the headers with &lt;code&gt;extern &#34;C&#34;&lt;/code&gt; if they are C headers, especially the headers are from the project.
+
+Note that some code may need to be wrapped with &lt;code&gt;extern &#34;C&#34;&lt;/code&gt; as their source is C program.
+
+MUST RETURN THE FULL CODE, INCLUDING UNCHANGED PARTS.
+EXTREMELY IMPORTANT: AVOID USING &lt;code&gt;goto&lt;/code&gt;. If you have to write code using &lt;code&gt;goto&lt;/code&gt;, you MUST MUST also declare all variables BEFORE the &lt;code&gt;goto&lt;/code&gt;. Never introduce new variables after the &lt;code&gt;goto&lt;/code&gt;.
+
+Below is the code needs to be built:
+&lt;code&gt;
+#include &lt;fuzzer/FuzzedDataProvider.h&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+#include &lt;cstdint&gt;
+#include &lt;cstddef&gt;
+#include &lt;cstdlib&gt;
+#include &lt;cstring&gt;
+#include &lt;iostream&gt;
+#include &lt;sstream&gt;
+#include &lt;algorithm&gt;
+#include &lt;iterator&gt;
+#include &lt;cctype&gt;
+
+extern &#34;C&#34; {
+#include &#34;archive_entry.h&#34;
+}
+
+extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    return 0;
+}
+
+extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    FuzzedDataProvider fuzzed_data(data, size);
+
+    archive_entry *entry = archive_entry_new();
+    if (entry == nullptr) {
+        return 0;
+    }
+
+    int flags = fuzzed_data.ConsumeIntegral&lt;int&gt;();
+
+    const wchar_t *result = archive_entry_acl_text_w(entry, flags);
+
+    if (result != nullptr) {
+        size_t length = wcslen(result);
+        (void)length;
+    }
+
+    archive_entry_free(entry);
+
+    return 0;
+}
+&lt;/code&gt;
+
+The code can build successfully but has a runtime issue: No code coverage increasement, indicating the fuzz target ineffectively invokes the function under test.
+
+Fix code:
+1. Consider possible solutions for the issues listed above.
+2. Choose a solution that can maximize fuzzing result, which is utilizing the function under test and feeding it not null input.
+3. Apply the solutions to the original code.
+It&#39;s important to show the complete code, not only the fixed line.
+&lt;solution&gt;
+</pre>
+
+
+
+<h3>Code #1</h3>
+
+<pre>
+Here&#39;s the updated code to ensure that the fuzz target effectively invokes the function under test and handles non-null input:
+
+```cpp
+#include &lt;fuzzer/FuzzedDataProvider.h&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+#include &lt;cstdint&gt;
+#include &lt;cstddef&gt;
+#include &lt;cstdlib&gt;
+#include &lt;cstring&gt;
+#include &lt;iostream&gt;
+#include &lt;sstream&gt;
+#include &lt;algorithm&gt;
+#include &lt;iterator&gt;
+#include &lt;cctype&gt;
+
+extern &#34;C&#34; {
+#include &#34;archive_entry.h&#34;
+}
+
+extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    return 0;
+}
+
+extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    // Ensure there is enough data to consume
+    if (size &lt; sizeof(int)) {
+        return 0;
+    }
+
+    FuzzedDataProvider fuzzed_data(data, size);
+
+    archive_entry *entry = archive_entry_new();
+    if (entry == nullptr) {
+        return 0;
+    }
+
+    // Consume an integer for the flags
+    int flags = fuzzed_data.ConsumeIntegral&lt;int&gt;();
+
+    // Set some dummy data to the archive entry to ensure it&#39;s not empty
+    archive_entry_set_pathname(entry, &#34;dummy_path&#34;);
+    archive_entry_set_size(entry, 12345);
+
+    // Call the function under test with the non-null input
+    const wchar_t *result = archive_entry_acl_text_w(entry, flags);
+
+    if (result != nullptr) {
+        size_t length = wcslen(result);
+        (void)length;
+    }
+
+    archive_entry_free(entry);
+
+    return 0;
+}
+```
+
+### Explanation of Changes:
+1. **Data Size Check**: Added a check to ensure that the `size` is at least the size of an `int` to prevent consuming more data than available.
+2. **Dummy Data**: Set some dummy data to the `archive_entry` to ensure it is not empty, which can help in invoking the function under test effectively.
+3. **Function Call**: The function `archive_entry_acl_text_w` is called with the non-null input, ensuring the fuzz target is effectively testing the function.
+
+These changes should help in maximizing the fuzzing result by ensuring that the function under test is invoked with meaningful, non-null input.
+</pre>
+
+
+<h3>Fixer prompt #2</h3>
+<pre>
+
+Given the following C++ fuzz harness and its build error message, fix the code to make it build for fuzzing.
+
+If there is undeclared identifier or unknown type name error, fix it by finding and including the related libraries.
+
+You MUST wrap the headers with &lt;code&gt;extern &#34;C&#34;&lt;/code&gt; if they are C headers, especially the headers are from the project.
+
+Note that some code may need to be wrapped with &lt;code&gt;extern &#34;C&#34;&lt;/code&gt; as their source is C program.
+
+MUST RETURN THE FULL CODE, INCLUDING UNCHANGED PARTS.
+EXTREMELY IMPORTANT: AVOID USING &lt;code&gt;goto&lt;/code&gt;. If you have to write code using &lt;code&gt;goto&lt;/code&gt;, you MUST MUST also declare all variables BEFORE the &lt;code&gt;goto&lt;/code&gt;. Never introduce new variables after the &lt;code&gt;goto&lt;/code&gt;.
+
+Below is the code needs to be built:
+&lt;code&gt;
+#include &lt;fuzzer/FuzzedDataProvider.h&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+#include &lt;cstdint&gt;
+#include &lt;cstddef&gt;
+#include &lt;cstdlib&gt;
+#include &lt;cstring&gt;
+#include &lt;iostream&gt;
+#include &lt;sstream&gt;
+#include &lt;algorithm&gt;
+#include &lt;iterator&gt;
+#include &lt;cctype&gt;
+
+extern &#34;C&#34; {
+#include &#34;archive_entry.h&#34;
+}
+
+extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    return 0;
+}
+
+extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    // Ensure there is enough data to consume
+    if (size &lt; sizeof(int)) {
+        return 0;
+    }
+
+    FuzzedDataProvider fuzzed_data(data, size);
+
+    archive_entry *entry = archive_entry_new();
+    if (entry == nullptr) {
+        return 0;
+    }
+
+    // Consume an integer for the flags
+    int flags = fuzzed_data.ConsumeIntegral&lt;int&gt;();
+
+    // Set some dummy data to the archive entry to ensure it&#39;s not empty
+    archive_entry_set_pathname(entry, &#34;dummy_path&#34;);
+    archive_entry_set_size(entry, 12345);
+
+    // Call the function under test with the non-null input
+    const wchar_t *result = archive_entry_acl_text_w(entry, flags);
+
+    if (result != nullptr) {
+        size_t length = wcslen(result);
+        (void)length;
+    }
+
+    archive_entry_free(entry);
+
+    return 0;
+}
+&lt;/code&gt;
+
+The code can build successfully but has a runtime issue: No code coverage increasement, indicating the fuzz target ineffectively invokes the function under test.
+
+Fix code:
+1. Consider possible solutions for the issues listed above.
+2. Choose a solution that can maximize fuzzing result, which is utilizing the function under test and feeding it not null input.
+3. Apply the solutions to the original code.
+It&#39;s important to show the complete code, not only the fixed line.
+&lt;solution&gt;
+</pre>
+
+
+
+<h3>Code #2</h3>
+
+<pre>
+To address the runtime issue of no code coverage increase, we need to ensure that the input data is effectively consumed and used to invoke the function under test. Here are the steps to improve the fuzzing effectiveness:
+
+1. **Ensure that the input data is used dynamically**: Instead of setting static values, we can consume more data from the `FuzzedDataProvider` to set dynamic values for the archive entry.
+2. **Check for valid strings**: Ensure that the strings consumed from the input data are null-terminated and valid.
+3. **Use the consumed data to set more properties**: This can include setting the pathname, size, and other attributes dynamically.
+
+Here is the modified code:
+
+```cpp
+#include &lt;fuzzer/FuzzedDataProvider.h&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+#include &lt;cstdint&gt;
+#include &lt;cstddef&gt;
+#include &lt;cstdlib&gt;
+#include &lt;cstring&gt;
+#include &lt;iostream&gt;
+#include &lt;sstream&gt;
+#include &lt;algorithm&gt;
+#include &lt;iterator&gt;
+#include &lt;cctype&gt;
+
+extern &#34;C&#34; {
+#include &#34;archive_entry.h&#34;
+}
+
+extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    return 0;
+}
+
+extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    // Ensure there is enough data to consume
+    if (size &lt; sizeof(int)) {
+        return 0;
+    }
+
+    FuzzedDataProvider fuzzed_data(data, size);
+
+    archive_entry *entry = archive_entry_new();
+    if (entry == nullptr) {
+        return 0;
+    }
+
+    // Consume an integer for the flags
+    int flags = fuzzed_data.ConsumeIntegral&lt;int&gt;();
+
+    // Consume a string for the pathname
+    std::string pathname = fuzzed_data.ConsumeRandomLengthString();
+    if (pathname.empty()) {
+        pathname = &#34;default_path&#34;;
+    }
+    archive_entry_set_pathname(entry, pathname.c_str());
+
+    // Consume an integer for the size
+    int64_t size_value = fuzzed_data.ConsumeIntegral&lt;int64_t&gt;();
+    archive_entry_set_size(entry, size_value);
+
+    // Call the function under test with the non-null input
+    const wchar_t *result = archive_entry_acl_text_w(entry, flags);
+
+    if (result != nullptr) {
+        size_t length = wcslen(result);
+        (void)length;
+    }
+
+    archive_entry_free(entry);
+
+    return 0;
+}
+```
+
+### Explanation of Changes:
+1. **Dynamic Pathname**: Consumed a random-length string from the input data to set the pathname dynamically. If the consumed string is empty, a default value is used.
+2. **Dynamic Size**: Consumed an integer from the input data to set the size dynamically.
+3. **Consuming More Data**: By consuming more data from the input, we ensure that the fuzzing input is effectively utilized, which should help in increasing code coverage.
+
+These changes should help in making the fuzz target more effective by dynamically using the input data to invoke the function under test.
+</pre>
+
+
+<h2>Logs</h2>
+<pre>
+Fixing /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-libarchive-archive_entry_acl_text_w/fixed_targets/03.cc with gpt-4o, attempt 1.
+Fixing /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-libarchive-archive_entry_acl_text_w/fixed_targets/03.cc with gpt-4o, attempt 2.
+Successfully built /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-libarchive-archive_entry_acl_text_w/fixed_targets/03.cc with gpt-4o in 2 iterations of fixing.
+Triaging the crash related to /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-libarchive-archive_entry_acl_text_w/fixed_targets/03.cc with gpt-4o.
+Warning: no crash info in libarchive-archive_entry_acl_text_w-03.
+Result for libarchive-archive_entry_acl_text_w-03: crashes=False, coverage=0.039923954372623575 (105/2630), coverage diff=0.0033139566469277994 (122/36814)
+
+</pre>
+
+<h2>Run logs</h2>
+<pre>
+INFO:__main__:Running: docker run --rm --privileged --shm-size=2g --platform linux/amd64 -e FUZZING_ENGINE=libfuzzer -e SANITIZER=address -e RUN_FUZZER_MODE=interactive -e HELPER=True -v /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-libarchive-archive_entry_acl_text_w/corpora/03.cc:/tmp/libarchive_fuzzer_corpus -v /tmp/tmpqe63huln/build/out/libarchive-archive_entry_acl_text_w-03:/out -t gcr.io/oss-fuzz-base/base-runner run_fuzzer libarchive_fuzzer -print_final_stats=1 -max_total_time=30 -len_control=0 -timeout=30.
+vm.mmap_rnd_bits = 28
+rm: cannot remove &#39;/tmp/libarchive_fuzzer_corpus&#39;: Device or resource busy
+Using seed corpus: libarchive_fuzzer_seed_corpus.zip
+/out/libarchive_fuzzer -rss_limit_mb=2560 -timeout=25 -print_final_stats=1 -max_total_time=30 -len_control=0 -timeout=30 /tmp/libarchive_fuzzer_corpus &lt; /dev/null
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 2037201026
+INFO: Loaded 1 modules   (2630 inline 8-bit counters): 2630 [0x55ea332965d8, 0x55ea3329701e), 
+INFO: Loaded 1 PC tables (2630 PCs): 2630 [0x55ea33297020,0x55ea332a1480), 
+INFO:      965 files found in /tmp/libarchive_fuzzer_corpus
+INFO: -max_len is not provided; libFuzzer will not generate inputs larger than 1048576 bytes
+INFO: seed corpus: files: 965 min: 2b max: 27570880b total: 104912470b rss: 32Mb
+#966	INITED cov: 104 ft: 157 corp: 27/4991b exec/s: 0 rss: 68Mb
+#1028	NEW    cov: 104 ft: 158 corp: 28/5349b lim: 1048576 exec/s: 0 rss: 68Mb L: 358/2698 MS: 2 InsertRepeatedBytes-EraseBytes-
+#1064	REDUCE cov: 104 ft: 158 corp: 28/5329b lim: 1048576 exec/s: 0 rss: 68Mb L: 331/2698 MS: 1 EraseBytes-
+#1092	NEW    cov: 104 ft: 159 corp: 29/5979b lim: 1048576 exec/s: 0 rss: 68Mb L: 650/2698 MS: 3 CrossOver-CrossOver-CrossOver-
+#1176	REDUCE cov: 104 ft: 159 corp: 29/5828b lim: 1048576 exec/s: 0 rss: 68Mb L: 499/2698 MS: 4 ChangeBinInt-ChangeBinInt-ChangeBinInt-EraseBytes-
+#1179	NEW    cov: 104 ft: 160 corp: 30/5905b lim: 1048576 exec/s: 0 rss: 68Mb L: 77/2698 MS: 3 InsertByte-ChangeBinInt-CrossOver-
+#1200	REDUCE cov: 104 ft: 160 corp: 30/5876b lim: 1048576 exec/s: 0 rss: 68Mb L: 470/2698 MS: 1 EraseBytes-
+#1241	REDUCE cov: 104 ft: 160 corp: 30/5805b lim: 1048576 exec/s: 0 rss: 68Mb L: 260/2698 MS: 1 EraseBytes-
+#1243	REDUCE cov: 104 ft: 160 corp: 30/5803b lim: 1048576 exec/s: 0 rss: 68Mb L: 20/2698 MS: 2 EraseBytes-CrossOver-
+#1279	REDUCE cov: 104 ft: 160 corp: 30/5794b lim: 1048576 exec/s: 0 rss: 68Mb L: 68/2698 MS: 1 EraseBytes-
+#1373	REDUCE cov: 104 ft: 160 corp: 30/5793b lim: 1048576 exec/s: 0 rss: 68Mb L: 22/2698 MS: 4 CrossOver-ChangeByte-InsertByte-EraseBytes-
+#1383	REDUCE cov: 104 ft: 160 corp: 30/5792b lim: 1048576 exec/s: 0 rss: 68Mb L: 67/2698 MS: 5 ChangeBit-CrossOver-ChangeBit-ChangeBinInt-EraseBytes-
+#1391	REDUCE cov: 104 ft: 160 corp: 30/5791b lim: 1048576 exec/s: 0 rss: 68Mb L: 1/2698 MS: 3 ShuffleBytes-CrossOver-EraseBytes-
+#1459	REDUCE cov: 104 ft: 160 corp: 30/5778b lim: 1048576 exec/s: 0 rss: 68Mb L: 247/2698 MS: 3 ShuffleBytes-ChangeByte-EraseBytes-
+#1510	REDUCE cov: 104 ft: 160 corp: 30/5747b lim: 1048576 exec/s: 0 rss: 68Mb L: 45/2698 MS: 1 EraseBytes-
+#1528	REDUCE cov: 104 ft: 160 corp: 30/5730b lim: 1048576 exec/s: 0 rss: 68Mb L: 99/2698 MS: 3 CopyPart-CopyPart-EraseBytes-
+#1549	REDUCE cov: 104 ft: 160 corp: 30/5599b lim: 1048576 exec/s: 0 rss: 68Mb L: 227/2698 MS: 1 EraseBytes-
+#1590	REDUCE cov: 104 ft: 160 corp: 30/5595b lim: 1048576 exec/s: 0 rss: 68Mb L: 41/2698 MS: 1 EraseBytes-
+#1634	REDUCE cov: 104 ft: 160 corp: 30/5554b lim: 1048576 exec/s: 0 rss: 68Mb L: 910/2698 MS: 4 ShuffleBytes-ChangeBit-InsertRepeatedBytes-EraseBytes-
+#1669	REDUCE cov: 104 ft: 160 corp: 30/5195b lim: 1048576 exec/s: 0 rss: 68Mb L: 551/2698 MS: 5 ChangeBit-CMP-CopyPart-CrossOver-EraseBytes- DE: &#34;\000\000\000\000&#34;-
+#1737	REDUCE cov: 104 ft: 160 corp: 30/5174b lim: 1048576 exec/s: 0 rss: 68Mb L: 78/2698 MS: 3 ChangeByte-CopyPart-EraseBytes-
+#1936	REDUCE cov: 104 ft: 160 corp: 30/4687b lim: 1048576 exec/s: 0 rss: 68Mb L: 2211/2211 MS: 4 InsertByte-CrossOver-ChangeByte-EraseBytes-
+#1951	REDUCE cov: 104 ft: 160 corp: 30/4513b lim: 1048576 exec/s: 0 rss: 68Mb L: 377/2211 MS: 5 InsertRepeatedBytes-ChangeBit-InsertByte-EraseBytes-EraseBytes-
+#2217	REDUCE cov: 104 ft: 160 corp: 30/4505b lim: 1048576 exec/s: 0 rss: 68Mb L: 33/2211 MS: 1 EraseBytes-
+#2294	REDUCE cov: 104 ft: 160 corp: 30/4120b lim: 1048576 exec/s: 0 rss: 68Mb L: 1826/1826 MS: 2 ChangeASCIIInt-EraseBytes-
+#2412	REDUCE cov: 104 ft: 162 corp: 31/4176b lim: 1048576 exec/s: 0 rss: 68Mb L: 56/1826 MS: 3 ShuffleBytes-CopyPart-CrossOver-
+#2449	REDUCE cov: 104 ft: 162 corp: 31/4172b lim: 1048576 exec/s: 0 rss: 68Mb L: 117/1826 MS: 2 CopyPart-EraseBytes-
+#2487	REDUCE cov: 104 ft: 162 corp: 31/4168b lim: 1048576 exec/s: 0 rss: 68Mb L: 52/1826 MS: 3 CrossOver-PersAutoDict-EraseBytes- DE: &#34;\000\000\000\000&#34;-
+#2509	REDUCE cov: 104 ft: 162 corp: 31/4140b lim: 1048576 exec/s: 0 rss: 68Mb L: 89/1826 MS: 2 ChangeBinInt-EraseBytes-
+#2526	REDUCE cov: 104 ft: 162 corp: 31/4125b lim: 1048576 exec/s: 0 rss: 68Mb L: 52/1826 MS: 2 ChangeASCIIInt-EraseBytes-
+#2548	REDUCE cov: 104 ft: 162 corp: 31/4111b lim: 1048576 exec/s: 0 rss: 68Mb L: 363/1826 MS: 2 ChangeBit-EraseBytes-
+#2595	REDUCE cov: 104 ft: 163 corp: 32/4828b lim: 1048576 exec/s: 0 rss: 68Mb L: 717/1826 MS: 2 ChangeASCIIInt-CrossOver-
+#2681	REDUCE cov: 104 ft: 163 corp: 32/4771b lim: 1048576 exec/s: 0 rss: 68Mb L: 170/1826 MS: 1 EraseBytes-
+#2708	REDUCE cov: 104 ft: 163 corp: 32/4756b lim: 1048576 exec/s: 0 rss: 68Mb L: 155/1826 MS: 2 InsertRepeatedBytes-EraseBytes-
+#2806	REDUCE cov: 104 ft: 163 corp: 32/4699b lim: 1048576 exec/s: 0 rss: 68Mb L: 306/1826 MS: 3 ChangeByte-ShuffleBytes-EraseBytes-
+#2837	REDUCE cov: 104 ft: 163 corp: 32/4583b lim: 1048576 exec/s: 0 rss: 68Mb L: 190/1826 MS: 1 EraseBytes-
+#2847	REDUCE cov: 104 ft: 163 corp: 32/4582b lim: 1048576 exec/s: 0 rss: 68Mb L: 27/1826 MS: 5 ShuffleBytes-ChangeByte-CopyPart-ChangeByte-EraseBytes-
+#2879	REDUCE cov: 104 ft: 163 corp: 32/4566b lim: 1048576 exec/s: 0 rss: 68Mb L: 36/1826 MS: 2 InsertByte-EraseBytes-
+#2904	REDUCE cov: 104 ft: 163 corp: 32/4543b lim: 1048576 exec/s: 0 rss: 68Mb L: 224/1826 MS: 5 CrossOver-CopyPart-CopyPart-ChangeBit-EraseBytes-
+#2931	REDUCE cov: 104 ft: 163 corp: 32/4541b lim: 1048576 exec/s: 0 rss: 68Mb L: 39/1826 MS: 2 ChangeBinInt-EraseBytes-
+#3009	REDUCE cov: 104 ft: 163 corp: 32/4515b lim: 1048576 exec/s: 0 rss: 68Mb L: 444/1826 MS: 3 CopyPart-CrossOver-EraseBytes-
+#3060	REDUCE cov: 104 ft: 163 corp: 32/4512b lim: 1048576 exec/s: 0 rss: 68Mb L: 33/1826 MS: 1 EraseBytes-
+#3105	NEW    cov: 105 ft: 164 corp: 33/5294b lim: 1048576 exec/s: 0 rss: 68Mb L: 782/1826 MS: 5 CrossOver-InsertRepeatedBytes-ChangeBit-CrossOver-CopyPart-
+#3450	REDUCE cov: 105 ft: 164 corp: 33/5283b lim: 1048576 exec/s: 0 rss: 68Mb L: 22/1826 MS: 5 ChangeASCIIInt-ChangeBit-ChangeBinInt-CMP-EraseBytes- DE: &#34;\000\000&#34;-
+#3540	REDUCE cov: 105 ft: 164 corp: 33/5278b lim: 1048576 exec/s: 0 rss: 68Mb L: 84/1826 MS: 5 PersAutoDict-EraseBytes-PersAutoDict-PersAutoDict-CopyPart- DE: &#34;\000\000&#34;-&#34;\000\000&#34;-&#34;\000\000\000\000&#34;-
+#3581	REDUCE cov: 105 ft: 164 corp: 33/5240b lim: 1048576 exec/s: 0 rss: 68Mb L: 122/1826 MS: 1 EraseBytes-
+#3768	REDUCE cov: 105 ft: 164 corp: 33/5219b lim: 1048576 exec/s: 0 rss: 68Mb L: 134/1826 MS: 2 CrossOver-EraseBytes-
+#3800	REDUCE cov: 105 ft: 164 corp: 33/5210b lim: 1048576 exec/s: 0 rss: 68Mb L: 69/1826 MS: 2 ChangeASCIIInt-EraseBytes-
+#3968	REDUCE cov: 105 ft: 164 corp: 33/4882b lim: 1048576 exec/s: 0 rss: 68Mb L: 454/1826 MS: 3 ChangeBinInt-ChangeASCIIInt-EraseBytes-
+#4054	REDUCE cov: 105 ft: 164 corp: 33/4838b lim: 1048576 exec/s: 0 rss: 68Mb L: 90/1826 MS: 1 EraseBytes-
+#4075	REDUCE cov: 105 ft: 164 corp: 33/4798b lim: 1048576 exec/s: 0 rss: 68Mb L: 82/1826 MS: 1 EraseBytes-
+#4269	REDUCE cov: 105 ft: 164 corp: 33/4788b lim: 1048576 exec/s: 0 rss: 68Mb L: 59/1826 MS: 4 PersAutoDict-InsertRepeatedBytes-InsertByte-EraseBytes- DE: &#34;\000\000\000\000&#34;-
+#4505	REDUCE cov: 105 ft: 164 corp: 33/4375b lim: 1048576 exec/s: 0 rss: 68Mb L: 1413/1413 MS: 1 EraseBytes-
+#4521	REDUCE cov: 105 ft: 164 corp: 33/4274b lim: 1048576 exec/s: 0 rss: 68Mb L: 1312/1312 MS: 1 EraseBytes-
+#4552	REDUCE cov
+...truncated...
+b lim: 1048576 exec/s: 152447 rss: 73Mb L: 21/255 MS: 1 EraseBytes-
+#461938	REDUCE cov: 105 ft: 165 corp: 34/1067b lim: 1048576 exec/s: 153979 rss: 73Mb L: 57/255 MS: 2 ChangeByte-EraseBytes-
+#483962	REDUCE cov: 105 ft: 165 corp: 34/1060b lim: 1048576 exec/s: 161320 rss: 73Mb L: 248/248 MS: 4 CrossOver-InsertByte-ChangeBit-EraseBytes-
+#493598	REDUCE cov: 105 ft: 165 corp: 34/1034b lim: 1048576 exec/s: 123399 rss: 73Mb L: 222/222 MS: 1 EraseBytes-
+#501234	REDUCE cov: 105 ft: 165 corp: 34/1033b lim: 1048576 exec/s: 125308 rss: 73Mb L: 56/222 MS: 1 EraseBytes-
+#524288	pulse  cov: 105 ft: 165 corp: 34/1033b lim: 1048576 exec/s: 131072 rss: 73Mb
+#526443	REDUCE cov: 105 ft: 165 corp: 34/1028b lim: 1048576 exec/s: 131610 rss: 73Mb L: 217/217 MS: 2 ChangeByte-EraseBytes-
+#539851	REDUCE cov: 105 ft: 165 corp: 34/1025b lim: 1048576 exec/s: 134962 rss: 73Mb L: 214/214 MS: 3 ShuffleBytes-ChangeASCIIInt-EraseBytes-
+#541217	REDUCE cov: 105 ft: 165 corp: 34/993b lim: 1048576 exec/s: 135304 rss: 73Mb L: 182/182 MS: 1 EraseBytes-
+#554013	REDUCE cov: 105 ft: 165 corp: 34/990b lim: 1048576 exec/s: 138503 rss: 73Mb L: 179/179 MS: 1 EraseBytes-
+#554335	REDUCE cov: 105 ft: 165 corp: 34/989b lim: 1048576 exec/s: 138583 rss: 73Mb L: 20/179 MS: 2 EraseBytes-CopyPart-
+#558981	REDUCE cov: 105 ft: 165 corp: 34/980b lim: 1048576 exec/s: 139745 rss: 73Mb L: 170/170 MS: 1 EraseBytes-
+#568938	REDUCE cov: 105 ft: 165 corp: 34/976b lim: 1048576 exec/s: 142234 rss: 73Mb L: 166/166 MS: 2 ShuffleBytes-EraseBytes-
+#596050	REDUCE cov: 105 ft: 165 corp: 34/968b lim: 1048576 exec/s: 149012 rss: 73Mb L: 158/158 MS: 2 ShuffleBytes-EraseBytes-
+#602806	REDUCE cov: 105 ft: 165 corp: 34/966b lim: 1048576 exec/s: 150701 rss: 73Mb L: 54/158 MS: 1 EraseBytes-
+#646624	REDUCE cov: 105 ft: 165 corp: 34/961b lim: 1048576 exec/s: 129324 rss: 73Mb L: 153/153 MS: 2 ChangeBinInt-EraseBytes-
+#658548	REDUCE cov: 105 ft: 165 corp: 34/946b lim: 1048576 exec/s: 131709 rss: 73Mb L: 138/138 MS: 4 EraseBytes-InsertByte-ShuffleBytes-CopyPart-
+#700514	REDUCE cov: 105 ft: 165 corp: 34/945b lim: 1048576 exec/s: 140102 rss: 73Mb L: 53/138 MS: 1 EraseBytes-
+#701866	REDUCE cov: 105 ft: 165 corp: 34/942b lim: 1048576 exec/s: 140373 rss: 73Mb L: 135/135 MS: 2 ShuffleBytes-EraseBytes-
+#719413	REDUCE cov: 105 ft: 165 corp: 34/941b lim: 1048576 exec/s: 143882 rss: 73Mb L: 134/134 MS: 2 ChangeBit-EraseBytes-
+#763604	REDUCE cov: 105 ft: 165 corp: 34/939b lim: 1048576 exec/s: 127267 rss: 73Mb L: 132/132 MS: 1 EraseBytes-
+#770798	REDUCE cov: 105 ft: 165 corp: 34/938b lim: 1048576 exec/s: 128466 rss: 73Mb L: 52/132 MS: 4 ChangeByte-EraseBytes-CopyPart-EraseBytes-
+#807404	REDUCE cov: 105 ft: 165 corp: 34/931b lim: 1048576 exec/s: 134567 rss: 73Mb L: 125/132 MS: 1 EraseBytes-
+#846035	REDUCE cov: 105 ft: 165 corp: 34/930b lim: 1048576 exec/s: 141005 rss: 73Mb L: 51/132 MS: 1 EraseBytes-
+#887101	REDUCE cov: 105 ft: 165 corp: 34/927b lim: 1048576 exec/s: 147850 rss: 73Mb L: 48/132 MS: 1 EraseBytes-
+#896373	REDUCE cov: 105 ft: 165 corp: 34/914b lim: 1048576 exec/s: 128053 rss: 73Mb L: 112/132 MS: 2 EraseBytes-CopyPart-
+#935304	REDUCE cov: 105 ft: 165 corp: 34/913b lim: 1048576 exec/s: 133614 rss: 73Mb L: 111/132 MS: 1 EraseBytes-
+#976021	REDUCE cov: 105 ft: 165 corp: 34/910b lim: 1048576 exec/s: 139431 rss: 73Mb L: 108/132 MS: 2 InsertByte-EraseBytes-
+#992052	REDUCE cov: 105 ft: 165 corp: 34/909b lim: 1048576 exec/s: 141721 rss: 73Mb L: 47/132 MS: 1 EraseBytes-
+#993378	REDUCE cov: 105 ft: 165 corp: 34/908b lim: 1048576 exec/s: 141911 rss: 73Mb L: 46/132 MS: 1 EraseBytes-
+#997779	REDUCE cov: 105 ft: 165 corp: 34/907b lim: 1048576 exec/s: 142539 rss: 73Mb L: 45/132 MS: 1 EraseBytes-
+#1002465	REDUCE cov: 105 ft: 165 corp: 34/906b lim: 1048576 exec/s: 143209 rss: 73Mb L: 107/132 MS: 1 EraseBytes-
+#1011101	REDUCE cov: 105 ft: 165 corp: 34/905b lim: 1048576 exec/s: 144443 rss: 73Mb L: 106/132 MS: 1 EraseBytes-
+#1043207	REDUCE cov: 105 ft: 165 corp: 34/904b lim: 1048576 exec/s: 130400 rss: 73Mb L: 44/132 MS: 1 EraseBytes-
+#1048576	pulse  cov: 105 ft: 165 corp: 34/904b lim: 1048576 exec/s: 131072 rss: 73Mb
+#1057383	REDUCE cov: 105 ft: 165 corp: 34/903b lim: 1048576 exec/s: 132172 rss: 73Mb L: 43/132 MS: 1 EraseBytes-
+#1080439	REDUCE cov: 105 ft: 165 corp: 34/902b lim: 1048576 exec/s: 135054 rss: 73Mb L: 105/132 MS: 1 EraseBytes-
+#1313498	REDUCE cov: 105 ft: 165 corp: 34/901b lim: 1048576 exec/s: 145944 rss: 73Mb L: 42/132 MS: 4 EraseBytes-EraseBytes-EraseBytes-CopyPart-
+#1318976	REDUCE cov: 105 ft: 165 corp: 34/900b lim: 1048576 exec/s: 146552 rss: 73Mb L: 41/132 MS: 3 CrossOver-ChangeByte-EraseBytes-
+#1380207	REDUCE cov: 105 ft: 165 corp: 34/899b lim: 1048576 exec/s: 138020 rss: 73Mb L: 104/132 MS: 1 EraseBytes-
+#1399723	REDUCE cov: 105 ft: 165 corp: 34/898b lim: 1048576 exec/s: 139972 rss: 73Mb L: 103/132 MS: 1 EraseBytes-
+#1411704	REDUCE cov: 105 ft: 165 corp: 34/897b lim: 1048576 exec/s: 141170 rss: 73Mb L: 102/132 MS: 1 EraseBytes-
+#1413590	REDUCE cov: 105 ft: 165 corp: 34/896b lim: 1048576 exec/s: 141359 rss: 73Mb L: 101/132 MS: 1 EraseBytes-
+#1441013	REDUCE cov: 105 ft: 165 corp: 34/893b lim: 1048576 exec/s: 144101 rss: 73Mb L: 98/132 MS: 3 ChangeBit-EraseBytes-CopyPart-
+#1476726	REDUCE cov: 105 ft: 165 corp: 34/890b lim: 1048576 exec/s: 134247 rss: 73Mb L: 38/132 MS: 3 PersAutoDict-CopyPart-EraseBytes- DE: &#34;\000\000\000\000&#34;-
+#1509437	REDUCE cov: 105 ft: 165 corp: 34/888b lim: 1048576 exec/s: 137221 rss: 73Mb L: 96/132 MS: 1 EraseBytes-
+#1519883	REDUCE cov: 105 ft: 165 corp: 34/886b lim: 1048576 exec/s: 138171 rss: 73Mb L: 94/132 MS: 1 EraseBytes-
+#1520409	REDUCE cov: 105 ft: 165 corp: 34/884b lim: 1048576 exec/s: 138219 rss: 73Mb L: 92/132 MS: 1 EraseBytes-
+#1636691	REDUCE cov: 105 ft: 165 corp: 34/882b lim: 1048576 exec/s: 136390 rss: 73Mb L: 36/132 MS: 2 CopyPart-EraseBytes-
+#1682003	REDUCE cov: 105 ft: 165 corp: 34/880b lim: 1048576 exec/s: 140166 rss: 73Mb L: 90/132 MS: 2 EraseBytes-CopyPart-
+#1736394	REDUCE cov: 105 ft: 165 corp: 34/879b lim: 1048576 exec/s: 144699 rss: 73Mb L: 89/132 MS: 1 EraseBytes-
+#1775350	REDUCE cov: 105 ft: 165 corp: 34/877b lim: 1048576 exec/s: 136565 rss: 73Mb L: 87/132 MS: 1 EraseBytes-
+#1827404	REDUCE cov: 105 ft: 165 corp: 34/875b lim: 1048576 exec/s: 140569 rss: 73Mb L: 85/132 MS: 4 ShuffleBytes-CopyPart-ShuffleBytes-EraseBytes-
+#1963685	REDUCE cov: 105 ft: 165 corp: 34/874b lim: 1048576 exec/s: 140263 rss: 73Mb L: 84/132 MS: 1 EraseBytes-
+#1979866	REDUCE cov: 105 ft: 165 corp: 34/873b lim: 1048576 exec/s: 141419 rss: 73Mb L: 83/132 MS: 1 EraseBytes-
+#2097152	pulse  cov: 105 ft: 165 corp: 34/873b lim: 1048576 exec/s: 139810 rss: 73Mb
+#2660232	REDUCE cov: 105 ft: 165 corp: 34/872b lim: 1048576 exec/s: 140012 rss: 73Mb L: 82/132 MS: 1 EraseBytes-
+#3233729	REDUCE cov: 105 ft: 165 corp: 34/870b lim: 1048576 exec/s: 134738 rss: 73Mb L: 80/132 MS: 2 EraseBytes-CopyPart-
+#3249162	REDUCE cov: 105 ft: 165 corp: 34/868b lim: 1048576 exec/s: 135381 rss: 73Mb L: 78/132 MS: 3 CopyPart-ChangeBit-EraseBytes-
+#3688666	REDUCE cov: 105 ft: 166 corp: 35/1175b lim: 1048576 exec/s: 136617 rss: 73Mb L: 307/307 MS: 4 CopyPart-CopyPart-ChangeBinInt-CopyPart-
+#3692497	REDUCE cov: 105 ft: 166 corp: 35/1161b lim: 1048576 exec/s: 136759 rss: 73Mb L: 293/293 MS: 1 EraseBytes-
+#3768938	REDUCE cov: 105 ft: 166 corp: 35/1160b lim: 1048576 exec/s: 139590 rss: 73Mb L: 77/293 MS: 1 EraseBytes-
+#4029198	DONE   cov: 105 ft: 166 corp: 35/1160b lim: 1048576 exec/s: 129974 rss: 73Mb
+###### Recommended dictionary. ######
+&#34;\000\000\000\000&#34; # Uses: 37774
+&#34;\000\000&#34; # Uses: 37978
+&#34;\001\000&#34; # Uses: 37702
+&#34;\004\000\000\000\000\000\000\000&#34; # Uses: 33740
+&#34;\010\000\000\000&#34; # Uses: 37036
+&#34;\000\000\000\000\000\000\002\252&#34; # Uses: 33813
+&#34;\001\000\000\000\000\000\000\272&#34; # Uses: 33556
+&#34;\377\377\377\377\377\377\377\377&#34; # Uses: 33462
+&#34;\001\000\000\000&#34; # Uses: 36939
+&#34;\377\377\377\377&#34; # Uses: 36391
+###### End of recommended dictionary. ######
+Done 4029198 runs in 31 second(s)
+stat::number_of_executed_units: 4029198
+stat::average_exec_per_sec:     129974
+stat::new_units_added:          337
+stat::slowest_unit_time_sec:    0
+stat::peak_rss_mb:              73
+
+</pre>
+
+
+</body>

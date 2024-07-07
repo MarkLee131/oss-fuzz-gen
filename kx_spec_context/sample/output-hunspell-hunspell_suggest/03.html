@@ -1,0 +1,602 @@
+<!doctype html>
+
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Experiment results</title>
+<style>
+* {
+    box-sizing: border-box;
+}
+
+html {
+    line-height: 1.15;
+}
+
+body {
+    font-family: sans-serif;
+    font-size: 16px;
+}
+
+table {
+    border-collapse: collapse;
+    border-spacing: 0;
+}
+
+td, th {
+    border-right: 1px #dedede solid;
+    border-bottom: 1px #dedede solid;
+    padding: 5px;
+    text-align: left;
+}
+td:first-child, th:first-child {
+    border-left: 1px #dedede solid;
+}
+th {
+    border-top: 1px #dedede solid;
+}
+
+tbody tr:nth-child(odd) {
+    background-color: #f4f5ff;
+}
+</style>
+<body>
+    LLM: 
+    
+<h1>output-hunspell-hunspell_suggest / 03</h1>
+Bug: False
+<br>
+Crash reason: NO_SEMANTIC_ERR
+<br>
+<br>
+
+<h2>Triage</h2>
+<pre>
+
+</pre>
+<br>
+
+
+
+
+
+<h3>Final code</h3>
+
+<pre>
+#include &lt;fuzzer/FuzzedDataProvider.h&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+#include &lt;cstdint&gt;
+#include &lt;cstddef&gt;
+#include &lt;cstdlib&gt;
+#include &lt;cstring&gt;
+#include &lt;iostream&gt;
+#include &lt;sstream&gt;
+#include &lt;algorithm&gt;
+#include &lt;iterator&gt;
+#include &lt;cctype&gt;
+
+extern &#34;C&#34; {
+#include &#34;hunspell.h&#34;
+}
+
+extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    return 0;
+}
+
+extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    FuzzedDataProvider dataProvider(data, size);
+
+    // Initialize Hunspell with a dummy affix and dictionary file
+    Hunhandle* pHunspell = Hunspell_create(&#34;/usr/share/hunspell/en_US.aff&#34;, &#34;/usr/share/hunspell/en_US.dic&#34;);
+
+    if (!pHunspell) {
+        return 0; // If initialization fails, exit early
+    }
+
+    std::string word = dataProvider.ConsumeRandomLengthString(size);
+    const char* c_word = word.c_str();
+
+    char** suggestions = nullptr;
+
+    int result = Hunspell_suggest(pHunspell, &amp;suggestions, c_word);
+
+    if (suggestions) {
+        for (int i = 0; i &lt; result; ++i) {
+            free(suggestions[i]);
+        }
+        free(suggestions);
+    }
+
+    // Clean up Hunspell object
+    Hunspell_destroy(pHunspell);
+
+    return 0;
+}
+</pre>
+
+
+<h3>Fixer prompt #1</h3>
+<pre>
+
+Given the following C++ fuzz harness and its build error message, fix the code to make it build for fuzzing.
+
+If there is undeclared identifier or unknown type name error, fix it by finding and including the related libraries.
+
+You MUST wrap the headers with &lt;code&gt;extern &#34;C&#34;&lt;/code&gt; if they are C headers, especially the headers are from the project.
+
+Note that some code may need to be wrapped with &lt;code&gt;extern &#34;C&#34;&lt;/code&gt; as their source is C program.
+
+MUST RETURN THE FULL CODE, INCLUDING UNCHANGED PARTS.
+EXTREMELY IMPORTANT: AVOID USING &lt;code&gt;goto&lt;/code&gt;. If you have to write code using &lt;code&gt;goto&lt;/code&gt;, you MUST MUST also declare all variables BEFORE the &lt;code&gt;goto&lt;/code&gt;. Never introduce new variables after the &lt;code&gt;goto&lt;/code&gt;.
+
+Below is the code needs to be built:
+&lt;code&gt;
+#include &lt;fuzzer/FuzzedDataProvider.h&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+#include &lt;cstdint&gt;
+#include &lt;cstddef&gt;
+#include &lt;cstdlib&gt;
+#include &lt;cstring&gt;
+#include &lt;iostream&gt;
+#include &lt;sstream&gt;
+#include &lt;algorithm&gt;
+#include &lt;iterator&gt;
+#include &lt;cctype&gt;
+
+extern &#34;C&#34; {
+#include &#34;hunspell.h&#34;
+}
+
+extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    return 0;
+}
+
+extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    FuzzedDataProvider dataProvider(data, size);
+
+    Hunhandle* pHunspell = nullptr;
+
+    std::string word = dataProvider.ConsumeRandomLengthString(size);
+    const char* c_word = word.c_str();
+
+    char** suggestions = nullptr;
+
+    int result = Hunspell_suggest(pHunspell, &amp;suggestions, c_word);
+
+    if (suggestions) {
+        for (int i = 0; i &lt; result; ++i) {
+            free(suggestions[i]);
+        }
+        free(suggestions);
+    }
+
+    return 0;
+}
+&lt;/code&gt;
+
+The code can build successfully but has a runtime issue: Fuzzing crashed immediately at runtime (ASAN-ERROR: AddressSanitizer: SEGV on unknown address 0x000000000020 (pc 0x56318e44d979 bp 0x7ffd2ca393c0 sp 0x7ffd2ca39180 T0)), indicating fuzz target code for invoking the function under test is incorrect or unrobust.
+&lt;error&gt;
+Crash stacks:
+Stack 0:
+#0 0x56318e44d979 in HunspellImpl::suggest_internal(std::__1::basic_string&lt;char, std::__1::char_traits&lt;char&gt;, std::__1::allocator&lt;char&gt;&gt; const&amp;, std::__1::vector&lt;std::__1::basic_string&lt;char, std::__1::char_traits&lt;char&gt;, std::__1::allocator&lt;char&gt;&gt;, std::__1::allocator&lt;std::__1::basic_string&lt;char, std::__1::char_traits&lt;char&gt;, std::__1::allocator&lt;char&gt;&gt;&gt;&gt;&amp;, std::__1::vector&lt;std::__1::basic_string&lt;char, std::__1::char_traits&lt;char&gt;, std::__1::allocator&lt;char&gt;&gt;, std::__1::allocator&lt;std::__1::basic_string&lt;char, std::__1::char_traits&lt;char&gt;, std::__1::allocator&lt;char&gt;&gt;&gt;&gt;&amp;, bool&amp;, unsigned long&amp;, int&amp;) /src/hunspell/src/hunspell/hunspell.cxx:1070:8
+#1 0x56318e44b92b in HunspellImpl::suggest(std::__1::basic_string&lt;char, std::__1::char_traits&lt;char&gt;, std::__1::allocator&lt;char&gt;&gt; const&amp;, std::__1::vector&lt;std::__1::basic_string&lt;char, std::__1::char_traits&lt;char&gt;, std::__1::allocator&lt;char&gt;&gt;, std::__1::allocator&lt;std::__1::basic_string&lt;char, std::__1::char_traits&lt;char&gt;, std::__1::allocator&lt;char&gt;&gt;&gt;&gt;&amp;) /src/hunspell/src/hunspell/hunspell.cxx:965:35
+#2 0x56318e469555 in suggest /src/hunspell/src/hunspell/hunspell.cxx:1056:10
+#3 0x56318e469555 in HunspellImpl::suggest(char***, char const*) /src/hunspell/src/hunspell/hunspell.cxx:2050:39
+#4 0x56318e43bacd in LLVMFuzzerTestOneInput /src/hunspell/src/tools/jcc-corrected-fuzzer.cxx:32:18
+#5 0x56318e2ee2e0 in fuzzer::Fuzzer::ExecuteCallback(unsigned char const*, unsigned long) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:614:13
+#6 0x56318e2ef7e1 in fuzzer::Fuzzer::ReadAndExecuteSeedCorpora(std::__Fuzzer::vector&lt;fuzzer::SizedFile, std::__Fuzzer::allocator&lt;fuzzer::SizedFile&gt;&gt;&amp;) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:807:3
+#7 0x56318e2efdc7 in fuzzer::Fuzzer::Loop(std::__Fuzzer::vector&lt;fuzzer::SizedFile, std::__Fuzzer::allocator&lt;fuzzer::SizedFile&gt;&gt;&amp;) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:867:3
+#8 0x56318e2de3d6 in fuzzer::FuzzerDriver(int*, char***, int (*)(unsigned char const*, unsigned long)) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerDriver.cpp:914:6
+#9 0x56318e30a902 in main /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerMain.cpp:20:10
+#10 0x7f83a8bae082 in __libc_start_main (/lib/x86_64-linux-gnu/libc.so.6+0x24082) (BuildId: 0702430aef5fa3dda43986563e9ffcc47efbd75e)
+#11 0x56318e2cf54d in _start (/out/fuzzer+0xc254d)
+&lt;/error&gt;
+
+Fix code:
+1. Consider possible solutions for the issues listed above.
+2. Choose a solution that can maximize fuzzing result, which is utilizing the function under test and feeding it not null input.
+3. Apply the solutions to the original code.
+It&#39;s important to show the complete code, not only the fixed line.
+&lt;solution&gt;
+</pre>
+
+
+
+<h3>Code #1</h3>
+
+<pre>
+To address the runtime issue in the fuzzing harness, it is crucial to ensure that the `Hunspell` object (`Hunhandle*`) is properly initialized before it is used. Additionally, we need to make sure that the input provided to the `Hunspell_suggest` function is valid and that the `Hunspell` object is correctly cleaned up after use.
+
+Here&#39;s the corrected and complete code:
+
+```cpp
+#include &lt;fuzzer/FuzzedDataProvider.h&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+#include &lt;cstdint&gt;
+#include &lt;cstddef&gt;
+#include &lt;cstdlib&gt;
+#include &lt;cstring&gt;
+#include &lt;iostream&gt;
+#include &lt;sstream&gt;
+#include &lt;algorithm&gt;
+#include &lt;iterator&gt;
+#include &lt;cctype&gt;
+
+extern &#34;C&#34; {
+#include &#34;hunspell.h&#34;
+}
+
+extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    return 0;
+}
+
+extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    FuzzedDataProvider dataProvider(data, size);
+
+    // Initialize Hunspell with a dummy affix and dictionary file
+    Hunhandle* pHunspell = Hunspell_create(&#34;/usr/share/hunspell/en_US.aff&#34;, &#34;/usr/share/hunspell/en_US.dic&#34;);
+
+    if (!pHunspell) {
+        return 0; // If initialization fails, exit early
+    }
+
+    std::string word = dataProvider.ConsumeRandomLengthString(size);
+    const char* c_word = word.c_str();
+
+    char** suggestions = nullptr;
+
+    int result = Hunspell_suggest(pHunspell, &amp;suggestions, c_word);
+
+    if (suggestions) {
+        for (int i = 0; i &lt; result; ++i) {
+            free(suggestions[i]);
+        }
+        free(suggestions);
+    }
+
+    // Clean up Hunspell object
+    Hunspell_destroy(pHunspell);
+
+    return 0;
+}
+```
+
+### Explanation:
+1. **Initialization of `Hunspell` object**:
+   - The `Hunspell_create` function is used to initialize the `Hunspell` object (`pHunspell`). It takes paths to the affix file and dictionary file as arguments. For this example, we assume the files are located at `/usr/share/hunspell/en_US.aff` and `/usr/share/hunspell/en_US.dic`. Adjust the paths as necessary based on your environment.
+   - If the initialization fails (i.e., `pHunspell` is `nullptr`), the function returns early to avoid using an uninitialized `Hunspell` object.
+
+2. **Consuming random length string**:
+   - The `ConsumeRandomLengthString` function from `FuzzedDataProvider` is used to generate a random string from the input data.
+
+3. **Calling `Hunspell_suggest`**:
+   - The `Hunspell_suggest` function is called with the `Hunspell` object, the suggestions array, and the input word.
+
+4. **Cleaning up suggestions**:
+   - If suggestions are provided, they are freed to avoid memory leaks.
+
+5. **Destroying `Hunspell` object**:
+   - The `Hunspell_destroy` function is called to clean up the `Hunspell` object after use.
+
+By ensuring proper initialization and cleanup, the fuzzing harness should now run without crashing due to uninitialized or misused `Hunspell` objects.
+</pre>
+
+
+<h2>Logs</h2>
+<pre>
+Fixing /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-hunspell-hunspell_suggest/fixed_targets/03.cxx with gpt-4o, attempt 1.
+Successfully built /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-hunspell-hunspell_suggest/fixed_targets/03.cxx with gpt-4o in 1 iterations of fixing.
+Triaging the crash related to /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-hunspell-hunspell_suggest/fixed_targets/03.cxx with gpt-4o.
+Warning: no crash info in hunspell-hunspell_suggest-03.
+Result for hunspell-hunspell_suggest-03: crashes=False, coverage=0.0752022846263684 (1422/18909), coverage diff=0.005680119581464873 (57/10035)
+
+</pre>
+
+<h2>Run logs</h2>
+<pre>
+INFO:__main__:Running: docker run --rm --privileged --shm-size=2g --platform linux/amd64 -e FUZZING_ENGINE=libfuzzer -e SANITIZER=address -e RUN_FUZZER_MODE=interactive -e HELPER=True -v /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-hunspell-hunspell_suggest/corpora/03.cxx:/tmp/fuzzer_corpus -v /tmp/tmpqe63huln/build/out/hunspell-hunspell_suggest-03:/out -t gcr.io/oss-fuzz-base/base-runner run_fuzzer fuzzer -print_final_stats=1 -max_total_time=30 -len_control=0 -timeout=30.
+vm.mmap_rnd_bits = 28
+rm: cannot remove &#39;/tmp/fuzzer_corpus&#39;: Device or resource busy
+/out/fuzzer -rss_limit_mb=2560 -timeout=25 -print_final_stats=1 -max_total_time=30 -len_control=0 -timeout=30 /tmp/fuzzer_corpus -max_len=262144 &lt; /dev/null
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 4143995904
+INFO: Loaded 1 modules   (18909 inline 8-bit counters): 18909 [0x558cbef45c18, 0x558cbef4a5f5), 
+INFO: Loaded 1 PC tables (18909 PCs): 18909 [0x558cbef4a5f8,0x558cbef943c8), 
+INFO:        0 files found in /tmp/fuzzer_corpus
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.dic: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+INFO: A corpus is not provided, starting from an empty corpus
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.dic: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+#2	INITED cov: 586 ft: 587 corp: 1/1b exec/s: 0 rss: 33Mb
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.dic: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.dic: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+	NEW_FUNC[1/3]: 0x558cbed126f0 in AffixMgr::get_reptable() const /src/hunspell/src/hunspell/affixmgr.cxx:3510
+	NEW_FUNC[2/3]: 0x558cbed47050 in AffixMgr::get_maptable() const /src/hunspell/src/hunspell/affixmgr.cxx:3536
+#4	NEW    cov: 637 ft: 699 corp: 2/3b lim: 262144 exec/s: 0 rss: 35Mb L: 2/2 MS: 2 ShuffleBytes-InsertByte-
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.dic: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.dic: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+#6	NEW    cov: 637 ft: 703 corp: 3/6b lim: 262144 exec/s: 0 rss: 35Mb L: 3/3 MS: 2 EraseBytes-CMP- DE: &#34;\000\000&#34;-
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.dic: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+#7	NEW    cov: 643 ft: 711 corp: 4/8b lim: 262144 exec/s: 0 rss: 36Mb L: 2/3 MS: 1 PersAutoDict- DE: &#34;\000\000&#34;-
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.dic: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+	NEW_FUNC[1/4]: 0x558cbeceb560 in std::__1::__wrap_iter&lt;char*&gt; std::__1::basic_string&lt;char, std::__1::char_traits&lt;char&gt;, std::__1::allocator&lt;char&gt;&gt;::__insert_with_size&lt;std::__1::__wrap_iter&lt;char const*&gt;, std::__1::__wrap_iter&lt;char const*&gt;&gt;(std::__1::__wrap_iter&lt;char const*&gt;, std::__1::__wrap_iter&lt;char const*&gt;, std::__1::__wrap_iter&lt;char const*&gt;, unsigned long) /usr/local/bin/../include/c++/v1/string:2916
+	NEW_FUNC[2/4]: 0x558cbecebb20 in std::__1::__wrap_iter&lt;char*&gt; std::__1::basic_string&lt;char, std::__1::char_traits&lt;char&gt;, std::__1::allocator&lt;char&gt;&gt;::__insert_from_safe_copy[abi:v180000]&lt;std::__1::__wrap_iter&lt;char const*&gt;, std::__1::__wrap_iter&lt;char const*&gt;&gt;(unsigned long, unsigned long, std::__1::__wrap_iter&lt;char const*&gt;, std::__1::__wrap_iter&lt;char const*&gt;) /usr/local/bin/../include/c++/v1/string:1781
+#8	NEW    cov: 840 ft: 963 corp: 5/62b lim: 262144 exec/s: 0 rss: 37Mb L: 54/54 MS: 1 InsertRepeatedBytes-
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.dic: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+#9	NEW    cov: 840 ft: 1008 corp: 6/130b lim: 262144 exec/s: 0 rss: 37Mb L: 68/68 MS: 1 CrossOver-
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.dic: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.dic: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+#11	NEW    cov: 840 ft: 1012 corp: 7/134b lim: 262144 exec/s: 0 rss: 38Mb L: 4/68 MS: 2 ShuffleBytes-CrossOver-
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.dic: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+	NEW_FUNC[1/2]: 0x558cbec760b0 in HunspellImpl::mkallsmall2(std::__1::basic_string&lt;char, std::__1::char_traits&lt;char&gt;, std::__1::allocator&lt;char&gt;&gt;&amp;, std::__1::vector&lt;w_char, std::__1::allocator&lt;w_char&gt;&gt;&amp;) /src/hunspell/src/hunspell/hunspell.cxx:385
+	NEW_FUNC[2/2]: 0x558cbed66600 in mkallsmall(std::__1::basic_string&lt;char, std::__1::char_traits&lt;char&gt;, std::__1::allocator&lt;char&gt;&gt;&amp;, cs_info const*) /src/hunspell/src/hunspell/csutil.cxx:621
+#12	NEW    cov: 868 ft: 1271 corp: 8/138b lim: 262144 exec/s: 0 rss: 39Mb L: 4/68 MS: 1 ChangeByte-
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.dic: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.dic: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+#14	NEW    cov: 881 ft: 1368 corp: 9/209b lim: 262144 exec/s: 0 rss: 39Mb L: 71/71 MS: 2 ShuffleBytes-CrossOver-
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.dic: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.dic: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.dic: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.dic: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.dic: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.dic: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+#20	NEW    cov: 881 ft: 1376 corp: 10/264b lim: 262144 exec/s: 0 rss: 39Mb L: 55/71 MS: 1 InsertByte-
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.dic: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.dic: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+#22	NEW    cov: 881 ft: 1380 corp: 11/288b lim: 262144 exec/s: 0 rss: 39Mb L: 24/71 MS: 2 ChangeBit-CrossOver-
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.dic: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.dic: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.dic: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.dic: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.dic: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.dic: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.dic: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.dic: cannot open
+error: /usr/share/hunspell/en_US.aff: canno
+...truncated...
+re/hunspell/en_US.dic: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.dic: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.dic: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.dic: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.dic: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.dic: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.dic: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.dic: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.dic: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.dic: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.dic: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.dic: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.dic: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.dic: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.dic: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.dic: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.dic: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.dic: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.dic: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.dic: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.dic: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.dic: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.dic: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.dic: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.dic: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.dic: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.dic: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.dic: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.dic: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.dic: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.dic: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.dic: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.dic: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.dic: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.dic: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.dic: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.dic: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.dic: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.dic: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.dic: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+error: /usr/share/hunspell/en_US.dic: cannot open
+error: /usr/share/hunspell/en_US.aff: cannot open
+#23086	DONE   cov: 1422 ft: 5408 corp: 364/19Kb lim: 262144 exec/s: 744 rss: 52Mb
+###### Recommended dictionary. ######
+&#34;\000\000&#34; # Uses: 86
+&#34;\377\377\377,&#34; # Uses: 76
+&#34;\026t\026t&#34; # Uses: 76
+&#34;\377\377\377\377\377\377\377\020&#34; # Uses: 68
+&#34;\004\000\000\000&#34; # Uses: 60
+&#34;\377\377\377\010&#34; # Uses: 62
+&#34;\000\000\000\000\000\000\000\027&#34; # Uses: 79
+&#34;,\000&#34; # Uses: 72
+&#34;I\265@\300&#34; # Uses: 73
+&#34;A\012yyy&#34; # Uses: 68
+&#34;\377\377\377\377\377\377\377\026&#34; # Uses: 53
+&#34;\0014&#34; # Uses: 81
+&#34;\377\377&#34; # Uses: 72
+&#34;\000\000\000\000\000\000\000\034&#34; # Uses: 58
+&#34;\377\377\377\377\377\032\342\347&#34; # Uses: 46
+&#34;\011\202\037\000\000\000\000\000&#34; # Uses: 52
+&#34;\000\000\000\000\000\000\000\000&#34; # Uses: 51
+&#34;\000\000\000\000&#34; # Uses: 46
+&#34;&lt;?xml&#34; # Uses: 59
+&#34;\377\377\377\377\377\377\377\377&#34; # Uses: 63
+&#34;\023\000\000\000\000\000\000\000&#34; # Uses: 63
+&#34;\376\377\377\377\377\377\377\357&#34; # Uses: 52
+&#34;-#&#34; # Uses: 47
+&#34;-$&#34; # Uses: 56
+&#34;\004\000&#34; # Uses: 48
+&#34;\001\000\000\000\000\000\000Y&#34; # Uses: 49
+&#34;\000\000\000\000\000J\267\202&#34; # Uses: 42
+&#34;2\000\000\000&#34; # Uses: 32
+&#34;\376\377\377\377&#34; # Uses: 55
+&#34;\001\000\000\000\000\000\000\000&#34; # Uses: 33
+&#34;\000\002&#34; # Uses: 33
+&#34;2\000\000\000\000\000\000\000&#34; # Uses: 28
+&#34;\017\000\000\000\000\000\000\000&#34; # Uses: 32
+&#34;-\361\347\310&#34; # Uses: 40
+&#34;\377\003\000\000\000\000\000\000&#34; # Uses: 31
+&#34;\034\377&#34; # Uses: 18
+&#34;\004\000\000\000\000\000\000\000&#34; # Uses: 32
+&#34;\205p\347\000\000\000\000\000&#34; # Uses: 20
+&#34;\012\000&#34; # Uses: 13
+&#34;\201\012\311##&#34; # Uses: 12
+&#34;\033\000\000\000&#34; # Uses: 13
+&#34;^y&#34; # Uses: 17
+&#34;\001\002&#34; # Uses: 15
+&#34;--\361\347&#34; # Uses: 9
+&#34;\020\000\000\000&#34; # Uses: 3
+&#34;-3&#34; # Uses: 4
+&#34;\001\000\000\000&#34; # Uses: 6
+&#34;&lt;?&#34; # Uses: 5
+&#34;\210\033&#34; # Uses: 4
+&#34;^-&#34; # Uses: 0
+###### End of recommended dictionary. ######
+Done 23086 runs in 31 second(s)
+stat::number_of_executed_units: 23086
+stat::average_exec_per_sec:     744
+stat::new_units_added:          637
+stat::slowest_unit_time_sec:    0
+stat::peak_rss_mb:              52
+
+</pre>
+
+
+</body>

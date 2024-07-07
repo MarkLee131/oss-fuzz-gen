@@ -1,0 +1,706 @@
+<!doctype html>
+
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Experiment results</title>
+<style>
+* {
+    box-sizing: border-box;
+}
+
+html {
+    line-height: 1.15;
+}
+
+body {
+    font-family: sans-serif;
+    font-size: 16px;
+}
+
+table {
+    border-collapse: collapse;
+    border-spacing: 0;
+}
+
+td, th {
+    border-right: 1px #dedede solid;
+    border-bottom: 1px #dedede solid;
+    padding: 5px;
+    text-align: left;
+}
+td:first-child, th:first-child {
+    border-left: 1px #dedede solid;
+}
+th {
+    border-top: 1px #dedede solid;
+}
+
+tbody tr:nth-child(odd) {
+    background-color: #f4f5ff;
+}
+</style>
+<body>
+    LLM: 
+    
+<h1>output-libplist-plist_from_memory / 05</h1>
+Bug: True
+<br>
+Crash reason: NO_SEMANTIC_ERR
+<br>
+<br>
+
+<h2>Triage</h2>
+<pre>
+Crash is caused by bug in fuzz driver.
+
+The crash occurs because the fuzz driver calls `abort()` when `plist` is `nullptr` after a successful call to `plist_from_memory`. This indicates that the driver is not handling the case where `plist_from_memory` might return success but still set `plist` to `nullptr`, which could be a valid scenario depending on the implementation of `plist_from_memory`. The driver should be updated to handle this scenario properly without calling `abort()`.
+</pre>
+<br>
+
+
+
+
+
+<h3>Final code</h3>
+
+<pre>
+#include &lt;fuzzer/FuzzedDataProvider.h&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+#include &lt;cstdint&gt;
+#include &lt;cstddef&gt;
+#include &lt;cstdlib&gt;
+#include &lt;cstring&gt;
+#include &lt;iostream&gt;
+#include &lt;sstream&gt;
+#include &lt;algorithm&gt;
+#include &lt;iterator&gt;
+#include &lt;cctype&gt;
+
+extern &#34;C&#34; {
+#include &#34;plist/plist.h&#34;
+}
+
+extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    // Initialize the library or any resources within plist_from_memory within libplist needed for the fuzzing process here.
+    // No specific initialization required for libplist.
+    return 0;
+}
+
+extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    if (size == 0) {
+        return 0;
+    }
+
+    FuzzedDataProvider dataProvider(data, size);
+
+    // Generate fuzzed data for the parameters
+    std::vector&lt;char&gt; plist_data_vector = dataProvider.ConsumeRemainingBytes&lt;char&gt;();
+    if (plist_data_vector.empty()) {
+        return 0;
+    }
+
+    const char *plist_data = plist_data_vector.data();
+    uint32_t length = static_cast&lt;uint32_t&gt;(plist_data_vector.size());
+    plist_t plist = nullptr;
+    plist_format_t format;
+
+    // Call the function under test
+    plist_err_t result = plist_from_memory(plist_data, length, &amp;plist, &amp;format);
+
+    // Validate the result and postconditions
+    if (result == PLIST_ERR_SUCCESS) {
+        // Ensure plist is non-null
+        if (plist == nullptr) {
+            std::cerr &lt;&lt; &#34;Error: plist is null on success.&#34; &lt;&lt; std::endl;
+            abort();
+        }
+        // Ensure format is set correctly
+        switch (format) {
+            case PLIST_FORMAT_BINARY:
+            case PLIST_FORMAT_XML:
+            case PLIST_FORMAT_JSON:
+            case PLIST_FORMAT_OSTEP:
+                break;
+            default:
+                std::cerr &lt;&lt; &#34;Error: Invalid plist format.&#34; &lt;&lt; std::endl;
+                abort();
+        }
+    } else {
+        // Ensure plist is null on failure
+        if (plist != nullptr) {
+            std::cerr &lt;&lt; &#34;Error: plist is not null on failure.&#34; &lt;&lt; std::endl;
+            abort();
+        }
+    }
+
+    // Free resources if necessary
+    if (plist != nullptr) {
+        plist_free(plist);
+    }
+
+    return 0;
+}
+</pre>
+
+
+<h3>Fixer prompt #1</h3>
+<pre>
+
+Given the following C++ fuzz harness and its build error message, fix the code to make it build for fuzzing.
+
+If there is undeclared identifier or unknown type name error, fix it by finding and including the related libraries.
+
+You MUST wrap the headers with &lt;code&gt;extern &#34;C&#34;&lt;/code&gt; if they are C headers, especially the headers are from the project.
+
+Note that some code may need to be wrapped with &lt;code&gt;extern &#34;C&#34;&lt;/code&gt; as their source is C program.
+
+MUST RETURN THE FULL CODE, INCLUDING UNCHANGED PARTS.
+EXTREMELY IMPORTANT: AVOID USING &lt;code&gt;goto&lt;/code&gt;. If you have to write code using &lt;code&gt;goto&lt;/code&gt;, you MUST MUST also declare all variables BEFORE the &lt;code&gt;goto&lt;/code&gt;. Never introduce new variables after the &lt;code&gt;goto&lt;/code&gt;.
+
+Below is the code needs to be built:
+&lt;code&gt;
+#include &lt;fuzzer/FuzzedDataProvider.h&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+#include &lt;cstdint&gt;
+#include &lt;cstddef&gt;
+#include &lt;cstdlib&gt;
+#include &lt;cstring&gt;
+#include &lt;iostream&gt;
+#include &lt;sstream&gt;
+#include &lt;algorithm&gt;
+#include &lt;iterator&gt;
+#include &lt;cctype&gt;
+
+extern &#34;C&#34; {
+#include &#34;plist/plist.h&#34;
+}
+
+extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    // Initialize the library or any resources within plist_from_memory within libplist needed for the fuzzing process here.
+    // No specific initialization required for libplist.
+    return 0;
+}
+
+extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    FuzzedDataProvider dataProvider(data, size);
+
+    // Generate fuzzed data for the parameters
+    const char *plist_data = dataProvider.ConsumeRemainingBytes&lt;char&gt;();
+    uint32_t length = static_cast&lt;uint32_t&gt;(dataProvider.ConsumeIntegralInRange&lt;uint32_t&gt;(1, size));
+    plist_t plist = nullptr;
+    plist_format_t format;
+
+    // Call the function under test
+    plist_err_t result = plist_from_memory(plist_data, length, &amp;plist, &amp;format);
+
+    // Validate the result and postconditions
+    if (result == PLIST_ERR_SUCCESS) {
+        // Ensure plist is non-null
+        if (plist == nullptr) {
+            std::cerr &lt;&lt; &#34;Error: plist is null on success.&#34; &lt;&lt; std::endl;
+            abort();
+        }
+        // If format pointer was provided, ensure it is set correctly
+        if (&amp;format != nullptr) {
+            switch (format) {
+                case PLIST_FORMAT_BINARY:
+                case PLIST_FORMAT_XML:
+                case PLIST_FORMAT_JSON:
+                case PLIST_FORMAT_OSTEP:
+                    break;
+                default:
+                    std::cerr &lt;&lt; &#34;Error: Invalid plist format.&#34; &lt;&lt; std::endl;
+                    abort();
+            }
+        }
+    } else {
+        // Ensure plist is null on failure
+        if (plist != nullptr) {
+            std::cerr &lt;&lt; &#34;Error: plist is not null on failure.&#34; &lt;&lt; std::endl;
+            abort();
+        }
+    }
+
+    // Free resources if necessary
+    if (plist != nullptr) {
+        plist_free(plist);
+    }
+
+    return 0;
+}
+&lt;/code&gt;
+
+The code has the following build issues:
+&lt;error&gt;
+fuzz/oplist_fuzzer.cc:28:17: error: no viable conversion from &#39;std::vector&lt;char&gt;&#39; to &#39;const char *&#39;
+   28 |     const char *plist_data = dataProvider.ConsumeRemainingBytes&lt;char&gt;();
+      |                 ^            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+fuzz/oplist_fuzzer.cc:44:14: warning: comparison of address of &#39;format&#39; not equal to a null pointer is always true [-Wtautological-pointer-compare]
+   44 |         if (&amp;format != nullptr) {
+      |              ^~~~~~    ~~~~~~~
+&lt;/error&gt;
+
+Fix code:
+1. Consider possible solutions for the issues listed above.
+2. Choose a solution that can maximize fuzzing result, which is utilizing the function under test and feeding it not null input.
+3. Apply the solutions to the original code.
+It&#39;s important to show the complete code, not only the fixed line.
+&lt;solution&gt;
+</pre>
+
+
+
+<h3>Code #1</h3>
+
+<pre>
+Here is the fixed code with the necessary corrections:
+
+```cpp
+#include &lt;fuzzer/FuzzedDataProvider.h&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+#include &lt;cstdint&gt;
+#include &lt;cstddef&gt;
+#include &lt;cstdlib&gt;
+#include &lt;cstring&gt;
+#include &lt;iostream&gt;
+#include &lt;sstream&gt;
+#include &lt;algorithm&gt;
+#include &lt;iterator&gt;
+#include &lt;cctype&gt;
+
+extern &#34;C&#34; {
+#include &#34;plist/plist.h&#34;
+}
+
+extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    // Initialize the library or any resources within plist_from_memory within libplist needed for the fuzzing process here.
+    // No specific initialization required for libplist.
+    return 0;
+}
+
+extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    FuzzedDataProvider dataProvider(data, size);
+
+    // Generate fuzzed data for the parameters
+    std::vector&lt;char&gt; plist_data_vector = dataProvider.ConsumeRemainingBytes&lt;char&gt;();
+    const char *plist_data = plist_data_vector.data();
+    uint32_t length = static_cast&lt;uint32_t&gt;(dataProvider.ConsumeIntegralInRange&lt;uint32_t&gt;(1, size));
+    plist_t plist = nullptr;
+    plist_format_t format;
+
+    // Call the function under test
+    plist_err_t result = plist_from_memory(plist_data, length, &amp;plist, &amp;format);
+
+    // Validate the result and postconditions
+    if (result == PLIST_ERR_SUCCESS) {
+        // Ensure plist is non-null
+        if (plist == nullptr) {
+            std::cerr &lt;&lt; &#34;Error: plist is null on success.&#34; &lt;&lt; std::endl;
+            abort();
+        }
+        // Ensure format is set correctly
+        switch (format) {
+            case PLIST_FORMAT_BINARY:
+            case PLIST_FORMAT_XML:
+            case PLIST_FORMAT_JSON:
+            case PLIST_FORMAT_OSTEP:
+                break;
+            default:
+                std::cerr &lt;&lt; &#34;Error: Invalid plist format.&#34; &lt;&lt; std::endl;
+                abort();
+        }
+    } else {
+        // Ensure plist is null on failure
+        if (plist != nullptr) {
+            std::cerr &lt;&lt; &#34;Error: plist is not null on failure.&#34; &lt;&lt; std::endl;
+            abort();
+        }
+    }
+
+    // Free resources if necessary
+    if (plist != nullptr) {
+        plist_free(plist);
+    }
+
+    return 0;
+}
+```
+
+### Explanation of Fixes:
+1. **Conversion from `std::vector&lt;char&gt;` to `const char *`:**
+   - The `ConsumeRemainingBytes&lt;char&gt;()` function returns a `std::vector&lt;char&gt;`. To convert this to a `const char *`, we use the `data()` method of the `std::vector` which returns a pointer to the underlying array.
+
+2. **Comparison of address of `format` to `nullptr`:**
+   - The comparison `if (&amp;format != nullptr)` is always true because `&amp;format` is the address of a local variable which cannot be `nullptr`. This check is unnecessary and has been removed.
+
+By making these changes, the code should now build correctly and be ready for fuzzing.
+</pre>
+
+
+<h3>Fixer prompt #2</h3>
+<pre>
+
+Given the following C++ fuzz harness and its build error message, fix the code to make it build for fuzzing.
+
+If there is undeclared identifier or unknown type name error, fix it by finding and including the related libraries.
+
+You MUST wrap the headers with &lt;code&gt;extern &#34;C&#34;&lt;/code&gt; if they are C headers, especially the headers are from the project.
+
+Note that some code may need to be wrapped with &lt;code&gt;extern &#34;C&#34;&lt;/code&gt; as their source is C program.
+
+MUST RETURN THE FULL CODE, INCLUDING UNCHANGED PARTS.
+EXTREMELY IMPORTANT: AVOID USING &lt;code&gt;goto&lt;/code&gt;. If you have to write code using &lt;code&gt;goto&lt;/code&gt;, you MUST MUST also declare all variables BEFORE the &lt;code&gt;goto&lt;/code&gt;. Never introduce new variables after the &lt;code&gt;goto&lt;/code&gt;.
+
+Below is the code needs to be built:
+&lt;code&gt;
+#include &lt;fuzzer/FuzzedDataProvider.h&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+#include &lt;cstdint&gt;
+#include &lt;cstddef&gt;
+#include &lt;cstdlib&gt;
+#include &lt;cstring&gt;
+#include &lt;iostream&gt;
+#include &lt;sstream&gt;
+#include &lt;algorithm&gt;
+#include &lt;iterator&gt;
+#include &lt;cctype&gt;
+
+extern &#34;C&#34; {
+#include &#34;plist/plist.h&#34;
+}
+
+extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    // Initialize the library or any resources within plist_from_memory within libplist needed for the fuzzing process here.
+    // No specific initialization required for libplist.
+    return 0;
+}
+
+extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    FuzzedDataProvider dataProvider(data, size);
+
+    // Generate fuzzed data for the parameters
+    std::vector&lt;char&gt; plist_data_vector = dataProvider.ConsumeRemainingBytes&lt;char&gt;();
+    const char *plist_data = plist_data_vector.data();
+    uint32_t length = static_cast&lt;uint32_t&gt;(dataProvider.ConsumeIntegralInRange&lt;uint32_t&gt;(1, size));
+    plist_t plist = nullptr;
+    plist_format_t format;
+
+    // Call the function under test
+    plist_err_t result = plist_from_memory(plist_data, length, &amp;plist, &amp;format);
+
+    // Validate the result and postconditions
+    if (result == PLIST_ERR_SUCCESS) {
+        // Ensure plist is non-null
+        if (plist == nullptr) {
+            std::cerr &lt;&lt; &#34;Error: plist is null on success.&#34; &lt;&lt; std::endl;
+            abort();
+        }
+        // Ensure format is set correctly
+        switch (format) {
+            case PLIST_FORMAT_BINARY:
+            case PLIST_FORMAT_XML:
+            case PLIST_FORMAT_JSON:
+            case PLIST_FORMAT_OSTEP:
+                break;
+            default:
+                std::cerr &lt;&lt; &#34;Error: Invalid plist format.&#34; &lt;&lt; std::endl;
+                abort();
+        }
+    } else {
+        // Ensure plist is null on failure
+        if (plist != nullptr) {
+            std::cerr &lt;&lt; &#34;Error: plist is not null on failure.&#34; &lt;&lt; std::endl;
+            abort();
+        }
+    }
+
+    // Free resources if necessary
+    if (plist != nullptr) {
+        plist_free(plist);
+    }
+
+    return 0;
+}
+&lt;/code&gt;
+
+The code can build successfully but has a runtime issue: Fuzzing crashed immediately at runtime (ASAN-ERROR: AddressSanitizer: ABRT on unknown address 0x000000000011 (pc 0x7fe8dbc8400b bp 0x7ffe219aaf00 sp 0x7ffe219aabd0 T0)), indicating fuzz target code for invoking the function under test is incorrect or unrobust.
+&lt;error&gt;
+Crash stacks:
+Stack 0:
+#0 0x7fe8dbc8400b in raise (/lib/x86_64-linux-gnu/libc.so.6+0x4300b) (BuildId: 0702430aef5fa3dda43986563e9ffcc47efbd75e)
+#1 0x7fe8dbc63858 in abort (/lib/x86_64-linux-gnu/libc.so.6+0x22858) (BuildId: 0702430aef5fa3dda43986563e9ffcc47efbd75e)
+#2 0x562290bddebd in ConsumeIntegralInRange&lt;unsigned int&gt; /usr/local/lib/clang/18/include/fuzzer/FuzzedDataProvider.h:209:5
+#3 0x562290bddebd in LLVMFuzzerTestOneInput /src/libplist/fuzz/oplist_fuzzer.cc:30:58
+#4 0x562290a90390 in fuzzer::Fuzzer::ExecuteCallback(unsigned char const*, unsigned long) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:614:13
+#5 0x562290a91891 in fuzzer::Fuzzer::ReadAndExecuteSeedCorpora(std::__Fuzzer::vector&lt;fuzzer::SizedFile, std::__Fuzzer::allocator&lt;fuzzer::SizedFile&gt;&gt;&amp;) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:807:3
+#6 0x562290a91e77 in fuzzer::Fuzzer::Loop(std::__Fuzzer::vector&lt;fuzzer::SizedFile, std::__Fuzzer::allocator&lt;fuzzer::SizedFile&gt;&gt;&amp;) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:867:3
+#7 0x562290a80486 in fuzzer::FuzzerDriver(int*, char***, int (*)(unsigned char const*, unsigned long)) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerDriver.cpp:914:6
+#8 0x562290aac9b2 in main /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerMain.cpp:20:10
+#9 0x7fe8dbc65082 in __libc_start_main (/lib/x86_64-linux-gnu/libc.so.6+0x24082) (BuildId: 0702430aef5fa3dda43986563e9ffcc47efbd75e)
+#10 0x562290a715fd in _start (/out/oplist_fuzzer+0x715fd)
+&lt;/error&gt;
+
+Fix code:
+1. Consider possible solutions for the issues listed above.
+2. Choose a solution that can maximize fuzzing result, which is utilizing the function under test and feeding it not null input.
+3. Apply the solutions to the original code.
+It&#39;s important to show the complete code, not only the fixed line.
+&lt;solution&gt;
+</pre>
+
+
+
+<h3>Code #2</h3>
+
+<pre>
+Here&#39;s the fixed code with the necessary modifications to ensure that the fuzzing input is robust and does not cause immediate crashes:
+
+```cpp
+#include &lt;fuzzer/FuzzedDataProvider.h&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+#include &lt;cstdint&gt;
+#include &lt;cstddef&gt;
+#include &lt;cstdlib&gt;
+#include &lt;cstring&gt;
+#include &lt;iostream&gt;
+#include &lt;sstream&gt;
+#include &lt;algorithm&gt;
+#include &lt;iterator&gt;
+#include &lt;cctype&gt;
+
+extern &#34;C&#34; {
+#include &#34;plist/plist.h&#34;
+}
+
+extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    // Initialize the library or any resources within plist_from_memory within libplist needed for the fuzzing process here.
+    // No specific initialization required for libplist.
+    return 0;
+}
+
+extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    if (size == 0) {
+        return 0;
+    }
+
+    FuzzedDataProvider dataProvider(data, size);
+
+    // Generate fuzzed data for the parameters
+    std::vector&lt;char&gt; plist_data_vector = dataProvider.ConsumeRemainingBytes&lt;char&gt;();
+    if (plist_data_vector.empty()) {
+        return 0;
+    }
+
+    const char *plist_data = plist_data_vector.data();
+    uint32_t length = static_cast&lt;uint32_t&gt;(plist_data_vector.size());
+    plist_t plist = nullptr;
+    plist_format_t format;
+
+    // Call the function under test
+    plist_err_t result = plist_from_memory(plist_data, length, &amp;plist, &amp;format);
+
+    // Validate the result and postconditions
+    if (result == PLIST_ERR_SUCCESS) {
+        // Ensure plist is non-null
+        if (plist == nullptr) {
+            std::cerr &lt;&lt; &#34;Error: plist is null on success.&#34; &lt;&lt; std::endl;
+            abort();
+        }
+        // Ensure format is set correctly
+        switch (format) {
+            case PLIST_FORMAT_BINARY:
+            case PLIST_FORMAT_XML:
+            case PLIST_FORMAT_JSON:
+            case PLIST_FORMAT_OSTEP:
+                break;
+            default:
+                std::cerr &lt;&lt; &#34;Error: Invalid plist format.&#34; &lt;&lt; std::endl;
+                abort();
+        }
+    } else {
+        // Ensure plist is null on failure
+        if (plist != nullptr) {
+            std::cerr &lt;&lt; &#34;Error: plist is not null on failure.&#34; &lt;&lt; std::endl;
+            abort();
+        }
+    }
+
+    // Free resources if necessary
+    if (plist != nullptr) {
+        plist_free(plist);
+    }
+
+    return 0;
+}
+```
+
+### Explanation of Fixes:
+1. **Check for Zero Size Input**: Before proceeding with the fuzzing logic, the code now checks if the size of the input is zero. If it is, the function returns immediately. This prevents the function from attempting to process an empty input, which could lead to crashes.
+2. **Ensure Non-Empty `plist_data_vector`**: After consuming the remaining bytes from the `FuzzedDataProvider`, the code checks if `plist_data_vector` is empty. If it is, the function returns immediately. This ensures that the `plist_data` pointer is not null and has valid data to work with.
+3. **Correct `length` Assignment**: The length is now set to the size of the `plist_data_vector`, ensuring that it accurately reflects the size of the data being passed to `plist_from_memory`.
+
+These changes ensure that the fuzzing input is valid and robust, preventing immediate crashes and allowing the fuzzing process to proceed more effectively.
+</pre>
+
+
+<h2>Logs</h2>
+<pre>
+Fixing /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-libplist-plist_from_memory/fixed_targets/05.cc with gpt-4o, attempt 1.
+Fixing /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-libplist-plist_from_memory/fixed_targets/05.cc with gpt-4o, attempt 2.
+Successfully built /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-libplist-plist_from_memory/fixed_targets/05.cc with gpt-4o in 2 iterations of fixing.
+Triaging the crash related to /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-libplist-plist_from_memory/fixed_targets/05.cc with gpt-4o.
+Result for libplist-plist_from_memory-05: crashes=True, coverage=0.09239825953416944 (361/3907), coverage diff=0.006412005457025921 (47/7330)
+
+</pre>
+
+<h2>Run logs</h2>
+<pre>
+INFO:__main__:Running: docker run --rm --privileged --shm-size=2g --platform linux/amd64 -e FUZZING_ENGINE=libfuzzer -e SANITIZER=address -e RUN_FUZZER_MODE=interactive -e HELPER=True -v /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-libplist-plist_from_memory/corpora/05.cc:/tmp/oplist_fuzzer_corpus -v /tmp/tmpqe63huln/build/out/libplist-plist_from_memory-05:/out -t gcr.io/oss-fuzz-base/base-runner run_fuzzer oplist_fuzzer -print_final_stats=1 -max_total_time=30 -len_control=0 -timeout=30.
+vm.mmap_rnd_bits = 28
+rm: cannot remove &#39;/tmp/oplist_fuzzer_corpus&#39;: Device or resource busy
+Using seed corpus: oplist_fuzzer_seed_corpus.zip
+/out/oplist_fuzzer -rss_limit_mb=2560 -timeout=25 -print_final_stats=1 -max_total_time=30 -len_control=0 -timeout=30 /tmp/oplist_fuzzer_corpus -max_len=4096 -dict=oplist.dict &lt; /dev/null
+Dictionary: 41 entries
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 2151295577
+INFO: Loaded 1 modules   (3907 inline 8-bit counters): 3907 [0x55c34e2fa948, 0x55c34e2fb88b), 
+INFO: Loaded 1 PC tables (3907 PCs): 3907 [0x55c34e2fb890,0x55c34e30acc0), 
+INFO:        3 files found in /tmp/oplist_fuzzer_corpus
+INFO: seed corpus: files: 3 min: 341b max: 566b total: 1368b rss: 30Mb
+#4	INITED cov: 154 ft: 306 corp: 3/1368b exec/s: 0 rss: 32Mb
+#5	NEW    cov: 167 ft: 340 corp: 4/1936b lim: 4096 exec/s: 0 rss: 32Mb L: 568/568 MS: 1 ManualDict- DE: &#34;\\r&#34;-
+#6	NEW    cov: 168 ft: 359 corp: 5/2771b lim: 4096 exec/s: 0 rss: 32Mb L: 835/835 MS: 1 CopyPart-
+#9	NEW    cov: 168 ft: 394 corp: 6/3023b lim: 4096 exec/s: 0 rss: 33Mb L: 252/835 MS: 3 ChangeBinInt-InsertByte-EraseBytes-
+#11	NEW    cov: 169 ft: 399 corp: 7/3932b lim: 4096 exec/s: 0 rss: 33Mb L: 909/909 MS: 2 ChangeBinInt-CrossOver-
+#12	NEW    cov: 170 ft: 401 corp: 8/4393b lim: 4096 exec/s: 0 rss: 33Mb L: 461/909 MS: 1 ManualDict- DE: &#34;\\b&#34;-
+#13	NEW    cov: 171 ft: 469 corp: 9/4899b lim: 4096 exec/s: 0 rss: 33Mb L: 506/909 MS: 1 CopyPart-
+#14	NEW    cov: 171 ft: 471 corp: 10/5976b lim: 4096 exec/s: 0 rss: 33Mb L: 1077/1077 MS: 1 CopyPart-
+#15	NEW    cov: 171 ft: 499 corp: 11/6542b lim: 4096 exec/s: 0 rss: 33Mb L: 566/1077 MS: 1 ChangeBinInt-
+#16	NEW    cov: 172 ft: 526 corp: 12/7108b lim: 4096 exec/s: 0 rss: 33Mb L: 566/1077 MS: 1 ChangeBit-
+#18	NEW    cov: 176 ft: 564 corp: 13/8037b lim: 4096 exec/s: 0 rss: 33Mb L: 929/1077 MS: 2 CMP-CrossOver- DE: &#34;\000\000\000\031&#34;-
+#22	REDUCE cov: 176 ft: 564 corp: 13/7996b lim: 4096 exec/s: 0 rss: 33Mb L: 794/1077 MS: 4 InsertByte-CMP-ManualDict-EraseBytes- DE: &#34;CSecondKey&#34;-&#34;\\0&#34;-
+#23	NEW    cov: 177 ft: 566 corp: 14/8457b lim: 4096 exec/s: 0 rss: 33Mb L: 461/1077 MS: 1 ManualDict- DE: &#34;\\t&#34;-
+#24	NEW    cov: 178 ft: 567 corp: 15/8991b lim: 4096 exec/s: 0 rss: 33Mb L: 534/1077 MS: 1 EraseBytes-
+#32	NEW    cov: 178 ft: 571 corp: 16/9456b lim: 4096 exec/s: 0 rss: 33Mb L: 465/1077 MS: 3 InsertByte-ShuffleBytes-ManualDict- DE: &#34;=\&#34;\&#34;&#34;-
+#33	REDUCE cov: 178 ft: 571 corp: 16/9274b lim: 4096 exec/s: 0 rss: 33Mb L: 324/1077 MS: 1 EraseBytes-
+#44	NEW    cov: 178 ft: 578 corp: 17/9736b lim: 4096 exec/s: 0 rss: 33Mb L: 462/1077 MS: 1 InsertByte-
+#50	NEW    cov: 178 ft: 582 corp: 18/10053b lim: 4096 exec/s: 0 rss: 33Mb L: 317/1077 MS: 1 EraseBytes-
+#51	NEW    cov: 178 ft: 588 corp: 19/10887b lim: 4096 exec/s: 0 rss: 33Mb L: 834/1077 MS: 1 CopyPart-
+#54	REDUCE cov: 178 ft: 588 corp: 19/10874b lim: 4096 exec/s: 0 rss: 33Mb L: 452/1077 MS: 3 ChangeBit-ChangeBinInt-EraseBytes-
+#58	REDUCE cov: 178 ft: 616 corp: 20/11491b lim: 4096 exec/s: 0 rss: 33Mb L: 617/1077 MS: 4 ShuffleBytes-CopyPart-InsertRepeatedBytes-ChangeBit-
+#59	REDUCE cov: 178 ft: 619 corp: 21/11943b lim: 4096 exec/s: 0 rss: 33Mb L: 452/1077 MS: 1 PersAutoDict- DE: &#34;\\b&#34;-
+#62	NEW    cov: 178 ft: 621 corp: 22/12579b lim: 4096 exec/s: 0 rss: 34Mb L: 636/1077 MS: 3 InsertRepeatedBytes-PersAutoDict-InsertByte- DE: &#34;\\t&#34;-
+#63	NEW    cov: 178 ft: 622 corp: 23/12899b lim: 4096 exec/s: 0 rss: 34Mb L: 320/1077 MS: 1 PersAutoDict- DE: &#34;=\&#34;\&#34;&#34;-
+#66	NEW    cov: 178 ft: 623 corp: 24/13191b lim: 4096 exec/s: 0 rss: 34Mb L: 292/1077 MS: 3 ChangeBit-EraseBytes-CopyPart-
+#69	REDUCE cov: 178 ft: 624 corp: 25/13597b lim: 4096 exec/s: 0 rss: 34Mb L: 406/1077 MS: 3 CMP-ChangeByte-EraseBytes- DE: &#34;\242\003\000\000\000\000\000\000&#34;-
+#70	NEW    cov: 178 ft: 639 corp: 26/13982b lim: 4096 exec/s: 0 rss: 34Mb L: 385/1077 MS: 1 EraseBytes-
+#72	REDUCE cov: 178 ft: 639 corp: 26/13747b lim: 4096 exec/s: 0 rss: 34Mb L: 674/1077 MS: 2 InsertByte-EraseBytes-
+#74	NEW    cov: 178 ft: 649 corp: 27/15788b lim: 4096 exec/s: 0 rss: 34Mb L: 2041/2041 MS: 2 ShuffleBytes-CopyPart-
+#87	NEW    cov: 178 ft: 662 corp: 28/16088b lim: 4096 exec/s: 0 rss: 34Mb L: 300/2041 MS: 3 PersAutoDict-ShuffleBytes-EraseBytes- DE: &#34;\\b&#34;-
+#91	REDUCE cov: 178 ft: 662 corp: 28/15997b lim: 4096 exec/s: 0 rss: 34Mb L: 229/2041 MS: 4 ManualDict-ChangeByte-ChangeBinInt-EraseBytes- DE: &#34;/**/&#34;-
+#109	NEW    cov: 179 ft: 663 corp: 29/16Kb lim: 4096 exec/s: 0 rss: 34Mb L: 462/2041 MS: 3 InsertByte-ShuffleBytes-ChangeBinInt-
+#110	NEW    cov: 179 ft: 670 corp: 30/16Kb lim: 4096 exec/s: 0 rss: 34Mb L: 317/2041 MS: 1 ChangeByte-
+#112	NEW    cov: 181 ft: 677 corp: 31/17Kb lim: 4096 exec/s: 0 rss: 34Mb L: 770/2041 MS: 2 CrossOver-CopyPart-
+#150	REDUCE cov: 181 ft: 677 corp: 31/16Kb lim: 4096 exec/s: 0 rss: 34Mb L: 718/2041 MS: 3 PersAutoDict-ManualDict-EraseBytes- DE: &#34;\242\003\000\000\000\000\000\000&#34;-&#34;\\v&#34;-
+#166	REDUCE cov: 181 ft: 677 corp: 31/16Kb lim: 4096 exec/s: 0 rss: 34Mb L: 258/2041 MS: 1 EraseBytes-
+#179	NEW    cov: 182 ft: 680 corp: 32/17Kb lim: 4096 exec/s: 0 rss: 34Mb L: 545/2041 MS: 3 CopyPart-InsertRepeatedBytes-PersAutoDict- DE: &#34;\\v&#34;-
+#181	NEW    cov: 182 ft: 683 corp: 33/17Kb lim: 4096 exec/s: 0 rss: 34Mb L: 465/2041 MS: 2 ChangeByte-ManualDict- DE: &#34;\&#34;\&#34;=0&#34;-
+#189	NEW    cov: 182 ft: 687 corp: 34/18Kb lim: 4096 exec/s: 0 rss: 34Mb L: 535/2041 MS: 3 PersAutoDict-ChangeBinInt-InsertByte- DE: &#34;\\t&#34;-
+#196	REDUCE cov: 182 ft: 687 corp: 34/18Kb lim: 4096 exec/s: 0 rss: 34Mb L: 218/2041 MS: 2 ChangeBit-EraseBytes-
+#201	NEW    cov: 182 ft: 688 corp: 35/18Kb lim: 4096 exec/s: 0 rss: 34Mb L: 300/2041 MS: 5 CMP-PersAutoDict-ChangeASCIIInt-ManualDict-PersAutoDict- DE: &#34;\377\377\377\001&#34;-&#34;\\0&#34;-&#34;()&#34;-&#34;\\b&#34;-
+#245	REDUCE cov: 187 ft: 693 corp: 36/18Kb lim: 4096 exec/s: 0 rss: 35Mb L: 203/2041 MS: 4 CopyPart-EraseBytes-InsertRepeatedBytes-PersAutoDict- DE: &#34;\\0&#34;-
+#270	NEW    cov: 187 ft: 694 corp: 37/19Kb lim: 4096 exec/s: 0 rss: 35Mb L: 613/2041 MS: 5 InsertRepeatedBytes-ManualDict-PersAutoDict-ChangeBinInt-ChangeBinInt- DE: &#34;\\a&#34;-&#34;\377\377\377\001&#34;-
+#274	REDUCE cov: 187 ft: 694 corp: 37/19Kb lim: 4096 exec/s: 0 rss: 35Mb L: 430/2041 MS: 4 InsertByte-ChangeByte-ChangeBit-EraseBytes-
+#287	NEW    cov: 187 ft: 695 corp: 38/19Kb lim: 4096 exec/s: 0 rss: 35Mb L: 292/2041 MS: 3 PersAutoDict-ChangeBit-ShuffleBytes- DE: &#34;\\0&#34;-
+	NEW_FUNC[1/2]: 0x55c34e1e13c0 in byte_array_new /src/libplist/src/bytearray.c:27
+	NEW_FUNC[2/2]: 0x55c34e1e1560 in byte_array_free /src/libplist/src/bytearray.c:47
+#308	NEW    cov: 195 ft: 703 corp: 39/19Kb lim: 4096 exec/s: 308 rss: 35Mb L: 461/2041 MS: 1 CopyPart-
+#324	NEW    cov: 195 ft: 705 corp: 40/20Kb lim: 4096 exec/s: 324 rss: 36Mb L: 665/2041 MS: 1 CrossOver-
+#334	NEW    cov: 196 ft: 706 corp: 41/21Kb lim: 4096 exec/s: 334 rss: 36Mb L: 561/2041 MS: 5 ChangeByte-ChangeBit-InsertRepeatedBytes-ChangeASCIIInt-PersAutoDict- DE: &#34;\\r&#34;-
+#336	REDUCE cov: 197 ft: 707 corp: 42/21Kb lim: 4096 exec/s: 336 rss: 36Mb L: 258/2041 MS: 2 ChangeASCIIInt-ManualDict- DE: &#34;\\n&#34;-
+#385	REDUCE cov: 197 ft: 707 corp: 42/21Kb lim: 4096 exec/s: 385 rss: 36Mb L: 568/2041 MS: 4 ShuffleBytes-ShuffleBytes-ShuffleBytes-EraseBytes-
+#387	REDUCE cov: 197 ft: 707 corp: 42/21Kb lim: 4096 exec/s: 387 rss: 36Mb L: 119/2041 MS: 2 EraseBytes-ChangeByte-
+#395	NEW    cov: 197 ft: 708 corp: 43/21Kb lim: 4096 exec/s: 395 rss: 36Mb L: 209/2041 MS: 3 EraseBytes-ChangeByte-PersAutoDict- DE: &#34;/**/&#34;-
+#401	NEW    cov: 197 ft: 709 corp: 44/21Kb lim: 4096 exec/s: 401 rss: 36Mb L: 463/2041 MS: 1 PersAutoDict- DE: &#34;\\r&#34;-
+#417	NEW    cov: 199 ft: 719 corp: 45/22Kb lim: 4096 exec/s: 417 rss: 36Mb L: 461/2041 MS: 1 ChangeBit-
+#418	NEW    cov: 199 ft: 721 corp: 46/23Kb lim: 4096 exec/s: 418 
+...truncated...
+47 rss: 61Mb L: 44/3113 MS: 3 ChangeByte-ShuffleBytes-EraseBytes-
+#22897	REDUCE cov: 356 ft: 1274 corp: 268/88Kb lim: 4096 exec/s: 11448 rss: 61Mb L: 149/3113 MS: 3 ShuffleBytes-ChangeASCIIInt-EraseBytes-
+#22916	NEW    cov: 357 ft: 1277 corp: 269/88Kb lim: 4096 exec/s: 11458 rss: 61Mb L: 148/3113 MS: 4 CopyPart-CopyPart-CopyPart-InsertByte-
+#22988	NEW    cov: 357 ft: 1279 corp: 270/89Kb lim: 4096 exec/s: 11494 rss: 61Mb L: 226/3113 MS: 2 CopyPart-EraseBytes-
+#22999	REDUCE cov: 357 ft: 1279 corp: 270/89Kb lim: 4096 exec/s: 11499 rss: 61Mb L: 40/3113 MS: 1 EraseBytes-
+#23007	REDUCE cov: 357 ft: 1279 corp: 270/89Kb lim: 4096 exec/s: 11503 rss: 61Mb L: 78/3113 MS: 3 InsertByte-ChangeByte-EraseBytes-
+#23133	REDUCE cov: 357 ft: 1279 corp: 270/89Kb lim: 4096 exec/s: 11566 rss: 61Mb L: 60/3113 MS: 1 EraseBytes-
+#23256	REDUCE cov: 357 ft: 1279 corp: 270/88Kb lim: 4096 exec/s: 11628 rss: 61Mb L: 374/3113 MS: 3 ChangeByte-ChangeByte-CrossOver-
+#23343	REDUCE cov: 357 ft: 1279 corp: 270/88Kb lim: 4096 exec/s: 11671 rss: 61Mb L: 6/3113 MS: 2 ChangeBinInt-EraseBytes-
+#23357	REDUCE cov: 357 ft: 1279 corp: 270/88Kb lim: 4096 exec/s: 11678 rss: 61Mb L: 131/3113 MS: 4 ChangeByte-PersAutoDict-PersAutoDict-EraseBytes- DE: &#34;\000\000\000\000\000\000\001\260&#34;-&#34;\377\377\377\377\377\377\000\247&#34;-
+#23358	REDUCE cov: 357 ft: 1279 corp: 270/88Kb lim: 4096 exec/s: 11679 rss: 61Mb L: 9/3113 MS: 1 EraseBytes-
+#23392	REDUCE cov: 358 ft: 1283 corp: 271/88Kb lim: 4096 exec/s: 11696 rss: 61Mb L: 131/3113 MS: 4 CopyPart-CopyPart-ChangeBinInt-ChangeByte-
+#23440	REDUCE cov: 358 ft: 1284 corp: 272/89Kb lim: 4096 exec/s: 11720 rss: 61Mb L: 136/3113 MS: 3 PersAutoDict-ManualDict-InsertRepeatedBytes- DE: &#34;\214\000\000\000\000\000\000\000&#34;-&#34;\\v&#34;-
+#23467	REDUCE cov: 358 ft: 1284 corp: 272/89Kb lim: 4096 exec/s: 11733 rss: 61Mb L: 30/3113 MS: 2 InsertByte-EraseBytes-
+#23509	REDUCE cov: 358 ft: 1284 corp: 272/88Kb lim: 4096 exec/s: 11754 rss: 61Mb L: 1331/3113 MS: 2 ChangeByte-EraseBytes-
+#23513	REDUCE cov: 358 ft: 1284 corp: 272/88Kb lim: 4096 exec/s: 11756 rss: 61Mb L: 115/3113 MS: 4 ManualDict-ChangeByte-PersAutoDict-EraseBytes- DE: &#34;\\uDBFF\\uDFFF&#34;-&#34;\377\377\377u&#34;-
+#23551	REDUCE cov: 358 ft: 1284 corp: 272/88Kb lim: 4096 exec/s: 11775 rss: 61Mb L: 19/3113 MS: 3 ChangeByte-CMP-EraseBytes- DE: &#34;\034\000\000\000\000\000\000\000&#34;-
+#23602	REDUCE cov: 358 ft: 1284 corp: 272/88Kb lim: 4096 exec/s: 11801 rss: 61Mb L: 43/3113 MS: 1 EraseBytes-
+#23659	REDUCE cov: 358 ft: 1284 corp: 272/88Kb lim: 4096 exec/s: 11829 rss: 61Mb L: 29/3113 MS: 2 CMP-EraseBytes- DE: &#34;Some A\376\377\377\375SCII st&#34;-
+#23694	REDUCE cov: 358 ft: 1284 corp: 272/88Kb lim: 4096 exec/s: 11847 rss: 61Mb L: 27/3113 MS: 5 ChangeBinInt-ManualDict-EraseBytes-InsertByte-EraseBytes- DE: &#34;=\&#34;\&#34;&#34;-
+#23797	NEW    cov: 359 ft: 1294 corp: 273/88Kb lim: 4096 exec/s: 11898 rss: 61Mb L: 175/3113 MS: 3 ChangeBit-CrossOver-EraseBytes-
+#23821	REDUCE cov: 359 ft: 1294 corp: 273/88Kb lim: 4096 exec/s: 11910 rss: 61Mb L: 481/3113 MS: 4 ManualDict-InsertByte-ChangeByte-EraseBytes- DE: &#34;\\b&#34;-
+#23837	REDUCE cov: 359 ft: 1294 corp: 273/88Kb lim: 4096 exec/s: 11918 rss: 61Mb L: 119/3113 MS: 1 EraseBytes-
+#23844	REDUCE cov: 359 ft: 1294 corp: 273/88Kb lim: 4096 exec/s: 11922 rss: 61Mb L: 158/3113 MS: 2 ChangeBit-EraseBytes-
+#23851	REDUCE cov: 359 ft: 1294 corp: 273/88Kb lim: 4096 exec/s: 11925 rss: 61Mb L: 10/3113 MS: 2 ChangeByte-EraseBytes-
+#23883	REDUCE cov: 359 ft: 1294 corp: 273/88Kb lim: 4096 exec/s: 11941 rss: 61Mb L: 26/3113 MS: 2 ChangeBit-EraseBytes-
+#23889	NEW    cov: 359 ft: 1297 corp: 274/88Kb lim: 4096 exec/s: 11944 rss: 61Mb L: 226/3113 MS: 1 ChangeByte-
+#23909	REDUCE cov: 359 ft: 1297 corp: 274/88Kb lim: 4096 exec/s: 11954 rss: 61Mb L: 305/3113 MS: 5 ChangeASCIIInt-ShuffleBytes-InsertRepeatedBytes-ShuffleBytes-EraseBytes-
+#23935	REDUCE cov: 359 ft: 1297 corp: 274/88Kb lim: 4096 exec/s: 11967 rss: 61Mb L: 22/3113 MS: 1 EraseBytes-
+#23936	NEW    cov: 359 ft: 1299 corp: 275/89Kb lim: 4096 exec/s: 11968 rss: 61Mb L: 184/3113 MS: 1 InsertRepeatedBytes-
+#23940	NEW    cov: 359 ft: 1302 corp: 276/89Kb lim: 4096 exec/s: 11970 rss: 61Mb L: 154/3113 MS: 4 ShuffleBytes-ShuffleBytes-ManualDict-CrossOver- DE: &#34;,0&#34;-
+#23972	NEW    cov: 359 ft: 1306 corp: 277/89Kb lim: 4096 exec/s: 11986 rss: 61Mb L: 264/3113 MS: 2 ShuffleBytes-EraseBytes-
+#24034	REDUCE cov: 359 ft: 1306 corp: 277/89Kb lim: 4096 exec/s: 12017 rss: 61Mb L: 138/3113 MS: 2 PersAutoDict-EraseBytes- DE: &#34;{\&#34;\&#34;=0}&#34;-
+#24040	REDUCE cov: 359 ft: 1306 corp: 277/89Kb lim: 4096 exec/s: 12020 rss: 61Mb L: 26/3113 MS: 1 EraseBytes-
+#24058	REDUCE cov: 359 ft: 1306 corp: 277/89Kb lim: 4096 exec/s: 12029 rss: 61Mb L: 49/3113 MS: 3 PersAutoDict-ChangeBinInt-EraseBytes- DE: &#34;=0&#34;-
+#24115	REDUCE cov: 359 ft: 1306 corp: 277/89Kb lim: 4096 exec/s: 12057 rss: 61Mb L: 323/3113 MS: 2 ChangeBinInt-EraseBytes-
+#24154	REDUCE cov: 359 ft: 1306 corp: 277/89Kb lim: 4096 exec/s: 12077 rss: 61Mb L: 71/3113 MS: 4 ChangeBinInt-ChangeBit-InsertByte-EraseBytes-
+#24200	NEW    cov: 361 ft: 1312 corp: 278/89Kb lim: 4096 exec/s: 12100 rss: 61Mb L: 511/3113 MS: 1 CrossOver-
+Error: plist is null on success.
+AddressSanitizer:DEADLYSIGNAL
+=================================================================
+[1m[31m==17==ERROR: AddressSanitizer: ABRT on unknown address 0x000000000011 (pc 0x7f0bda67700b bp 0x7ffce76b7b90 sp 0x7ffce76b78b0 T0)
+[1m[0mSCARINESS: 10 (signal)
+    #0 0x7f0bda67700b in raise (/lib/x86_64-linux-gnu/libc.so.6+0x4300b) (BuildId: 0702430aef5fa3dda43986563e9ffcc47efbd75e)
+    #1 0x7f0bda656858 in abort (/lib/x86_64-linux-gnu/libc.so.6+0x22858) (BuildId: 0702430aef5fa3dda43986563e9ffcc47efbd75e)
+    #2 0x55c34e1a7df8 in LLVMFuzzerTestOneInput /src/libplist/fuzz/oplist_fuzzer.cc:50:13
+    #3 0x55c34e05a390 in fuzzer::Fuzzer::ExecuteCallback(unsigned char const*, unsigned long) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:614:13
+    #4 0x55c34e059bb5 in fuzzer::Fuzzer::RunOne(unsigned char const*, unsigned long, bool, fuzzer::InputInfo*, bool, bool*) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:516:7
+    #5 0x55c34e05b385 in fuzzer::Fuzzer::MutateAndTestOne() /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:760:19
+    #6 0x55c34e05c175 in fuzzer::Fuzzer::Loop(std::__Fuzzer::vector&lt;fuzzer::SizedFile, std::__Fuzzer::allocator&lt;fuzzer::SizedFile&gt;&gt;&amp;) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:905:5
+    #7 0x55c34e04a486 in fuzzer::FuzzerDriver(int*, char***, int (*)(unsigned char const*, unsigned long)) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerDriver.cpp:914:6
+    #8 0x55c34e0769b2 in main /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerMain.cpp:20:10
+    #9 0x7f0bda658082 in __libc_start_main (/lib/x86_64-linux-gnu/libc.so.6+0x24082) (BuildId: 0702430aef5fa3dda43986563e9ffcc47efbd75e)
+    #10 0x55c34e03b5fd in _start (/out/oplist_fuzzer+0x715fd)
+
+DEDUP_TOKEN: raise--abort--LLVMFuzzerTestOneInput
+AddressSanitizer can not provide additional info.
+SUMMARY: AddressSanitizer: ABRT (/lib/x86_64-linux-gnu/libc.so.6+0x4300b) (BuildId: 0702430aef5fa3dda43986563e9ffcc47efbd75e) in raise
+==17==ABORTING
+MS: 3 ChangeASCIIInt-InsertRepeatedBytes-InsertByte-; base unit: c725cbe8313f43a859ac36bfdf72882d2dc2533e
+0x5b,0x21,0x70,0x70,0x70,0x70,0x70,0x70,0x70,0x70,0x70,0x70,0x70,0x70,0x70,0x70,0x70,0x70,0x70,0x70,0x70,0x70,0x70,0x70,0x70,0x70,0x70,0x70,0x70,0x70,0x70,0x70,0x70,0x70,0x70,0x70,0x70,0x70,0x5d,0x70,0x70,0x70,0x70,0x70,0x70,0x70,0x70,0x70,0x70,0x70,0x70,0x70,0x70,0x70,0x70,0x70,0x70,0x70,0x70,0x70,0x70,0x70,0x70,0x70,0x70,0x70,0x70,0x70,0x70,0x70,0x70,0x70,0x70,0x70,0x70,0x70,0x70,0x70,0x70,0x70,0x70,0x70,0x70,0x70,0x70,0x2c,0x30,
+[!pppppppppppppppppppppppppppppppppppp]pppppppppppppppppppppppppppppppppppppppppppppp,0
+artifact_prefix=&#39;./&#39;; Test unit written to ./crash-23fdd9942fe46f422f0bdc1904e08339ac3d5ff4
+Base64: WyFwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBdcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcCww
+stat::number_of_executed_units: 24233
+stat::average_exec_per_sec:     12116
+stat::new_units_added:          884
+stat::slowest_unit_time_sec:    0
+stat::peak_rss_mb:              61
+
+</pre>
+
+
+</body>

@@ -1,0 +1,653 @@
+<!doctype html>
+
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Experiment results</title>
+<style>
+* {
+    box-sizing: border-box;
+}
+
+html {
+    line-height: 1.15;
+}
+
+body {
+    font-family: sans-serif;
+    font-size: 16px;
+}
+
+table {
+    border-collapse: collapse;
+    border-spacing: 0;
+}
+
+td, th {
+    border-right: 1px #dedede solid;
+    border-bottom: 1px #dedede solid;
+    padding: 5px;
+    text-align: left;
+}
+td:first-child, th:first-child {
+    border-left: 1px #dedede solid;
+}
+th {
+    border-top: 1px #dedede solid;
+}
+
+tbody tr:nth-child(odd) {
+    background-color: #f4f5ff;
+}
+</style>
+<body>
+    LLM: 
+    
+<h1>output-hunspell-hunspell_suggest / 02</h1>
+Bug: False
+<br>
+Crash reason: NO_SEMANTIC_ERR
+<br>
+<br>
+
+<h2>Triage</h2>
+<pre>
+
+</pre>
+<br>
+
+
+
+
+
+<h3>Final code</h3>
+
+<pre>
+#include &lt;fuzzer/FuzzedDataProvider.h&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+#include &lt;cstdint&gt;
+#include &lt;cstddef&gt;
+#include &lt;cstdlib&gt;
+#include &lt;cstring&gt;
+#include &lt;iostream&gt;
+#include &lt;sstream&gt;
+#include &lt;algorithm&gt;
+#include &lt;iterator&gt;
+#include &lt;cctype&gt;
+
+extern &#34;C&#34; {
+#include &lt;hunspell/hunspell.h&gt;  // Correctly include the necessary header file for Hunspell
+}
+
+extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    // Initialize the library or any resources within Hunspell needed for the fuzzing process here.
+    // Typically, Hunspell initialization might involve loading dictionaries, etc.
+    // For fuzzing, we can skip actual dictionary loading to focus on API robustness.
+    return 0;
+}
+
+extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    // Create a FuzzedDataProvider to parse the input data
+    FuzzedDataProvider dataProvider(data, size);
+
+    // Generate a dummy Hunspell instance (mock or dummy, as actual dictionary loading is skipped)
+    Hunhandle* pHunspell = Hunspell_create(&#34;/path/to/affix.aff&#34;, &#34;/path/to/dictionary.dic&#34;); // In actual fuzzing, this should be a valid instance
+
+    // Generate a random word from the input data
+    std::string word = dataProvider.ConsumeRandomLengthString(size);
+    const char* c_word = word.c_str();
+
+    // Prepare the suggestions list pointer
+    char** suggestions = nullptr;
+
+    // Call the function under test
+    int result = Hunspell_suggest(pHunspell, &amp;suggestions, c_word);
+
+    // Free the allocated suggestions (if any)
+    if (suggestions) {
+        for (int i = 0; i &lt; result; ++i) {
+            free(suggestions[i]);
+        }
+        free(suggestions);
+    }
+
+    // Destroy the Hunspell instance
+    Hunspell_destroy(pHunspell);
+
+    return 0;
+}
+</pre>
+
+
+<h3>Fixer prompt #1</h3>
+<pre>
+
+Given the following C++ fuzz harness and its build error message, fix the code to make it build for fuzzing.
+
+If there is undeclared identifier or unknown type name error, fix it by finding and including the related libraries.
+
+You MUST wrap the headers with &lt;code&gt;extern &#34;C&#34;&lt;/code&gt; if they are C headers, especially the headers are from the project.
+
+Note that some code may need to be wrapped with &lt;code&gt;extern &#34;C&#34;&lt;/code&gt; as their source is C program.
+
+MUST RETURN THE FULL CODE, INCLUDING UNCHANGED PARTS.
+EXTREMELY IMPORTANT: AVOID USING &lt;code&gt;goto&lt;/code&gt;. If you have to write code using &lt;code&gt;goto&lt;/code&gt;, you MUST MUST also declare all variables BEFORE the &lt;code&gt;goto&lt;/code&gt;. Never introduce new variables after the &lt;code&gt;goto&lt;/code&gt;.
+
+Below is the code needs to be built:
+&lt;code&gt;
+#include &lt;fuzzer/FuzzedDataProvider.h&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+#include &lt;cstdint&gt;
+#include &lt;cstddef&gt;
+#include &lt;cstdlib&gt;
+#include &lt;cstring&gt;
+#include &lt;iostream&gt;
+#include &lt;sstream&gt;
+#include &lt;algorithm&gt;
+#include &lt;iterator&gt;
+#include &lt;cctype&gt;
+
+extern &#34;C&#34; {
+#include &#34;hunspell.h&#34;  // Include the necessary header file for Hunspell
+}
+
+extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    // Initialize the library or any resources within Hunspell needed for the fuzzing process here.
+    // Typically, Hunspell initialization might involve loading dictionaries, etc.
+    // For fuzzing, we can skip actual dictionary loading to focus on API robustness.
+    return 0;
+}
+
+extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    // Create a FuzzedDataProvider to parse the input data
+    FuzzedDataProvider dataProvider(data, size);
+
+    // Generate a dummy Hunspell instance (mock or dummy, as actual dictionary loading is skipped)
+    Hunhandle* pHunspell = nullptr; // In actual fuzzing, this should be a valid instance
+
+    // Generate a random word from the input data
+    std::string word = dataProvider.ConsumeRandomLengthString(size);
+    const char* c_word = word.c_str();
+
+    // Prepare the suggestions list pointer
+    char** suggestions = nullptr;
+
+    // Call the function under test
+    int result = Hunspell_suggest(pHunspell, &amp;suggestions, c_word);
+
+    // Free the allocated suggestions (if any)
+    if (suggestions) {
+        for (int i = 0; i &lt; result; ++i) {
+            free(suggestions[i]);
+        }
+        free(suggestions);
+    }
+
+    return 0;
+}
+&lt;/code&gt;
+
+The code has the following build issues:
+&lt;error&gt;
+./src/tools/fuzzer.cxx:15:10: fatal error: &#39;hunspell.h&#39; file not found
+   15 | #include &#34;hunspell.h&#34;  // Include the necessary header file for Hunspell
+      |          ^~~~~~~~~~~~
+&lt;/error&gt;
+
+Fix code:
+1. Consider possible solutions for the issues listed above.
+2. Choose a solution that can maximize fuzzing result, which is utilizing the function under test and feeding it not null input.
+3. Apply the solutions to the original code.
+It&#39;s important to show the complete code, not only the fixed line.
+&lt;solution&gt;
+</pre>
+
+
+
+<h3>Code #1</h3>
+
+<pre>
+Certainly! Here is the complete code with the necessary fixes applied:
+
+```cpp
+#include &lt;fuzzer/FuzzedDataProvider.h&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+#include &lt;cstdint&gt;
+#include &lt;cstddef&gt;
+#include &lt;cstdlib&gt;
+#include &lt;cstring&gt;
+#include &lt;iostream&gt;
+#include &lt;sstream&gt;
+#include &lt;algorithm&gt;
+#include &lt;iterator&gt;
+#include &lt;cctype&gt;
+
+extern &#34;C&#34; {
+#include &lt;hunspell/hunspell.h&gt;  // Correctly include the necessary header file for Hunspell
+}
+
+extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    // Initialize the library or any resources within Hunspell needed for the fuzzing process here.
+    // Typically, Hunspell initialization might involve loading dictionaries, etc.
+    // For fuzzing, we can skip actual dictionary loading to focus on API robustness.
+    return 0;
+}
+
+extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    // Create a FuzzedDataProvider to parse the input data
+    FuzzedDataProvider dataProvider(data, size);
+
+    // Generate a dummy Hunspell instance (mock or dummy, as actual dictionary loading is skipped)
+    Hunhandle* pHunspell = Hunspell_create(&#34;/path/to/affix.aff&#34;, &#34;/path/to/dictionary.dic&#34;); // In actual fuzzing, this should be a valid instance
+
+    // Generate a random word from the input data
+    std::string word = dataProvider.ConsumeRandomLengthString(size);
+    const char* c_word = word.c_str();
+
+    // Prepare the suggestions list pointer
+    char** suggestions = nullptr;
+
+    // Call the function under test
+    int result = Hunspell_suggest(pHunspell, &amp;suggestions, c_word);
+
+    // Free the allocated suggestions (if any)
+    if (suggestions) {
+        for (int i = 0; i &lt; result; ++i) {
+            free(suggestions[i]);
+        }
+        free(suggestions);
+    }
+
+    // Destroy the Hunspell instance
+    Hunspell_destroy(pHunspell);
+
+    return 0;
+}
+```
+
+Key changes and considerations:
+1. **Correct Header Inclusion**: The `hunspell.h` header is included with the correct path `&lt;hunspell/hunspell.h&gt;`.
+2. **Hunspell Instance Creation**: Added `Hunspell_create` to instantiate a Hunspell object. Note that the paths to the affix and dictionary files should be valid paths to actual Hunspell dictionary files.
+3. **Hunspell Instance Destruction**: Added `Hunspell_destroy` to properly clean up the Hunspell instance after use.
+
+This should resolve the build issues and ensure the fuzz harness works correctly. Make sure to replace `&#34;/path/to/affix.aff&#34;` and `&#34;/path/to/dictionary.dic&#34;` with valid paths to the Hunspell dictionary files you intend to use for fuzzing.
+</pre>
+
+
+<h2>Logs</h2>
+<pre>
+Fixing /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-hunspell-hunspell_suggest/fixed_targets/02.cxx with gpt-4o, attempt 1.
+Successfully built /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-hunspell-hunspell_suggest/fixed_targets/02.cxx with gpt-4o in 1 iterations of fixing.
+Triaging the crash related to /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-hunspell-hunspell_suggest/fixed_targets/02.cxx with gpt-4o.
+Warning: no crash info in hunspell-hunspell_suggest-02.
+Result for hunspell-hunspell_suggest-02: crashes=False, coverage=0.07446583456737889 (1408/18908), coverage diff=0.005680119581464873 (57/10035)
+
+</pre>
+
+<h2>Run logs</h2>
+<pre>
+INFO:__main__:Running: docker run --rm --privileged --shm-size=2g --platform linux/amd64 -e FUZZING_ENGINE=libfuzzer -e SANITIZER=address -e RUN_FUZZER_MODE=interactive -e HELPER=True -v /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-hunspell-hunspell_suggest/corpora/02.cxx:/tmp/fuzzer_corpus -v /tmp/tmpqe63huln/build/out/hunspell-hunspell_suggest-02:/out -t gcr.io/oss-fuzz-base/base-runner run_fuzzer fuzzer -print_final_stats=1 -max_total_time=30 -len_control=0 -timeout=30.
+vm.mmap_rnd_bits = 28
+rm: cannot remove &#39;/tmp/fuzzer_corpus&#39;: Device or resource busy
+/out/fuzzer -rss_limit_mb=2560 -timeout=25 -print_final_stats=1 -max_total_time=30 -len_control=0 -timeout=30 /tmp/fuzzer_corpus -max_len=262144 &lt; /dev/null
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 3910356888
+INFO: Loaded 1 modules   (18908 inline 8-bit counters): 18908 [0x560e36548c18, 0x560e3654d5f4), 
+INFO: Loaded 1 PC tables (18908 PCs): 18908 [0x560e3654d5f8,0x560e365973b8), 
+INFO:        0 files found in /tmp/fuzzer_corpus
+error: /path/to/affix.aff: cannot open
+error: /path/to/dictionary.dic: cannot open
+error: /path/to/affix.aff: cannot open
+INFO: A corpus is not provided, starting from an empty corpus
+error: /path/to/affix.aff: cannot open
+error: /path/to/dictionary.dic: cannot open
+error: /path/to/affix.aff: cannot open
+#2	INITED cov: 591 ft: 592 corp: 1/1b exec/s: 0 rss: 34Mb
+error: /path/to/affix.aff: cannot open
+error: /path/to/dictionary.dic: cannot open
+error: /path/to/affix.aff: cannot open
+	NEW_FUNC[1/3]: 0x560e363156e0 in AffixMgr::get_reptable() const /src/hunspell/src/hunspell/affixmgr.cxx:3510
+	NEW_FUNC[2/3]: 0x560e3634a040 in AffixMgr::get_maptable() const /src/hunspell/src/hunspell/affixmgr.cxx:3536
+#3	NEW    cov: 642 ft: 704 corp: 2/3b lim: 262144 exec/s: 0 rss: 34Mb L: 2/2 MS: 1 CrossOver-
+error: /path/to/affix.aff: cannot open
+error: /path/to/dictionary.dic: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/dictionary.dic: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/dictionary.dic: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/dictionary.dic: cannot open
+error: /path/to/affix.aff: cannot open
+	NEW_FUNC[1/4]: 0x560e362ee550 in std::__1::__wrap_iter&lt;char*&gt; std::__1::basic_string&lt;char, std::__1::char_traits&lt;char&gt;, std::__1::allocator&lt;char&gt;&gt;::__insert_with_size&lt;std::__1::__wrap_iter&lt;char const*&gt;, std::__1::__wrap_iter&lt;char const*&gt;&gt;(std::__1::__wrap_iter&lt;char const*&gt;, std::__1::__wrap_iter&lt;char const*&gt;, std::__1::__wrap_iter&lt;char const*&gt;, unsigned long) /usr/local/bin/../include/c++/v1/string:2916
+	NEW_FUNC[2/4]: 0x560e362eeb10 in std::__1::__wrap_iter&lt;char*&gt; std::__1::basic_string&lt;char, std::__1::char_traits&lt;char&gt;, std::__1::allocator&lt;char&gt;&gt;::__insert_from_safe_copy[abi:v180000]&lt;std::__1::__wrap_iter&lt;char const*&gt;, std::__1::__wrap_iter&lt;char const*&gt;&gt;(unsigned long, unsigned long, std::__1::__wrap_iter&lt;char const*&gt;, std::__1::__wrap_iter&lt;char const*&gt;) /usr/local/bin/../include/c++/v1/string:1781
+#7	NEW    cov: 823 ft: 943 corp: 3/93b lim: 262144 exec/s: 0 rss: 37Mb L: 90/90 MS: 4 CrossOver-CrossOver-CrossOver-InsertRepeatedBytes-
+error: /path/to/affix.aff: cannot open
+error: /path/to/dictionary.dic: cannot open
+error: /path/to/affix.aff: cannot open
+#8	NEW    cov: 825 ft: 962 corp: 4/183b lim: 262144 exec/s: 0 rss: 37Mb L: 90/90 MS: 1 ChangeBinInt-
+error: /path/to/affix.aff: cannot open
+error: /path/to/dictionary.dic: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/dictionary.dic: cannot open
+error: /path/to/affix.aff: cannot open
+#10	NEW    cov: 827 ft: 1057 corp: 5/250b lim: 262144 exec/s: 0 rss: 38Mb L: 67/90 MS: 2 ChangeByte-CrossOver-
+error: /path/to/affix.aff: cannot open
+error: /path/to/dictionary.dic: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/dictionary.dic: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/dictionary.dic: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/dictionary.dic: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/dictionary.dic: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/dictionary.dic: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/dictionary.dic: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/dictionary.dic: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/dictionary.dic: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/dictionary.dic: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/dictionary.dic: cannot open
+error: /path/to/affix.aff: cannot open
+#21	NEW    cov: 827 ft: 1086 corp: 6/341b lim: 262144 exec/s: 0 rss: 40Mb L: 91/91 MS: 1 InsertByte-
+error: /path/to/affix.aff: cannot open
+error: /path/to/dictionary.dic: cannot open
+error: /path/to/affix.aff: cannot open
+#22	NEW    cov: 827 ft: 1098 corp: 7/414b lim: 262144 exec/s: 0 rss: 40Mb L: 73/91 MS: 1 EraseBytes-
+error: /path/to/affix.aff: cannot open
+error: /path/to/dictionary.dic: cannot open
+error: /path/to/affix.aff: cannot open
+#23	NEW    cov: 827 ft: 1121 corp: 8/506b lim: 262144 exec/s: 0 rss: 40Mb L: 92/92 MS: 1 InsertByte-
+error: /path/to/affix.aff: cannot open
+error: /path/to/dictionary.dic: cannot open
+error: /path/to/affix.aff: cannot open
+#24	NEW    cov: 827 ft: 1128 corp: 9/574b lim: 262144 exec/s: 0 rss: 40Mb L: 68/92 MS: 1 EraseBytes-
+error: /path/to/affix.aff: cannot open
+error: /path/to/dictionary.dic: cannot open
+error: /path/to/affix.aff: cannot open
+#25	NEW    cov: 828 ft: 1135 corp: 10/766b lim: 262144 exec/s: 0 rss: 40Mb L: 192/192 MS: 1 InsertRepeatedBytes-
+error: /path/to/affix.aff: cannot open
+error: /path/to/dictionary.dic: cannot open
+error: /path/to/affix.aff: cannot open
+#26	NEW    cov: 828 ft: 1143 corp: 11/831b lim: 262144 exec/s: 0 rss: 40Mb L: 65/192 MS: 1 EraseBytes-
+error: /path/to/affix.aff: cannot open
+error: /path/to/dictionary.dic: cannot open
+error: /path/to/affix.aff: cannot open
+#27	NEW    cov: 828 ft: 1172 corp: 12/922b lim: 262144 exec/s: 0 rss: 40Mb L: 91/192 MS: 1 ChangeBinInt-
+error: /path/to/affix.aff: cannot open
+error: /path/to/dictionary.dic: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/dictionary.dic: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/dictionary.dic: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/dictionary.dic: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/dictionary.dic: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/dictionary.dic: cannot open
+error: /path/to/affix.aff: cannot open
+#33	NEW    cov: 840 ft: 1276 corp: 13/1012b lim: 262144 exec/s: 0 rss: 40Mb L: 90/192 MS: 1 ChangeBinInt-
+error: /path/to/affix.aff: cannot open
+error: /path/to/dictionary.dic: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/dictionary.dic: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/dictionary.dic: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/dictionary.dic: cannot open
+error: /path/to/affix.aff: cannot open
+#37	NEW    cov: 840 ft: 1298 corp: 14/1181b lim: 262144 exec/s: 0 rss: 40Mb L: 169/192 MS: 4 InsertByte-ShuffleBytes-ChangeBinInt-CopyPart-
+error: /path/to/affix.aff: cannot open
+error: /path/to/dictionary.dic: cannot open
+...truncated...
+: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/dictionary.dic: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/dictionary.dic: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/dictionary.dic: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/dictionary.dic: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/dictionary.dic: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/dictionary.dic: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/dictionary.dic: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/dictionary.dic: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/dictionary.dic: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/dictionary.dic: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/dictionary.dic: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/dictionary.dic: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/dictionary.dic: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/dictionary.dic: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/dictionary.dic: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/dictionary.dic: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/dictionary.dic: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/dictionary.dic: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/dictionary.dic: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/dictionary.dic: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/dictionary.dic: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/dictionary.dic: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/dictionary.dic: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/dictionary.dic: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/dictionary.dic: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/dictionary.dic: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/dictionary.dic: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/dictionary.dic: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/dictionary.dic: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/dictionary.dic: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/dictionary.dic: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/dictionary.dic: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/dictionary.dic: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/dictionary.dic: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/dictionary.dic: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/dictionary.dic: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/dictionary.dic: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/dictionary.dic: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/dictionary.dic: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/dictionary.dic: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/dictionary.dic: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/dictionary.dic: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/dictionary.dic: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/dictionary.dic: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/dictionary.dic: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/dictionary.dic: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/affix.aff: cannot open
+error: /path/to/dictionary.dic: cannot open
+error: /path/to/affix.aff: cannot open
+#26178	DONE   cov: 1408 ft: 5474 corp: 381/23Kb lim: 262144 exec/s: 844 rss: 54Mb
+###### Recommended dictionary. ######
+&#34;\001\000\000\000&#34; # Uses: 77
+&#34;\000\002&#34; # Uses: 55
+&#34;\001\000\000\000\000\000\000\013&#34; # Uses: 56
+&#34;\000\000&#34; # Uses: 66
+&#34;\031\000&#34; # Uses: 60
+&#34;&lt;?xm&#34; # Uses: 58
+&#34;\377\377\377\377\377\377\377\377&#34; # Uses: 77
+&#34;\026\000\000\000\000\000\000\000&#34; # Uses: 66
+&#34;\001\000\000\000\000\000\000\000&#34; # Uses: 53
+&#34;V\000\000\000&#34; # Uses: 57
+&#34;&lt;?xml&#34; # Uses: 54
+&#34;\377\377\377\377&#34; # Uses: 51
+&#34;\001Z&#34; # Uses: 62
+&#34;\004\000\000\000&#34; # Uses: 45
+&#34;\002\000\000\000\000\000\000\000&#34; # Uses: 44
+&#34;\001\027&#34; # Uses: 55
+&#34;\001\000\000\000\000\000\000\030&#34; # Uses: 54
+&#34;\376\377\377\377\377\377\377\357&#34; # Uses: 75
+&#34;\377\377\377\377\377\377\377\026&#34; # Uses: 58
+&#34;\377F&#34; # Uses: 48
+&#34;\317\377\377\377&#34; # Uses: 51
+&#34;&lt;?&#34; # Uses: 55
+&#34;Y\000\000\000&#34; # Uses: 63
+&#34;\377\377&#34; # Uses: 63
+&#34;-$&#34; # Uses: 47
+&#34;\377\377\377\377\377\377\377B&#34; # Uses: 41
+&#34;\344\305$\000\000\000\000\000&#34; # Uses: 39
+&#34;\000\000\000\000&#34; # Uses: 51
+&#34;\002\000&#34; # Uses: 47
+&#34;\377\000&#34; # Uses: 43
+&#34;\377\377\377\377\377\377\377\324&#34; # Uses: 34
+&#34;\034\000\000\000&#34; # Uses: 44
+&#34;\377\377\377O&#34; # Uses: 37
+&#34;\032\000&#34; # Uses: 27
+&#34;A\012\012\036p&#34; # Uses: 37
+&#34;\377\377\377\032&#34; # Uses: 24
+&#34;^-&#34; # Uses: 31
+&#34;\376\377\377\377&#34; # Uses: 33
+&#34;\035\000&#34; # Uses: 25
+&#34;\001\016&#34; # Uses: 32
+&#34;\005\000&#34; # Uses: 27
+&#34;!\000&#34; # Uses: 20
+&#34;&#39;\000&#34; # Uses: 29
+&#34;\030\000&#34; # Uses: 19
+&#34;-\000\000\000\000\000\000\000&#34; # Uses: 26
+&#34;AZZ\272\012&#34; # Uses: 18
+&#34;-\362&#34; # Uses: 20
+&#34;,\317YA\012&#34; # Uses: 18
+&#34;\001\012&#34; # Uses: 27
+&#34;\001\006&#34; # Uses: 14
+&#34;\012a\012\012\036pl&#34; # Uses: 17
+&#34;\016\000\000\000\000\000\000\000&#34; # Uses: 17
+&#34;\377\004&#34; # Uses: 18
+&#34;\022\000\000\000&#34; # Uses: 16
+&#34;\377\377\377\377\377\377\377\033&#34; # Uses: 13
+&#34;\001\021&#34; # Uses: 11
+&#34;\035\000\000\000&#34; # Uses: 9
+&#34;\0001&#34; # Uses: 12
+&#34;,\317Y\031&#34; # Uses: 7
+&#34;,]&#34; # Uses: 8
+&#34;\001\000\000\000\000\000\000\004&#34; # Uses: 9
+&#34;\027\000\000\000\000\000\000\000&#34; # Uses: 6
+&#34;AV&#34; # Uses: 4
+&#34;-#&#34; # Uses: 2
+&#34;-\363&#34; # Uses: 3
+###### End of recommended dictionary. ######
+Done 26178 runs in 31 second(s)
+stat::number_of_executed_units: 26178
+stat::average_exec_per_sec:     844
+stat::new_units_added:          749
+stat::slowest_unit_time_sec:    0
+stat::peak_rss_mb:              54
+
+</pre>
+
+
+</body>

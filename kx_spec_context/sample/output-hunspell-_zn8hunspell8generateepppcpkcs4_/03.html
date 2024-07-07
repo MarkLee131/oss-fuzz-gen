@@ -1,0 +1,963 @@
+<!doctype html>
+
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Experiment results</title>
+<style>
+* {
+    box-sizing: border-box;
+}
+
+html {
+    line-height: 1.15;
+}
+
+body {
+    font-family: sans-serif;
+    font-size: 16px;
+}
+
+table {
+    border-collapse: collapse;
+    border-spacing: 0;
+}
+
+td, th {
+    border-right: 1px #dedede solid;
+    border-bottom: 1px #dedede solid;
+    padding: 5px;
+    text-align: left;
+}
+td:first-child, th:first-child {
+    border-left: 1px #dedede solid;
+}
+th {
+    border-top: 1px #dedede solid;
+}
+
+tbody tr:nth-child(odd) {
+    background-color: #f4f5ff;
+}
+</style>
+<body>
+    LLM: 
+    
+<h1>output-hunspell-_zn8hunspell8generateepppcpkcs4_ / 03</h1>
+Bug: False
+<br>
+Crash reason: NO_SEMANTIC_ERR
+<br>
+<br>
+
+<h2>Triage</h2>
+<pre>
+
+</pre>
+<br>
+
+
+
+
+
+<h3>Final code</h3>
+
+<pre>
+#include &lt;fuzzer/FuzzedDataProvider.h&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+#include &lt;cstdint&gt;
+#include &lt;cstddef&gt;
+#include &lt;cstdlib&gt;
+#include &lt;cstring&gt;
+#include &lt;iostream&gt;
+#include &lt;sstream&gt;
+#include &lt;algorithm&gt;
+#include &lt;iterator&gt;
+#include &lt;cctype&gt;
+
+extern &#34;C&#34; {
+#include &#34;hunspell/hunspell.h&#34;
+}
+
+extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    return 0;
+}
+
+extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    FuzzedDataProvider fuzzed_data(data, size);
+
+    std::string word = fuzzed_data.ConsumeRandomLengthString();
+    std::string pattern = fuzzed_data.ConsumeRandomLengthString();
+
+    word.push_back(&#39;\0&#39;);
+    pattern.push_back(&#39;\0&#39;);
+
+    char **slst = nullptr;
+
+    // Create a Hunspell handle (assuming the dictionary files are provided)
+    Hunhandle *hunspell_handle = Hunspell_create(&#34;en_US.aff&#34;, &#34;en_US.dic&#34;);
+    if (hunspell_handle == nullptr) {
+        std::cerr &lt;&lt; &#34;Error: Failed to create Hunspell handle&#34; &lt;&lt; std::endl;
+        return 0;
+    }
+
+    // Call Hunspell_generate with the correct number of arguments
+    int result = Hunspell_generate(hunspell_handle, &amp;slst, word.c_str(), pattern.c_str());
+
+    if (result &gt;= 0) {
+        for (int i = 0; i &lt; result; ++i) {
+            if (slst[i] != nullptr) {
+                size_t len = strlen(slst[i]);
+                if (slst[i][len] != &#39;\0&#39;) {
+                    std::cerr &lt;&lt; &#34;Error: Non-null terminated string in slst&#34; &lt;&lt; std::endl;
+                    abort();
+                }
+                free(slst[i]);
+            }
+        }
+        free(slst);
+    }
+
+    // Destroy the Hunspell handle
+    Hunspell_destroy(hunspell_handle);
+
+    return 0;
+}
+</pre>
+
+
+<h3>Fixer prompt #1</h3>
+<pre>
+
+Given the following C++ fuzz harness and its build error message, fix the code to make it build for fuzzing.
+
+If there is undeclared identifier or unknown type name error, fix it by finding and including the related libraries.
+
+You MUST wrap the headers with &lt;code&gt;extern &#34;C&#34;&lt;/code&gt; if they are C headers, especially the headers are from the project.
+
+Note that some code may need to be wrapped with &lt;code&gt;extern &#34;C&#34;&lt;/code&gt; as their source is C program.
+
+MUST RETURN THE FULL CODE, INCLUDING UNCHANGED PARTS.
+EXTREMELY IMPORTANT: AVOID USING &lt;code&gt;goto&lt;/code&gt;. If you have to write code using &lt;code&gt;goto&lt;/code&gt;, you MUST MUST also declare all variables BEFORE the &lt;code&gt;goto&lt;/code&gt;. Never introduce new variables after the &lt;code&gt;goto&lt;/code&gt;.
+
+Below is the code needs to be built:
+&lt;code&gt;
+#include &lt;fuzzer/FuzzedDataProvider.h&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+#include &lt;cstdint&gt;
+#include &lt;cstddef&gt;
+#include &lt;cstdlib&gt;
+#include &lt;cstring&gt;
+#include &lt;iostream&gt;
+#include &lt;sstream&gt;
+#include &lt;algorithm&gt;
+#include &lt;iterator&gt;
+#include &lt;cctype&gt;
+
+extern &#34;C&#34; {
+#include &#34;hunspell.h&#34;
+}
+
+extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    return 0;
+}
+
+extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    FuzzedDataProvider fuzzed_data(data, size);
+
+    std::string word = fuzzed_data.ConsumeRandomLengthString();
+    std::string pattern = fuzzed_data.ConsumeRandomLengthString();
+
+    word.push_back(&#39;\0&#39;);
+    pattern.push_back(&#39;\0&#39;);
+
+    char **slst = nullptr;
+
+    int result = Hunspell::generate(&amp;slst, word.c_str(), pattern.c_str());
+
+    if (result &gt;= 0) {
+        for (int i = 0; i &lt; result; ++i) {
+            if (slst[i] != nullptr) {
+                size_t len = strlen(slst[i]);
+                if (slst[i][len] != &#39;\0&#39;) {
+                    std::cerr &lt;&lt; &#34;Error: Non-null terminated string in slst&#34; &lt;&lt; std::endl;
+                    abort();
+                }
+                free(slst[i]);
+            }
+        }
+        free(slst);
+    }
+
+    return 0;
+}
+&lt;/code&gt;
+
+The code has the following build issues:
+&lt;error&gt;
+./src/tools/fuzzer.cxx:15:10: fatal error: &#39;hunspell.h&#39; file not found
+   15 | #include &#34;hunspell.h&#34;
+      |          ^~~~~~~~~~~~
+&lt;/error&gt;
+
+Fix code:
+1. Consider possible solutions for the issues listed above.
+2. Choose a solution that can maximize fuzzing result, which is utilizing the function under test and feeding it not null input.
+3. Apply the solutions to the original code.
+It&#39;s important to show the complete code, not only the fixed line.
+&lt;solution&gt;
+</pre>
+
+
+
+<h3>Code #1</h3>
+
+<pre>
+Below is the fixed code with the necessary changes to ensure it builds correctly for fuzzing. The issue with the missing `hunspell.h` file is addressed by ensuring the correct path is used and wrapping the C headers with `extern &#34;C&#34;`.
+
+```cpp
+#include &lt;fuzzer/FuzzedDataProvider.h&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+#include &lt;cstdint&gt;
+#include &lt;cstddef&gt;
+#include &lt;cstdlib&gt;
+#include &lt;cstring&gt;
+#include &lt;iostream&gt;
+#include &lt;sstream&gt;
+#include &lt;algorithm&gt;
+#include &lt;iterator&gt;
+#include &lt;cctype&gt;
+
+extern &#34;C&#34; {
+#include &#34;hunspell/hunspell.h&#34;
+}
+
+extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    return 0;
+}
+
+extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    FuzzedDataProvider fuzzed_data(data, size);
+
+    std::string word = fuzzed_data.ConsumeRandomLengthString();
+    std::string pattern = fuzzed_data.ConsumeRandomLengthString();
+
+    word.push_back(&#39;\0&#39;);
+    pattern.push_back(&#39;\0&#39;);
+
+    char **slst = nullptr;
+
+    // Assuming Hunspell::generate is a typo and should be Hunspell_generate
+    int result = Hunspell_generate(&amp;slst, word.c_str(), pattern.c_str());
+
+    if (result &gt;= 0) {
+        for (int i = 0; i &lt; result; ++i) {
+            if (slst[i] != nullptr) {
+                size_t len = strlen(slst[i]);
+                if (slst[i][len] != &#39;\0&#39;) {
+                    std::cerr &lt;&lt; &#34;Error: Non-null terminated string in slst&#34; &lt;&lt; std::endl;
+                    abort();
+                }
+                free(slst[i]);
+            }
+        }
+        free(slst);
+    }
+
+    return 0;
+}
+```
+
+Key changes made:
+1. Corrected the include path for `hunspell.h` to `#include &#34;hunspell/hunspell.h&#34;`.
+2. Wrapped the inclusion of `hunspell.h` with `extern &#34;C&#34;` to ensure proper linkage.
+3. Corrected the function call from `Hunspell::generate` to `Hunspell_generate` assuming it was a typo. If the actual function name is different, it should be updated accordingly.
+</pre>
+
+
+<h3>Fixer prompt #2</h3>
+<pre>
+
+Given the following C++ fuzz harness and its build error message, fix the code to make it build for fuzzing.
+
+If there is undeclared identifier or unknown type name error, fix it by finding and including the related libraries.
+
+You MUST wrap the headers with &lt;code&gt;extern &#34;C&#34;&lt;/code&gt; if they are C headers, especially the headers are from the project.
+
+Note that some code may need to be wrapped with &lt;code&gt;extern &#34;C&#34;&lt;/code&gt; as their source is C program.
+
+MUST RETURN THE FULL CODE, INCLUDING UNCHANGED PARTS.
+EXTREMELY IMPORTANT: AVOID USING &lt;code&gt;goto&lt;/code&gt;. If you have to write code using &lt;code&gt;goto&lt;/code&gt;, you MUST MUST also declare all variables BEFORE the &lt;code&gt;goto&lt;/code&gt;. Never introduce new variables after the &lt;code&gt;goto&lt;/code&gt;.
+
+Below is the code needs to be built:
+&lt;code&gt;
+#include &lt;fuzzer/FuzzedDataProvider.h&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+#include &lt;cstdint&gt;
+#include &lt;cstddef&gt;
+#include &lt;cstdlib&gt;
+#include &lt;cstring&gt;
+#include &lt;iostream&gt;
+#include &lt;sstream&gt;
+#include &lt;algorithm&gt;
+#include &lt;iterator&gt;
+#include &lt;cctype&gt;
+
+extern &#34;C&#34; {
+#include &#34;hunspell/hunspell.h&#34;
+}
+
+extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    return 0;
+}
+
+extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    FuzzedDataProvider fuzzed_data(data, size);
+
+    std::string word = fuzzed_data.ConsumeRandomLengthString();
+    std::string pattern = fuzzed_data.ConsumeRandomLengthString();
+
+    word.push_back(&#39;\0&#39;);
+    pattern.push_back(&#39;\0&#39;);
+
+    char **slst = nullptr;
+
+    // Assuming Hunspell::generate is a typo and should be Hunspell_generate
+    int result = Hunspell_generate(&amp;slst, word.c_str(), pattern.c_str());
+
+    if (result &gt;= 0) {
+        for (int i = 0; i &lt; result; ++i) {
+            if (slst[i] != nullptr) {
+                size_t len = strlen(slst[i]);
+                if (slst[i][len] != &#39;\0&#39;) {
+                    std::cerr &lt;&lt; &#34;Error: Non-null terminated string in slst&#34; &lt;&lt; std::endl;
+                    abort();
+                }
+                free(slst[i]);
+            }
+        }
+        free(slst);
+    }
+
+    return 0;
+}
+&lt;/code&gt;
+
+The code has the following build issues:
+&lt;error&gt;
+./src/tools/fuzzer.cxx:34:18: error: no matching function for call to &#39;Hunspell_generate&#39;
+   34 |     int result = Hunspell_generate(&amp;slst, word.c_str(), pattern.c_str());
+      |                  ^~~~~~~~~~~~~~~~~
+./src/hunspell/hunspell.h:124:30: note: candidate function not viable: requires 4 arguments, but 3 were provided
+  124 | LIBHUNSPELL_DLL_EXPORTED int Hunspell_generate(Hunhandle* pHunspell,
+      |                              ^                 ~~~~~~~~~~~~~~~~~~~~~
+  125 |                                                char*** slst,
+      |                                                ~~~~~~~~~~~~~
+  126 |                                                const char* word,
+      |                                                ~~~~~~~~~~~~~~~~~
+  127 |                                                const char* word2);
+      |                                                ~~~~~~~~~~~~~~~~~
+&lt;/error&gt;
+
+Fix code:
+1. Consider possible solutions for the issues listed above.
+2. Choose a solution that can maximize fuzzing result, which is utilizing the function under test and feeding it not null input.
+3. Apply the solutions to the original code.
+It&#39;s important to show the complete code, not only the fixed line.
+&lt;solution&gt;
+</pre>
+
+
+
+<h3>Code #2</h3>
+
+<pre>
+Here is the fixed code with the necessary changes:
+
+```cpp
+#include &lt;fuzzer/FuzzedDataProvider.h&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+#include &lt;cstdint&gt;
+#include &lt;cstddef&gt;
+#include &lt;cstdlib&gt;
+#include &lt;cstring&gt;
+#include &lt;iostream&gt;
+#include &lt;sstream&gt;
+#include &lt;algorithm&gt;
+#include &lt;iterator&gt;
+#include &lt;cctype&gt;
+
+extern &#34;C&#34; {
+#include &#34;hunspell/hunspell.h&#34;
+}
+
+extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    return 0;
+}
+
+extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    FuzzedDataProvider fuzzed_data(data, size);
+
+    std::string word = fuzzed_data.ConsumeRandomLengthString();
+    std::string pattern = fuzzed_data.ConsumeRandomLengthString();
+
+    word.push_back(&#39;\0&#39;);
+    pattern.push_back(&#39;\0&#39;);
+
+    char **slst = nullptr;
+
+    // Create a Hunspell handle (assuming the dictionary files are provided)
+    Hunhandle *hunspell_handle = Hunspell_create(&#34;en_US.aff&#34;, &#34;en_US.dic&#34;);
+    if (hunspell_handle == nullptr) {
+        std::cerr &lt;&lt; &#34;Error: Failed to create Hunspell handle&#34; &lt;&lt; std::endl;
+        return 0;
+    }
+
+    // Call Hunspell_generate with the correct number of arguments
+    int result = Hunspell_generate(hunspell_handle, &amp;slst, word.c_str(), pattern.c_str());
+
+    if (result &gt;= 0) {
+        for (int i = 0; i &lt; result; ++i) {
+            if (slst[i] != nullptr) {
+                size_t len = strlen(slst[i]);
+                if (slst[i][len] != &#39;\0&#39;) {
+                    std::cerr &lt;&lt; &#34;Error: Non-null terminated string in slst&#34; &lt;&lt; std::endl;
+                    abort();
+                }
+                free(slst[i]);
+            }
+        }
+        free(slst);
+    }
+
+    // Destroy the Hunspell handle
+    Hunspell_destroy(hunspell_handle);
+
+    return 0;
+}
+```
+
+### Explanation of Changes:
+1. **Hunspell Handle Initialization**:
+   - Added the creation of a Hunspell handle using `Hunspell_create`.
+   - The `Hunspell_create` function requires paths to the `.aff` and `.dic` files, so placeholders `&#34;en_US.aff&#34;` and `&#34;en_US.dic&#34;` are used. These should be replaced with the actual paths to the dictionary files.
+
+2. **Correct Function Call**:
+   - Modified the call to `Hunspell_generate` to include the `Hunhandle` as the first argument.
+
+3. **Handle Cleanup**:
+   - Added a call to `Hunspell_destroy` to clean up the Hunspell handle after use.
+
+By making these changes, the code should compile and run correctly, utilizing the Hunspell library for fuzz testing.
+</pre>
+
+
+<h2>Logs</h2>
+<pre>
+Fixing /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-hunspell-_zn8hunspell8generateepppcpkcs4_/fixed_targets/03.cxx with gpt-4o, attempt 1.
+Fixing /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-hunspell-_zn8hunspell8generateepppcpkcs4_/fixed_targets/03.cxx with gpt-4o, attempt 2.
+Successfully built /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-hunspell-_zn8hunspell8generateepppcpkcs4_/fixed_targets/03.cxx with gpt-4o in 2 iterations of fixing.
+Triaging the crash related to /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-hunspell-_zn8hunspell8generateepppcpkcs4_/fixed_targets/03.cxx with gpt-4o.
+Warning: no crash info in hunspell-zn8hunspell8generateepppcpkcs4-03.
+Result for hunspell-zn8hunspell8generateepppcpkcs4-03: crashes=False, coverage=0.028509696458684654 (541/18976), coverage diff=0.017040358744394617 (171/10035)
+
+</pre>
+
+<h2>Run logs</h2>
+<pre>
+INFO:__main__:Running: docker run --rm --privileged --shm-size=2g --platform linux/amd64 -e FUZZING_ENGINE=libfuzzer -e SANITIZER=address -e RUN_FUZZER_MODE=interactive -e HELPER=True -v /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-hunspell-_zn8hunspell8generateepppcpkcs4_/corpora/03.cxx:/tmp/fuzzer_corpus -v /tmp/tmpqe63huln/build/out/hunspell-zn8hunspell8generateepppcpkcs4-03:/out -t gcr.io/oss-fuzz-base/base-runner run_fuzzer fuzzer -print_final_stats=1 -max_total_time=30 -len_control=0 -timeout=30.
+vm.mmap_rnd_bits = 28
+rm: cannot remove &#39;/tmp/fuzzer_corpus&#39;: Device or resource busy
+/out/fuzzer -rss_limit_mb=2560 -timeout=25 -print_final_stats=1 -max_total_time=30 -len_control=0 -timeout=30 /tmp/fuzzer_corpus -max_len=262144 &lt; /dev/null
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 24065707
+INFO: Loaded 1 modules   (18976 inline 8-bit counters): 18976 [0x55d494b6ecb8, 0x55d494b736d8), 
+INFO: Loaded 1 PC tables (18976 PCs): 18976 [0x55d494b736d8,0x55d494bbd8d8), 
+INFO:        0 files found in /tmp/fuzzer_corpus
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+INFO: A corpus is not provided, starting from an empty corpus
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+#2	INITED cov: 335 ft: 336 corp: 1/1b exec/s: 0 rss: 33Mb
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+#6	NEW    cov: 335 ft: 340 corp: 2/3b lim: 262144 exec/s: 0 rss: 35Mb L: 2/2 MS: 4 ChangeBit-ShuffleBytes-ChangeBit-CrossOver-
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+#9	NEW    cov: 335 ft: 344 corp: 3/6b lim: 262144 exec/s: 0 rss: 36Mb L: 3/3 MS: 3 InsertByte-ShuffleBytes-InsertByte-
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+#11	NEW    cov: 342 ft: 358 corp: 4/49b lim: 262144 exec/s: 0 rss: 37Mb L: 43/43 MS: 2 CopyPart-InsertRepeatedBytes-
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+#12	NEW    cov: 342 ft: 362 corp: 5/77b lim: 262144 exec/s: 0 rss: 37Mb L: 28/43 MS: 1 EraseBytes-
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+#23	REDUCE cov: 342 ft: 362 corp: 5/67b lim: 262144 exec/s: 0 rss: 38Mb L: 18/43 MS: 1 EraseBytes-
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+#30	NEW    cov: 342 ft: 366 corp: 6/71b lim: 262144 exec/s: 0 rss: 39Mb L: 4/43 MS: 2 ChangeByte-CrossOver-
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+#46	NEW    cov: 342 ft: 370 corp: 7/82b lim: 262144 exec/s: 0 rss: 39Mb L: 11/43 MS: 1 CMP- DE: &#34;\000\000\000\000\000\000\000\002&#34;-
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+erro
+...truncated...
+
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+error: en_US.aff: cannot open
+error: en_US.dic: cannot open
+error: en_US.aff: cannot open
+#172669	DONE   cov: 541 ft: 855 corp: 76/1347b lim: 262144 exec/s: 5569 rss: 43Mb
+###### Recommended dictionary. ######
+&#34;\000\000\000\000\000\000\000\002&#34; # Uses: 680
+&#34;\001\000&#34; # Uses: 815
+&#34;\000\000\000\000\000\000\000\000&#34; # Uses: 737
+&#34;\000\000&#34; # Uses: 759
+&#34;\001\000\000\000\000\000\000E&#34; # Uses: 628
+&#34;\377\377\377\377&#34; # Uses: 704
+&#34;TUUUUUU\005&#34; # Uses: 625
+&#34;Z\000&#34; # Uses: 675
+&#34;\001\012&#34; # Uses: 679
+&#34;\022\000\000\000\000\000\000\000&#34; # Uses: 576
+&#34;\377\377\377\377\377\377\377\377&#34; # Uses: 600
+&#34;\001\000\000\012&#34; # Uses: 674
+&#34;\012\000&#34; # Uses: 697
+&#34;/\000\000\000\000\000\000\000&#34; # Uses: 589
+&#34;\003\000&#34; # Uses: 661
+&#34;\004\000&#34; # Uses: 646
+&#34;\0000&#34; # Uses: 637
+&#34;\004\000\000\000\000\000\000\000&#34; # Uses: 512
+&#34;\001\000\000\001&#34; # Uses: 580
+&#34;\017\000\000\000&#34; # Uses: 526
+&#34;\000\000\000\034&#34; # Uses: 478
+&#34;\377\377\377\003&#34; # Uses: 452
+&#34;\377\022&#34; # Uses: 413
+&#34;\000\005&#34; # Uses: 478
+&#34;d\000\000\000\000\000\000\000&#34; # Uses: 342
+&#34;\013\000\000\000&#34; # Uses: 380
+###### End of recommended dictionary. ######
+Done 172669 runs in 31 second(s)
+stat::number_of_executed_units: 172669
+stat::average_exec_per_sec:     5569
+stat::new_units_added:          594
+stat::slowest_unit_time_sec:    0
+stat::peak_rss_mb:              43
+
+</pre>
+
+
+</body>

@@ -1,0 +1,471 @@
+<!doctype html>
+
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Experiment results</title>
+<style>
+* {
+    box-sizing: border-box;
+}
+
+html {
+    line-height: 1.15;
+}
+
+body {
+    font-family: sans-serif;
+    font-size: 16px;
+}
+
+table {
+    border-collapse: collapse;
+    border-spacing: 0;
+}
+
+td, th {
+    border-right: 1px #dedede solid;
+    border-bottom: 1px #dedede solid;
+    padding: 5px;
+    text-align: left;
+}
+td:first-child, th:first-child {
+    border-left: 1px #dedede solid;
+}
+th {
+    border-top: 1px #dedede solid;
+}
+
+tbody tr:nth-child(odd) {
+    background-color: #f4f5ff;
+}
+</style>
+<body>
+    LLM: 
+    
+<h1>output-libusb-libusb_get_string_descriptor_ascii / 05</h1>
+Bug: False
+<br>
+Crash reason: NO_SEMANTIC_ERR
+<br>
+<br>
+
+<h2>Triage</h2>
+<pre>
+
+</pre>
+<br>
+
+
+
+
+
+<h3>Final code</h3>
+
+<pre>
+#include &lt;fuzzer/FuzzedDataProvider.h&gt;
+#include &lt;cstdint&gt;
+#include &lt;cstddef&gt;
+#include &lt;cstdlib&gt;
+#include &lt;cstring&gt;
+#include &lt;iostream&gt;
+
+extern &#34;C&#34; {
+#include &#34;libusb.h&#34;
+}
+
+extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    libusb_init(NULL);
+    return 0;
+}
+
+extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    FuzzedDataProvider fuzzed_data(data, size);
+
+    // Use fuzzed data to create a device handle with random VID and PID
+    uint16_t vid = fuzzed_data.ConsumeIntegral&lt;uint16_t&gt;();
+    uint16_t pid = fuzzed_data.ConsumeIntegral&lt;uint16_t&gt;();
+
+    libusb_device_handle *dev_handle = libusb_open_device_with_vid_pid(NULL, vid, pid);
+    if (dev_handle == nullptr) {
+        return 0;
+    }
+
+    uint8_t desc_index = fuzzed_data.ConsumeIntegral&lt;uint8_t&gt;();
+    int length = fuzzed_data.ConsumeIntegralInRange&lt;int&gt;(1, 255);
+    unsigned char *buffer = static_cast&lt;unsigned char *&gt;(malloc(length));
+
+    if (buffer == nullptr) {
+        libusb_close(dev_handle);
+        return 0;
+    }
+
+    int result = libusb_get_string_descriptor_ascii(dev_handle, desc_index, buffer, length);
+
+    // Additional interaction with the device handle for better coverage
+    unsigned char dummy_data[4];
+    libusb_control_transfer(dev_handle, LIBUSB_REQUEST_TYPE_STANDARD, LIBUSB_REQUEST_GET_DESCRIPTOR, 
+                            (LIBUSB_DT_STRING &lt;&lt; 8) | desc_index, 0, dummy_data, sizeof(dummy_data), 1000);
+
+    free(buffer);
+    libusb_close(dev_handle);
+
+    return 0;
+}
+</pre>
+
+
+<h3>Fixer prompt #1</h3>
+<pre>
+
+Given the following C++ fuzz harness and its build error message, fix the code to make it build for fuzzing.
+
+If there is undeclared identifier or unknown type name error, fix it by finding and including the related libraries.
+
+You MUST wrap the headers with &lt;code&gt;extern &#34;C&#34;&lt;/code&gt; if they are C headers, especially the headers are from the project.
+
+Note that some code may need to be wrapped with &lt;code&gt;extern &#34;C&#34;&lt;/code&gt; as their source is C program.
+
+MUST RETURN THE FULL CODE, INCLUDING UNCHANGED PARTS.
+EXTREMELY IMPORTANT: AVOID USING &lt;code&gt;goto&lt;/code&gt;. If you have to write code using &lt;code&gt;goto&lt;/code&gt;, you MUST MUST also declare all variables BEFORE the &lt;code&gt;goto&lt;/code&gt;. Never introduce new variables after the &lt;code&gt;goto&lt;/code&gt;.
+
+Below is the code needs to be built:
+&lt;code&gt;
+#include &lt;fuzzer/FuzzedDataProvider.h&gt;
+#include &lt;cstdint&gt;
+#include &lt;cstddef&gt;
+#include &lt;cstdlib&gt;
+#include &lt;cstring&gt;
+#include &lt;iostream&gt;
+
+extern &#34;C&#34; {
+#include &#34;libusb.h&#34;
+}
+
+extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    libusb_init(NULL);
+    return 0;
+}
+
+extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    FuzzedDataProvider fuzzed_data(data, size);
+
+    libusb_device_handle *dev_handle = reinterpret_cast&lt;libusb_device_handle *&gt;(fuzzed_data.ConsumeIntegral&lt;uintptr_t&gt;());
+    uint8_t desc_index = fuzzed_data.ConsumeIntegral&lt;uint8_t&gt;();
+    int length = fuzzed_data.ConsumeIntegralInRange&lt;int&gt;(1, 255);
+    unsigned char *buffer = static_cast&lt;unsigned char *&gt;(malloc(length));
+
+    if (buffer == nullptr) {
+        return 0;
+    }
+
+    int result = libusb_get_string_descriptor_ascii(dev_handle, desc_index, buffer, length);
+
+    free(buffer);
+
+    return 0;
+}
+&lt;/code&gt;
+
+The code can build successfully but has a runtime issue: Fuzzing crashed immediately at runtime (ASAN-ERROR: AddressSanitizer: SEGV on unknown address (pc 0x55e9b822a5dd bp 0x7ffe49751f80 sp 0x7ffe49751ec0 T0)), indicating fuzz target code for invoking the function under test is incorrect or unrobust.
+&lt;error&gt;
+Crash stacks:
+Stack 0:
+#0 0x55e9b822a5dd in libusb_control_transfer /src/libusb/libusb/sync.c:112:27
+#1 0x55e9b821d62e in libusb_get_string_descriptor /src/libusb/libusb/./libusb.h:2194:9
+#2 0x55e9b821d62e in libusb_get_string_descriptor_ascii /src/libusb/libusb/descriptor.c:1268:6
+#3 0x55e9b820eee5 in LLVMFuzzerTestOneInput /src/jcc-corrected-libusb_fuzzer.cc:29:18
+#4 0x55e9b80c1660 in fuzzer::Fuzzer::ExecuteCallback(unsigned char const*, unsigned long) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:614:13
+#5 0x55e9b80c0e85 in fuzzer::Fuzzer::RunOne(unsigned char const*, unsigned long, bool, fuzzer::InputInfo*, bool, bool*) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:516:7
+#6 0x55e9b80c2655 in fuzzer::Fuzzer::MutateAndTestOne() /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:760:19
+#7 0x55e9b80c3445 in fuzzer::Fuzzer::Loop(std::__Fuzzer::vector&lt;fuzzer::SizedFile, std::__Fuzzer::allocator&lt;fuzzer::SizedFile&gt;&gt;&amp;) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:905:5
+#8 0x55e9b80b1756 in fuzzer::FuzzerDriver(int*, char***, int (*)(unsigned char const*, unsigned long)) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerDriver.cpp:914:6
+#9 0x55e9b80ddc82 in main /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerMain.cpp:20:10
+#10 0x7f7e2826e082 in __libc_start_main (/lib/x86_64-linux-gnu/libc.so.6+0x24082) (BuildId: 0702430aef5fa3dda43986563e9ffcc47efbd75e)
+#11 0x55e9b80a28cd in _start (/out/libusb_fuzzer+0x578cd)
+&lt;/error&gt;
+
+Fix code:
+1. Consider possible solutions for the issues listed above.
+2. Choose a solution that can maximize fuzzing result, which is utilizing the function under test and feeding it not null input.
+3. Apply the solutions to the original code.
+It&#39;s important to show the complete code, not only the fixed line.
+&lt;solution&gt;
+</pre>
+
+
+
+<h3>Code #1</h3>
+
+<pre>
+To fix the runtime issue, we need to ensure that the `libusb_device_handle` is properly initialized and valid before passing it to the `libusb_get_string_descriptor_ascii` function. This can be achieved by setting up a mock or real device handle that libusb can work with. Here is the complete corrected code:
+
+```cpp
+#include &lt;fuzzer/FuzzedDataProvider.h&gt;
+#include &lt;cstdint&gt;
+#include &lt;cstddef&gt;
+#include &lt;cstdlib&gt;
+#include &lt;cstring&gt;
+#include &lt;iostream&gt;
+
+extern &#34;C&#34; {
+#include &#34;libusb.h&#34;
+}
+
+extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    libusb_init(NULL);
+    return 0;
+}
+
+extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    FuzzedDataProvider fuzzed_data(data, size);
+
+    // Create a dummy libusb_device_handle
+    libusb_device_handle *dev_handle = libusb_open_device_with_vid_pid(NULL, 0x1234, 0x5678);
+    if (dev_handle == nullptr) {
+        return 0;
+    }
+
+    uint8_t desc_index = fuzzed_data.ConsumeIntegral&lt;uint8_t&gt;();
+    int length = fuzzed_data.ConsumeIntegralInRange&lt;int&gt;(1, 255);
+    unsigned char *buffer = static_cast&lt;unsigned char *&gt;(malloc(length));
+
+    if (buffer == nullptr) {
+        libusb_close(dev_handle);
+        return 0;
+    }
+
+    int result = libusb_get_string_descriptor_ascii(dev_handle, desc_index, buffer, length);
+
+    free(buffer);
+    libusb_close(dev_handle);
+
+    return 0;
+}
+```
+
+Explanation of changes:
+1. **Initialization of `libusb_device_handle`:** Instead of using a random pointer, we use `libusb_open_device_with_vid_pid` to open a dummy device handle. This ensures that the `dev_handle` is valid.
+2. **Error handling:** We check if `libusb_open_device_with_vid_pid` returns `nullptr` and handle it gracefully.
+3. **Resource management:** We close the device handle using `libusb_close` after we are done with it to avoid resource leaks.
+
+These changes ensure that the `libusb_device_handle` is valid and properly managed, which should prevent the segmentation fault and allow the fuzzing to proceed correctly.
+</pre>
+
+
+<h3>Fixer prompt #2</h3>
+<pre>
+
+Given the following C++ fuzz harness and its build error message, fix the code to make it build for fuzzing.
+
+If there is undeclared identifier or unknown type name error, fix it by finding and including the related libraries.
+
+You MUST wrap the headers with &lt;code&gt;extern &#34;C&#34;&lt;/code&gt; if they are C headers, especially the headers are from the project.
+
+Note that some code may need to be wrapped with &lt;code&gt;extern &#34;C&#34;&lt;/code&gt; as their source is C program.
+
+MUST RETURN THE FULL CODE, INCLUDING UNCHANGED PARTS.
+EXTREMELY IMPORTANT: AVOID USING &lt;code&gt;goto&lt;/code&gt;. If you have to write code using &lt;code&gt;goto&lt;/code&gt;, you MUST MUST also declare all variables BEFORE the &lt;code&gt;goto&lt;/code&gt;. Never introduce new variables after the &lt;code&gt;goto&lt;/code&gt;.
+
+Below is the code needs to be built:
+&lt;code&gt;
+#include &lt;fuzzer/FuzzedDataProvider.h&gt;
+#include &lt;cstdint&gt;
+#include &lt;cstddef&gt;
+#include &lt;cstdlib&gt;
+#include &lt;cstring&gt;
+#include &lt;iostream&gt;
+
+extern &#34;C&#34; {
+#include &#34;libusb.h&#34;
+}
+
+extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    libusb_init(NULL);
+    return 0;
+}
+
+extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    FuzzedDataProvider fuzzed_data(data, size);
+
+    // Create a dummy libusb_device_handle
+    libusb_device_handle *dev_handle = libusb_open_device_with_vid_pid(NULL, 0x1234, 0x5678);
+    if (dev_handle == nullptr) {
+        return 0;
+    }
+
+    uint8_t desc_index = fuzzed_data.ConsumeIntegral&lt;uint8_t&gt;();
+    int length = fuzzed_data.ConsumeIntegralInRange&lt;int&gt;(1, 255);
+    unsigned char *buffer = static_cast&lt;unsigned char *&gt;(malloc(length));
+
+    if (buffer == nullptr) {
+        libusb_close(dev_handle);
+        return 0;
+    }
+
+    int result = libusb_get_string_descriptor_ascii(dev_handle, desc_index, buffer, length);
+
+    free(buffer);
+    libusb_close(dev_handle);
+
+    return 0;
+}
+&lt;/code&gt;
+
+The code can build successfully but has a runtime issue: No code coverage increasement, indicating the fuzz target ineffectively invokes the function under test.
+
+Fix code:
+1. Consider possible solutions for the issues listed above.
+2. Choose a solution that can maximize fuzzing result, which is utilizing the function under test and feeding it not null input.
+3. Apply the solutions to the original code.
+It&#39;s important to show the complete code, not only the fixed line.
+&lt;solution&gt;
+</pre>
+
+
+
+<h3>Code #2</h3>
+
+<pre>
+Certainly! To address the issue of no code coverage increase, we need to ensure that the fuzz target meaningfully exercises the functions under test. One potential problem is that the dummy `libusb_device_handle` might not be correctly initialized or might not be interacting with the fuzzed data in a meaningful way.
+
+To improve the fuzz target, we can:
+1. Ensure that `libusb_open_device_with_vid_pid` is called with valid parameters.
+2. Add more meaningful interactions with the `libusb_device_handle` using the fuzzed data.
+
+Here is the revised code with these considerations:
+
+```cpp
+#include &lt;fuzzer/FuzzedDataProvider.h&gt;
+#include &lt;cstdint&gt;
+#include &lt;cstddef&gt;
+#include &lt;cstdlib&gt;
+#include &lt;cstring&gt;
+#include &lt;iostream&gt;
+
+extern &#34;C&#34; {
+#include &#34;libusb.h&#34;
+}
+
+extern &#34;C&#34; int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    libusb_init(NULL);
+    return 0;
+}
+
+extern &#34;C&#34; int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    FuzzedDataProvider fuzzed_data(data, size);
+
+    // Use fuzzed data to create a device handle with random VID and PID
+    uint16_t vid = fuzzed_data.ConsumeIntegral&lt;uint16_t&gt;();
+    uint16_t pid = fuzzed_data.ConsumeIntegral&lt;uint16_t&gt;();
+
+    libusb_device_handle *dev_handle = libusb_open_device_with_vid_pid(NULL, vid, pid);
+    if (dev_handle == nullptr) {
+        return 0;
+    }
+
+    uint8_t desc_index = fuzzed_data.ConsumeIntegral&lt;uint8_t&gt;();
+    int length = fuzzed_data.ConsumeIntegralInRange&lt;int&gt;(1, 255);
+    unsigned char *buffer = static_cast&lt;unsigned char *&gt;(malloc(length));
+
+    if (buffer == nullptr) {
+        libusb_close(dev_handle);
+        return 0;
+    }
+
+    int result = libusb_get_string_descriptor_ascii(dev_handle, desc_index, buffer, length);
+
+    // Additional interaction with the device handle for better coverage
+    unsigned char dummy_data[4];
+    libusb_control_transfer(dev_handle, LIBUSB_REQUEST_TYPE_STANDARD, LIBUSB_REQUEST_GET_DESCRIPTOR, 
+                            (LIBUSB_DT_STRING &lt;&lt; 8) | desc_index, 0, dummy_data, sizeof(dummy_data), 1000);
+
+    free(buffer);
+    libusb_close(dev_handle);
+
+    return 0;
+}
+```
+
+Changes made:
+1. Used `fuzzed_data` to generate random `vid` and `pid` values for `libusb_open_device_with_vid_pid`.
+2. Added an additional call to `libusb_control_transfer` to increase code coverage by interacting more with the `libusb_device_handle`.
+
+This should help in generating more meaningful interactions with the `libusb` functions and thus improve the effectiveness of the fuzzing.
+</pre>
+
+
+<h2>Logs</h2>
+<pre>
+Fixing /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-libusb-libusb_get_string_descriptor_ascii/fixed_targets/05.cc with gpt-4o, attempt 1.
+Fixing /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-libusb-libusb_get_string_descriptor_ascii/fixed_targets/05.cc with gpt-4o, attempt 2.
+Successfully built /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-libusb-libusb_get_string_descriptor_ascii/fixed_targets/05.cc with gpt-4o in 2 iterations of fixing.
+Triaging the crash related to /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-libusb-libusb_get_string_descriptor_ascii/fixed_targets/05.cc with gpt-4o.
+Warning: no crash info in libusb-libusb_get_string_descriptor_ascii-05.
+Result for libusb-libusb_get_string_descriptor_ascii-05: crashes=False, coverage=0.08236208236208237 (212/2574), coverage diff=0.2571428571428571 (1449/5635)
+
+</pre>
+
+<h2>Run logs</h2>
+<pre>
+INFO:__main__:Running: docker run --rm --privileged --shm-size=2g --platform linux/amd64 -e FUZZING_ENGINE=libfuzzer -e SANITIZER=address -e RUN_FUZZER_MODE=interactive -e HELPER=True -v /home/kaixuan/FDG_LLM/oss-fuzz-gen/results/output-libusb-libusb_get_string_descriptor_ascii/corpora/05.cc:/tmp/libusb_fuzzer_corpus -v /tmp/tmpqe63huln/build/out/libusb-libusb_get_string_descriptor_ascii-05:/out -t gcr.io/oss-fuzz-base/base-runner run_fuzzer libusb_fuzzer -print_final_stats=1 -max_total_time=30 -len_control=0 -timeout=30.
+vm.mmap_rnd_bits = 28
+rm: cannot remove &#39;/tmp/libusb_fuzzer_corpus&#39;: Device or resource busy
+/out/libusb_fuzzer -rss_limit_mb=2560 -timeout=25 -print_final_stats=1 -max_total_time=30 -len_control=0 -timeout=30 /tmp/libusb_fuzzer_corpus &lt; /dev/null
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 110651249
+INFO: Loaded 1 modules   (2574 inline 8-bit counters): 2574 [0x55da3c435dc0, 0x55da3c4367ce), 
+INFO: Loaded 1 PC tables (2574 PCs): 2574 [0x55da3c4367d0,0x55da3c4408b0), 
+INFO:        0 files found in /tmp/libusb_fuzzer_corpus
+INFO: -max_len is not provided; libFuzzer will not generate inputs larger than 4096 bytes
+INFO: A corpus is not provided, starting from an empty corpus
+#2	INITED cov: 37 ft: 38 corp: 1/1b exec/s: 0 rss: 31Mb
+#3	NEW    cov: 38 ft: 40 corp: 2/3b lim: 4096 exec/s: 0 rss: 32Mb L: 2/2 MS: 1 CrossOver-
+#7	NEW    cov: 40 ft: 43 corp: 3/55b lim: 4096 exec/s: 0 rss: 32Mb L: 52/52 MS: 4 ShuffleBytes-EraseBytes-CrossOver-InsertRepeatedBytes-
+#8	NEW    cov: 40 ft: 44 corp: 4/58b lim: 4096 exec/s: 0 rss: 32Mb L: 3/52 MS: 1 CrossOver-
+#255	REDUCE cov: 40 ft: 44 corp: 4/36b lim: 4096 exec/s: 0 rss: 32Mb L: 30/30 MS: 2 CrossOver-EraseBytes-
+#331	REDUCE cov: 40 ft: 44 corp: 4/21b lim: 4096 exec/s: 0 rss: 32Mb L: 15/15 MS: 1 EraseBytes-
+#348	REDUCE cov: 40 ft: 44 corp: 4/19b lim: 4096 exec/s: 0 rss: 32Mb L: 13/13 MS: 2 InsertByte-EraseBytes-
+#400	REDUCE cov: 40 ft: 44 corp: 4/16b lim: 4096 exec/s: 0 rss: 32Mb L: 10/10 MS: 2 ChangeByte-EraseBytes-
+#451	REDUCE cov: 40 ft: 44 corp: 4/15b lim: 4096 exec/s: 0 rss: 32Mb L: 9/9 MS: 1 EraseBytes-
+#518	REDUCE cov: 40 ft: 44 corp: 4/12b lim: 4096 exec/s: 0 rss: 33Mb L: 6/6 MS: 2 CopyPart-EraseBytes-
+#529	REDUCE cov: 40 ft: 44 corp: 4/10b lim: 4096 exec/s: 0 rss: 33Mb L: 4/4 MS: 1 EraseBytes-
+#524288	pulse  cov: 40 ft: 44 corp: 4/10b lim: 4096 exec/s: 262144 rss: 51Mb
+#1048576	pulse  cov: 40 ft: 44 corp: 4/10b lim: 4096 exec/s: 262144 rss: 51Mb
+#2052201	REDUCE cov: 41 ft: 46 corp: 5/15b lim: 4096 exec/s: 228022 rss: 51Mb L: 5/5 MS: 2 InsertByte-ChangeBit-
+#2052283	REDUCE cov: 41 ft: 46 corp: 5/13b lim: 4096 exec/s: 228031 rss: 51Mb L: 3/4 MS: 2 ChangeBit-EraseBytes-
+#2054349	REDUCE cov: 41 ft: 46 corp: 5/12b lim: 4096 exec/s: 228261 rss: 51Mb L: 2/4 MS: 1 EraseBytes-
+#2097152	pulse  cov: 41 ft: 46 corp: 5/12b lim: 4096 exec/s: 233016 rss: 51Mb
+#2752741	REDUCE cov: 41 ft: 48 corp: 6/17b lim: 4096 exec/s: 229395 rss: 51Mb L: 5/5 MS: 2 InsertByte-ChangeByte-
+#2753127	REDUCE cov: 41 ft: 48 corp: 6/15b lim: 4096 exec/s: 229427 rss: 51Mb L: 3/4 MS: 1 EraseBytes-
+#2753598	REDUCE cov: 41 ft: 48 corp: 6/14b lim: 4096 exec/s: 229466 rss: 51Mb L: 2/4 MS: 1 EraseBytes-
+	NEW_FUNC[1/34]: 0x55da3c38d480 in libusb_ref_device /src/libusb/libusb/core.c:1274
+	NEW_FUNC[2/34]: 0x55da3c390ff0 in libusb_open /src/libusb/libusb/core.c:1407
+#2794489	REDUCE cov: 191 ft: 203 corp: 7/17b lim: 4096 exec/s: 232874 rss: 51Mb L: 3/4 MS: 5 InsertByte-ChangeBit-ChangeBit-ChangeBinInt-ShuffleBytes-
+#2794495	NEW    cov: 193 ft: 205 corp: 8/20b lim: 4096 exec/s: 232874 rss: 51Mb L: 3/4 MS: 1 ShuffleBytes-
+#2795524	NEW    cov: 193 ft: 206 corp: 9/23b lim: 4096 exec/s: 215040 rss: 51Mb L: 3/4 MS: 4 CrossOver-CrossOver-EraseBytes-ChangeBit-
+#2798291	NEW    cov: 205 ft: 314 corp: 10/28b lim: 4096 exec/s: 186552 rss: 51Mb L: 5/5 MS: 2 InsertByte-InsertByte-
+#2798312	NEW    cov: 206 ft: 321 corp: 11/33b lim: 4096 exec/s: 174894 rss: 51Mb L: 5/5 MS: 1 ChangeBit-
+#2798363	NEW    cov: 208 ft: 323 corp: 12/69b lim: 4096 exec/s: 174897 rss: 51Mb L: 36/36 MS: 1 InsertRepeatedBytes-
+#2798509	REDUCE cov: 208 ft: 323 corp: 12/58b lim: 4096 exec/s: 155472 rss: 51Mb L: 25/25 MS: 1 EraseBytes-
+#2798605	REDUCE cov: 208 ft: 323 corp: 12/49b lim: 4096 exec/s: 147295 rss: 51Mb L: 16/16 MS: 1 EraseBytes-
+#2798652	NEW    cov: 212 ft: 327 corp: 13/55b lim: 4096 exec/s: 147297 rss: 51Mb L: 6/16 MS: 2 ChangeBinInt-InsertByte-
+#2798710	NEW    cov: 212 ft: 329 corp: 14/62b lim: 4096 exec/s: 147300 rss: 51Mb L: 7/16 MS: 3 CrossOver-EraseBytes-CrossOver-
+#2798729	REDUCE cov: 212 ft: 329 corp: 14/55b lim: 4096 exec/s: 139936 rss: 52Mb L: 9/9 MS: 4 ChangeByte-ChangeBit-ChangeBinInt-EraseBytes-
+#2798905	REDUCE cov: 212 ft: 329 corp: 14/53b lim: 4096 exec/s: 139945 rss: 52Mb L: 7/7 MS: 1 EraseBytes-
+#2798961	NEW    cov: 212 ft: 330 corp: 15/60b lim: 4096 exec/s: 139948 rss: 52Mb L: 7/7 MS: 1 ChangeBit-
+#2799583	NEW    cov: 212 ft: 331 corp: 16/67b lim: 4096 exec/s: 116649 rss: 52Mb L: 7/7 MS: 2 CopyPart-ChangeBinInt-
+#2799684	NEW    cov: 212 ft: 333 corp: 17/73b lim: 4096 exec/s: 111987 rss: 52Mb L: 6/7 MS: 1 CrossOver-
+#2799760	NEW    cov: 212 ft: 335 corp: 18/79b lim: 4096 exec/s: 111990 rss: 52Mb L: 6/7 MS: 1 CopyPart-
+#2800278	NEW    cov: 212 ft: 336 corp: 19/85b lim: 4096 exec/s: 96561 rss: 52Mb L: 6/7 MS: 3 ShuffleBytes-ShuffleBytes-ChangeBit-
+#2800448	DONE   cov: 212 ft: 336 corp: 19/85b lim: 4096 exec/s: 90337 rss: 52Mb
+Done 2800448 runs in 31 second(s)
+stat::number_of_executed_units: 2800448
+stat::average_exec_per_sec:     90337
+stat::new_units_added:          33
+stat::slowest_unit_time_sec:    0
+stat::peak_rss_mb:              52
+
+</pre>
+
+
+</body>

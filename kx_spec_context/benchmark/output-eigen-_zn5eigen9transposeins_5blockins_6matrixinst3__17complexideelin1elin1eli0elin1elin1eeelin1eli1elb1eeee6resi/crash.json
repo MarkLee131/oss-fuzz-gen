@@ -1,0 +1,100 @@
+{
+    "samples": [
+
+    {
+        "benchmark": "output-eigen-_zn5eigen9transposeins_5blockins_6matrixinst3__17complexideelin1elin1eli0elin1elin1eeelin1eli1elb1eeee6resi",
+        "sample": "01",
+        "status": "Done",
+        "compiles": "True",
+        "crashes": "True",
+        "crash_reason": "FP_NEAR_INIT_CRASH",
+        "bug": "False",
+        "coverage": "0.00",
+        "coverage_diff": "0.0",
+        "coverage_report": "#",
+        "stacktrace": "/stacktrace",
+        "target_binary": "/target_binary",
+        "reproducer": "/artifacts",
+        "run_log": "run.log",
+        "source_code": "#include <fuzzer/FuzzedDataProvider.h>\\n#include <Eigen/Core>\\n#include <Eigen/Dense>\\n#include <complex>\\n#include <cstdint>\\n#include <cstddef>\\n#include <cstdlib>\\n#include <cstring>\\n#include <iostream>\\n#include <sstream>\\n#include <algorithm>\\n#include <iterator>\\n#include <cctype>\\n\\nextern \"C\" int LLVMFuzzerInitialize(int *argc, char ***argv) {\\n    return 0;\\n}\\n\\nextern \"C\" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {\\n    FuzzedDataProvider provider(data, size);\\n\\n    using ComplexMatrix = Eigen::Matrix<std::complex<double>, Eigen::Dynamic, Eigen::Dynamic>;\\n    using BlockType = Eigen::Block<ComplexMatrix, Eigen::Dynamic, Eigen::Dynamic, false>;\\n    using TransposeBlock = Eigen::Transpose<BlockType>;\\n    using TransposeIntMatrix = Eigen::Transpose<Eigen::Matrix<int, Eigen::Dynamic, Eigen::Dynamic>>;\\n\\n    // Ensure the dimensions are within a reasonable range to avoid excessive memory allocation\\n    Eigen::Index rows = provider.ConsumeIntegralInRange<Eigen::Index>(1, 1000);\\n    Eigen::Index cols = provider.ConsumeIntegralInRange<Eigen::Index>(1, 1000);\\n\\n    ComplexMatrix complexMatrix = ComplexMatrix::Random(rows, cols);\\n    BlockType block = complexMatrix.block(0, 0, rows, std::min<Eigen::Index>(cols, 1));\\n    TransposeBlock transposeBlock(block);\\n\\n    Eigen::Index intRows = provider.ConsumeIntegralInRange<Eigen::Index>(1, 1000);\\n    Eigen::Index intCols = provider.ConsumeIntegralInRange<Eigen::Index>(1, 1000);\\n    Eigen::Matrix<int, Eigen::Dynamic, Eigen::Dynamic> intMatrix = Eigen::Matrix<int, Eigen::Dynamic, Eigen::Dynamic>::Random(intRows, intCols);\\n    TransposeIntMatrix transposeIntMatrix(intMatrix);\\n\\n    Eigen::Index newRows = provider.ConsumeIntegralInRange<Eigen::Index>(1, block.rows());\\n    Eigen::Index newCols = provider.ConsumeIntegralInRange<Eigen::Index>(1, block.cols());\\n\\n    // Ensure new dimensions are within the bounds of the original block's dimensions\\n    if (newRows <= block.rows() && newCols <= block.cols()) {\\n        transposeBlock.resize(newRows, newCols);\\n    }\\n\\n    return 0;\\n}",
+        "model": ""
+    },
+
+    {
+        "benchmark": "output-eigen-_zn5eigen9transposeins_5blockins_6matrixinst3__17complexideelin1elin1eli0elin1elin1eeelin1eli1elb1eeee6resi",
+        "sample": "02",
+        "status": "Done",
+        "compiles": "True",
+        "crashes": "True",
+        "crash_reason": "NO_SEMANTIC_ERR",
+        "bug": "True",
+        "coverage": "41.18",
+        "coverage_diff": "0.005876951331496786",
+        "coverage_report": "#",
+        "stacktrace": "/stacktrace",
+        "target_binary": "/target_binary",
+        "reproducer": "/artifacts",
+        "run_log": "run.log",
+        "source_code": "#include <fuzzer/FuzzedDataProvider.h>\\n#include <Eigen/Core>\\n#include <Eigen/Dense>\\n#include <complex>\\n#include <cstdint>\\n#include <cstddef>\\n#include <cstdlib>\\n#include <cstring>\\n#include <iostream>\\n#include <sstream>\\n#include <algorithm>\\n#include <iterator>\\n#include <cctype>\\n\\nextern \"C\" int LLVMFuzzerInitialize(int *argc, char ***argv) {\\n    // Initialize the library or any resources within Eigen needed for the fuzzing process here.\\n    // Eigen does not require specific initialization.\\n    return 0;\\n}\\n\\nextern \"C\" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {\\n    // Create a FuzzedDataProvider to handle the input data\\n    FuzzedDataProvider provider(data, size);\\n\\n    // Define the types used in the function\\n    using ComplexMatrix = Eigen::Matrix<std::complex<double>, Eigen::Dynamic, Eigen::Dynamic>;\\n    using BlockType = Eigen::Block<ComplexMatrix>;\\n    using TransposeBlock = Eigen::Transpose<BlockType>;\\n    using TransposeIntMatrix = Eigen::Transpose<Eigen::Matrix<int, Eigen::Dynamic, Eigen::Dynamic>>;\\n\\n    // Generate random dimensions for the matrices\\n    Eigen::Index rows = provider.ConsumeIntegral<Eigen::Index>();\\n    Eigen::Index cols = provider.ConsumeIntegral<Eigen::Index>();\\n\\n    // Ensure rows and cols are positive\\n    rows = std::max<Eigen::Index>(rows, 1);\\n    cols = std::max<Eigen::Index>(cols, 1);\\n\\n    // Create a complex matrix and a block from it\\n    ComplexMatrix complexMatrix = ComplexMatrix::Random(rows, cols);\\n    BlockType block = complexMatrix.block(0, 0, rows, std::min<Eigen::Index>(1, cols));\\n    TransposeBlock transposeBlock(block);\\n\\n    // Create an integer matrix transpose object\\n    Eigen::Index intRows = provider.ConsumeIntegral<Eigen::Index>();\\n    Eigen::Index intCols = provider.ConsumeIntegral<Eigen::Index>();\\n\\n    // Ensure intRows and intCols are positive\\n    intRows = std::max<Eigen::Index>(intRows, 1);\\n    intCols = std::max<Eigen::Index>(intCols, 1);\\n\\n    Eigen::Matrix<int, Eigen::Dynamic, Eigen::Dynamic> intMatrix = Eigen::Matrix<int, Eigen::Dynamic, Eigen::Dynamic>::Random(intRows, intCols);\\n    TransposeIntMatrix transposeIntMatrix(intMatrix);\\n\\n    // Call the resize function on the transposeBlock to satisfy the fuzzing requirement\\n    // Randomly generate new dimensions for the resize call\\n    Eigen::Index newRows = provider.ConsumeIntegral<Eigen::Index>();\\n    Eigen::Index newCols = provider.ConsumeIntegral<Eigen::Index>();\\n\\n    // Ensure newRows and newCols are positive\\n    newRows = std::max<Eigen::Index>(newRows, 1);\\n    newCols = std::max<Eigen::Index>(newCols, 1);\\n\\n    // Perform the resize operation\\n    transposeBlock.resize(newRows, newCols);\\n\\n    return 0;\\n}",
+        "model": ""
+    },
+
+    {
+        "benchmark": "output-eigen-_zn5eigen9transposeins_5blockins_6matrixinst3__17complexideelin1elin1eli0elin1elin1eeelin1eli1elb1eeee6resi",
+        "sample": "03",
+        "status": "Done",
+        "compiles": "True",
+        "crashes": "True",
+        "crash_reason": "NO_SEMANTIC_ERR",
+        "bug": "True",
+        "coverage": "35.75",
+        "coverage_diff": "0.005876951331496786",
+        "coverage_report": "#",
+        "stacktrace": "/stacktrace",
+        "target_binary": "/target_binary",
+        "reproducer": "/artifacts",
+        "run_log": "run.log",
+        "source_code": "#include <fuzzer/FuzzedDataProvider.h>\\n#include <Eigen/Core>\\n#include <Eigen/Dense>\\n#include <complex>\\n#include <cstdint>\\n#include <cstddef>\\n#include <cstdlib>\\n#include <cstring>\\n#include <iostream>\\n#include <sstream>\\n#include <algorithm>\\n#include <iterator>\\n#include <cctype>\\n\\nextern \"C\" int LLVMFuzzerInitialize(int *argc, char ***argv) {\\n    return 0;\\n}\\n\\nextern \"C\" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {\\n    FuzzedDataProvider provider(data, size);\\n\\n    using ComplexMatrix = Eigen::Matrix<std::complex<double>, Eigen::Dynamic, Eigen::Dynamic>;\\n    using BlockType = Eigen::Block<ComplexMatrix, Eigen::Dynamic, Eigen::Dynamic>;\\n    using TransposeBlock = Eigen::Transpose<BlockType>;\\n    using TransposeIntMatrix = Eigen::Transpose<Eigen::Matrix<int, Eigen::Dynamic, Eigen::Dynamic>>;\\n\\n    Eigen::Index rows = provider.ConsumeIntegralInRange<Eigen::Index>(1, 100);  // Ensure valid range\\n    Eigen::Index cols = provider.ConsumeIntegralInRange<Eigen::Index>(1, 100);  // Ensure valid range\\n\\n    ComplexMatrix complexMatrix = ComplexMatrix::Random(rows, cols);\\n    BlockType block = complexMatrix.block(0, 0, std::min(rows, complexMatrix.rows()), std::min(cols, complexMatrix.cols()));  // Adjusted to match the type returned by block\\n    TransposeBlock transposeBlock(block);\\n\\n    Eigen::Index intRows = provider.ConsumeIntegralInRange<Eigen::Index>(1, 100);  // Ensure valid range\\n    Eigen::Index intCols = provider.ConsumeIntegralInRange<Eigen::Index>(1, 100);  // Ensure valid range\\n    Eigen::Matrix<int, Eigen::Dynamic, Eigen::Dynamic> intMatrix = Eigen::Matrix<int, Eigen::Dynamic, Eigen::Dynamic>::Random(intRows, intCols);\\n    TransposeIntMatrix transposeIntMatrix(intMatrix);\\n\\n    Eigen::Index newRows = provider.ConsumeIntegralInRange<Eigen::Index>(1, 100);  // Ensure valid range\\n    Eigen::Index newCols = provider.ConsumeIntegralInRange<Eigen::Index>(1, 100);  // Ensure valid range\\n\\n    // Instead of resizing, create new blocks and transposes with the correct dimensions\\n    BlockType newBlock = complexMatrix.block(0, 0, std::min(newRows, complexMatrix.rows()), std::min(newCols, complexMatrix.cols()));\\n    TransposeBlock newTransposeBlock(newBlock);\\n\\n    // Correctly resize the transpose block\\n    newTransposeBlock.resize(newRows, newCols);\\n\\n    return 0;\\n}",
+        "model": ""
+    },
+
+    {
+        "benchmark": "output-eigen-_zn5eigen9transposeins_5blockins_6matrixinst3__17complexideelin1elin1eli0elin1elin1eeelin1eli1elb1eeee6resi",
+        "sample": "04",
+        "status": "Done",
+        "compiles": "True",
+        "crashes": "True",
+        "crash_reason": "NO_SEMANTIC_ERR",
+        "bug": "True",
+        "coverage": "41.18",
+        "coverage_diff": "0.005876951331496786",
+        "coverage_report": "#",
+        "stacktrace": "/stacktrace",
+        "target_binary": "/target_binary",
+        "reproducer": "/artifacts",
+        "run_log": "run.log",
+        "source_code": "#include <fuzzer/FuzzedDataProvider.h>\\n#include <Eigen/Core>\\n#include <Eigen/Dense>\\n#include <complex>\\n#include <cstdint>\\n#include <cstddef>\\n#include <cstdlib>\\n#include <cstring>\\n#include <iostream>\\n#include <sstream>\\n#include <algorithm>\\n#include <iterator>\\n#include <cctype>\\n\\nextern \"C\" int LLVMFuzzerInitialize(int *argc, char ***argv) {\\n    // Initialize the library or any resources within Eigen needed for the fuzzing process here.\\n    // Eigen does not require specific initialization.\\n    return 0;\\n}\\n\\nextern \"C\" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {\\n    // Create a FuzzedDataProvider to handle the input data\\n    FuzzedDataProvider provider(data, size);\\n\\n    // Define the types used in the function\\n    using ComplexMatrix = Eigen::Matrix<std::complex<double>, Eigen::Dynamic, Eigen::Dynamic>;\\n    using BlockType = Eigen::Block<ComplexMatrix>;\\n    using TransposeBlock = Eigen::Transpose<BlockType>;\\n    using TransposeIntMatrix = Eigen::Transpose<Eigen::Matrix<int, Eigen::Dynamic, Eigen::Dynamic>>;\\n\\n    // Generate random dimensions for the matrices\\n    Eigen::Index rows = provider.ConsumeIntegral<Eigen::Index>();\\n    Eigen::Index cols = provider.ConsumeIntegral<Eigen::Index>();\\n\\n    // Ensure the dimensions are positive to avoid invalid matrix sizes\\n    rows = std::max<Eigen::Index>(rows, 1);\\n    cols = std::max<Eigen::Index>(cols, 1);\\n\\n    // Create a complex matrix and a block from it\\n    ComplexMatrix complexMatrix = ComplexMatrix::Random(rows, cols);\\n    BlockType block = complexMatrix.block(0, 0, rows, std::min<Eigen::Index>(1, cols));\\n    TransposeBlock transposeBlock(block);\\n\\n    // Create an integer matrix transpose object\\n    Eigen::Index intRows = provider.ConsumeIntegral<Eigen::Index>();\\n    Eigen::Index intCols = provider.ConsumeIntegral<Eigen::Index>();\\n\\n    // Ensure the dimensions are positive to avoid invalid matrix sizes\\n    intRows = std::max<Eigen::Index>(intRows, 1);\\n    intCols = std::max<Eigen::Index>(intCols, 1);\\n\\n    Eigen::Matrix<int, Eigen::Dynamic, Eigen::Dynamic> intMatrix = Eigen::Matrix<int, Eigen::Dynamic, Eigen::Dynamic>::Random(intRows, intCols);\\n    TransposeIntMatrix transposeIntMatrix(intMatrix);\\n\\n    // Generate new dimensions for resizing\\n    Eigen::Index newRows = provider.ConsumeIntegral<Eigen::Index>();\\n    Eigen::Index newCols = provider.ConsumeIntegral<Eigen::Index>();\\n\\n    // Ensure the dimensions are positive to avoid invalid matrix sizes\\n    newRows = std::max<Eigen::Index>(newRows, 1);\\n    newCols = std::max<Eigen::Index>(newCols, 1);\\n\\n    // Call the function under test\\n    transposeBlock.resize(newRows, newCols);\\n\\n    return 0;\\n}",
+        "model": ""
+    },
+
+    {
+        "benchmark": "output-eigen-_zn5eigen9transposeins_5blockins_6matrixinst3__17complexideelin1elin1eli0elin1elin1eeelin1eli1elb1eeee6resi",
+        "sample": "05",
+        "status": "Done",
+        "compiles": "True",
+        "crashes": "False",
+        "crash_reason": "NO_SEMANTIC_ERR",
+        "bug": "True",
+        "coverage": "43.51",
+        "coverage_diff": "0.005876951331496786",
+        "coverage_report": "#",
+        "stacktrace": "/stacktrace",
+        "target_binary": "/target_binary",
+        "reproducer": "/artifacts",
+        "run_log": "run.log",
+        "source_code": "#include <fuzzer/FuzzedDataProvider.h>\\n#include <Eigen/Core>\\n#include <Eigen/Dense>\\n#include <complex>\\n#include <cstdint>\\n#include <cstddef>\\n#include <cstdlib>\\n#include <cstring>\\n#include <iostream>\\n#include <sstream>\\n#include <algorithm>\\n#include <iterator>\\n#include <cctype>\\n\\nextern \"C\" {\\n#include \"Eigen/src/Core/Matrix.h\"\\n#include \"Eigen/src/Core/Transpose.h\"\\n#include \"Eigen/src/Core/Block.h\"\\n}\\n\\nextern \"C\" int LLVMFuzzerInitialize(int *argc, char ***argv) {\\n    return 0;\\n}\\n\\nextern \"C\" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {\\n    FuzzedDataProvider provider(data, size);\\n\\n    using ComplexMatrix = Eigen::Matrix<std::complex<double>, Eigen::Dynamic, Eigen::Dynamic>;\\n    using BlockType = Eigen::Block<ComplexMatrix>;\\n    using TransposeBlock = Eigen::Transpose<BlockType>;\\n    using TransposeIntMatrix = Eigen::Transpose<Eigen::Matrix<int, Eigen::Dynamic, Eigen::Dynamic>>;\\n\\n    // Ensure that rows and columns are within a reasonable range to avoid excessive memory allocation\\n    Eigen::Index rows = provider.ConsumeIntegralInRange<Eigen::Index>(1, 100);\\n    Eigen::Index cols = provider.ConsumeIntegralInRange<Eigen::Index>(1, 100);\\n\\n    ComplexMatrix complexMatrix = ComplexMatrix::Random(rows, cols);\\n    BlockType block = complexMatrix.block(0, 0, std::min<Eigen::Index>(rows, 1), std::min<Eigen::Index>(cols, 1));\\n    TransposeBlock transposeBlock(block);\\n\\n    Eigen::Index intRows = provider.ConsumeIntegralInRange<Eigen::Index>(1, 100);\\n    Eigen::Index intCols = provider.ConsumeIntegralInRange<Eigen::Index>(1, 100);\\n    Eigen::Matrix<int, Eigen::Dynamic, Eigen::Dynamic> intMatrix = Eigen::Matrix<int, Eigen::Dynamic, Eigen::Dynamic>::Random(intRows, intCols);\\n    TransposeIntMatrix transposeIntMatrix(intMatrix);\\n\\n    Eigen::Index newRows = provider.ConsumeIntegralInRange<Eigen::Index>(1, 100);\\n    Eigen::Index newCols = provider.ConsumeIntegralInRange<Eigen::Index>(1, 100);\\n\\n    // Ensure the new dimensions are valid for the transposeBlock\\n    if (newRows <= transposeBlock.rows() && newCols <= transposeBlock.cols()) {\\n        transposeBlock.resize(newRows, newCols);\\n    }\\n\\n    return 0;\\n}",
+        "model": ""
+    }
+
+    ]
+}

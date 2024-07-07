@@ -1,3 +1,7 @@
+'''
+read the artifact from cen's json file
+'''
+
 import json
 import os
 
