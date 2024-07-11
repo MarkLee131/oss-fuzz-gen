@@ -102,7 +102,7 @@ def apply_llm_triage(
       temperature=temperature,
   )
 
-  builder = prompt_builder.DefaultTemplateBuilder(triage_model)
+  builder = prompt_builder.DefaultTemplateBuilder(triage_model, benchmark)
   prompt = builder.build_triager_prompt(benchmark, driver_code, crash_info,
                                         crash_func)
   prompt.save(prompt_path)

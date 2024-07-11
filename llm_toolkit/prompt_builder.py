@@ -113,9 +113,11 @@ class DefaultTemplateBuilder(PromptBuilder):
 
   def __init__(self,
                model: models.LLM,
+               benchmark: Benchmark,
                template_dir: str = DEFAULT_TEMPLATE_DIR):
     super().__init__(model)
     self._template_dir = template_dir
+    self.benchmark = benchmark
 
     # Load templates.
     self.priming_template_file = self._find_template(template_dir,
@@ -140,6 +142,7 @@ class DefaultTemplateBuilder(PromptBuilder):
         template_dir, 'triager_priming.txt')
     self.triager_problem_template_file = self._find_template(
         template_dir, 'triager_problem.txt')
+    self.headers_file = self._find_template(template_dir, 'header_files.json')
 
   def _format_priming(self, target_file_type: FileType,
                       needs_extern: bool) -> str:
@@ -193,8 +196,13 @@ class DefaultTemplateBuilder(PromptBuilder):
     context = jinja2.Template(self._get_template(self.context_template_file),
                               trim_blocks=True,
                               lstrip_blocks=True)
+    
+    import json
+    with open(self.headers_file) as f:
+      headers_json_list = json.load(f)
+      header_list = headers_json_list[self.benchmark.project]
     return context.render(
-        headers='\n'.join(context_info['files']),
+        headers= '\n'.join(header_list),
         must_insert=context_info['decl'],
         func_source=context_info['func_source'],
         xrefs='\n'.join(context_info['xrefs']),

@@ -36,7 +36,7 @@ from llm_toolkit import models, output_parser, prompt_builder, prompts
 # experiment, while {run_all_experiments.NUM_EXP, default 2} experiments will
 # run in parallel.
 NUM_EVA = int(os.getenv('LLM_NUM_EVA', '3'))
-DEBUG: bool = False
+DEBUG: bool = True
 
 # Default LLM hyper-parameters.
 # #182 shows Gemini returns NUM_SAMPLES independent responses via repeated
@@ -46,7 +46,7 @@ DEBUG: bool = False
 # WARN: Avoid large NUM_SAMPLES in highly parallelized local experiments.
 # It controls the number of LLM responses per prompt, which may exceed your
 # LLM's limit on query-per-second.
-NUM_SAMPLES = 2
+NUM_SAMPLES = 100
 MAX_TOKENS: int = 4096
 RUN_TIMEOUT: int = 30
 TEMPERATURE: float = 1
@@ -263,7 +263,7 @@ def run(benchmark: Benchmark,
                                                   template_dir)
       else:
         # Use default
-        builder = prompt_builder.DefaultTemplateBuilder(model, template_dir)
+        builder = prompt_builder.DefaultTemplateBuilder(model, benchmark, template_dir)
 
     prompt = builder.build(benchmark.function_signature,
                            benchmark.file_type,
