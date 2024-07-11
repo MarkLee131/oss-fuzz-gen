@@ -263,7 +263,8 @@ def run(benchmark: Benchmark,
                                                   template_dir)
       else:
         # Use default
-        builder = prompt_builder.DefaultTemplateBuilder(model, benchmark, template_dir)
+        builder = prompt_builder.DefaultTemplateBuilder(model, benchmark,
+                                                        template_dir)
 
     prompt = builder.build(benchmark.function_signature,
                            benchmark.file_type,

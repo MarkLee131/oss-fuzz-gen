@@ -196,13 +196,13 @@ class DefaultTemplateBuilder(PromptBuilder):
     context = jinja2.Template(self._get_template(self.context_template_file),
                               trim_blocks=True,
                               lstrip_blocks=True)
-    
+
     import json
     with open(self.headers_file) as f:
       headers_json_list = json.load(f)
       header_list = headers_json_list[self.benchmark.project]
     return context.render(
-        headers= '\n'.join(header_list),
+        headers='\n'.join(header_list),
         must_insert=context_info['decl'],
         func_source=context_info['func_source'],
         xrefs='\n'.join(context_info['xrefs']),
