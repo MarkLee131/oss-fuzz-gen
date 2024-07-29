@@ -199,7 +199,7 @@ class DefaultTemplateBuilder(PromptBuilder):
     import json
     with open(self.headers_file) as f:
       headers_json_list = json.load(f)
-      header_list = headers_json_list[self.benchmark.project]
+      header_list = headers_json_list[self.benchmark.project] # pylint: disable=reportOptionalMemberAccess
     return context.render(
         headers='\n'.join(header_list),
         must_insert=context_info['decl'],
