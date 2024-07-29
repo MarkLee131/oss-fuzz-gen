@@ -27,6 +27,7 @@ import traceback
 from abc import abstractmethod
 from typing import Any, Callable, Optional, Type
 
+import anthropic
 import openai
 import tiktoken
 import vertexai
@@ -36,6 +37,8 @@ from vertexai.preview.generative_models import GenerativeModel
 from vertexai.preview.language_models import CodeGenerationModel
 
 from llm_toolkit import prompts
+
+logger = logging.getLogger(__name__)
 
 # Model hyper-parameters.
 MAX_TOKENS: int = 2000
@@ -125,12 +128,12 @@ class LLM:
 
   # ============================== Generation ============================== #
   @abstractmethod
-  def generate_code(self,
-                    prompt: prompts.Prompt,
-                    response_dir: str,
-                    log_output: bool = False,
+  def query_llm(self,
+                prompt: prompts.Prompt,
+                response_dir: str,
+                log_output: bool = False,
                     build_spec: bool = False) -> None:
-    """Generates fuzz targets to the |response_dir|."""
+    """Queries the LLM and stores responses in |response_dir|."""
 
   @abstractmethod
   def prompt_type(self) -> type[prompts.Prompt]:
@@ -209,7 +212,7 @@ class GPT(LLM):
       else:
         encoder = tiktoken.encoding_for_model(self.name)
     except KeyError:
-      print(f'Could not get a tiktoken encoding for {self.name}.')
+      logger.info(f'Could not get a tiktoken encoding for {self.name}.')
       encoder = tiktoken.get_encoding('cl100k_base')
 
     num_tokens = 0
@@ -227,16 +230,17 @@ class GPT(LLM):
     return prompts.OpenAIPrompt
 
   # ============================== Generation ============================== #
-  def generate_code(self,
-                    prompt: prompts.Prompt,
-                    response_dir: str,
-                    log_output: bool = False,
+  def query_llm(self,
+                prompt: prompts.Prompt,
+                response_dir: str,
+                log_output: bool = False,
                     build_spec=False) -> None:
-    """Generates code with OpenAI's API."""
+    """Queries OpenAI's API and stores response in |response_dir|."""
     if self.ai_binary:
-      print(f'OpenAI does not use local AI binary: {self.ai_binary}')
+      raise ValueError(f'OpenAI does not use local AI binary: {self.ai_binary}')
     if self.temperature_list:
-      print(f'OpenAI does not allow temperature list: {self.temperature_list}')
+      logger.info(
+          f'OpenAI does not allow temperature list: {self.temperature_list}')
 
     client = openai.OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
 
@@ -260,7 +264,7 @@ class GPT(LLM):
 
     # TODO: Add a default value for completion.
     if log_output:
-      print(completion)
+      logger.info(completion)
     for index, choice in enumerate(completion.choices):  # type: ignore
       content = choice.message.content
       self._save_output(index, content, response_dir)
@@ -278,6 +282,78 @@ class GPT4o(GPT):
   name = 'gpt-4o'
 
 
+class Claude(LLM):
+  """Anthropic's Claude model encapsulator."""
+
+  _max_output_tokens = 4096
+  _vertex_ai_model = ''
+  context_window = 200000
+
+  # ================================ Prompt ================================ #
+  def estimate_token_num(self, text) -> int:
+    """Estimates the number of tokens in |text|."""
+    client = anthropic.Client()
+    return client.count_tokens(text)
+
+  def prompt_type(self) -> type[prompts.Prompt]:
+    """Returns the expected prompt type."""
+    return prompts.ClaudePrompt
+
+  def get_model(self) -> str:
+    return self._vertex_ai_model
+
+  # ============================== Generation ============================== #
+  def query_llm(self,
+                prompt: prompts.Prompt,
+                response_dir: str,
+                log_output: bool = False) -> None:
+    """Queries Claude's API and stores response in |response_dir|."""
+    if self.ai_binary:
+      raise ValueError(f'Claude does not use local AI binary: {self.ai_binary}')
+    if self.temperature_list:
+      logger.info(
+          f'Claude does not allow temperature list: {self.temperature_list}')
+
+    vertex_ai_locations = os.getenv('VERTEX_AI_LOCATIONS',
+                                    'europe-west1').split(',')
+    project_id = os.getenv('GOOGLE_CLOUD_PROJECT', 'oss-fuzz')
+    region = random.sample(vertex_ai_locations, 1)[0]
+    client = anthropic.AnthropicVertex(region=region, project_id=project_id)
+
+    completion = self.with_retry_on_error(
+        lambda: client.messages.create(max_tokens=self._max_output_tokens,
+                                       messages=prompt.get(),
+                                       model=self.get_model(),
+                                       temperature=self.temperature),
+        anthropic.AnthropicError)
+    if log_output:
+      logger.info(completion)
+    for index, choice in enumerate(completion.content):
+      content = choice.text
+      self._save_output(index, content, response_dir)
+
+
+class ClaudeHaikuV3(Claude):
+  """Claude Haiku 3."""
+
+  name = 'vertex_ai_claude-3-haiku'
+  _vertex_ai_model = 'claude-3-haiku@20240307'
+
+
+class ClaudeOpusV3(Claude):
+  """Claude Opus 3."""
+
+  name = 'vertex_ai_claude-3-opus'
+  _vertex_ai_model = 'claude-3-opus@20240229'
+
+
+class ClaudeSonnetV3D5(Claude):
+  """Claude Sonnet 3.5."""
+
+  name = 'vertex_ai_claude-3-5-sonnet'
+  _vertex_ai_model = 'claude-3-5-sonnet@20240620'
+
+
 class GoogleModel(LLM):
   """Generic Google model."""
 
@@ -291,18 +367,19 @@ class GoogleModel(LLM):
     return int(len(re.split('[^a-zA-Z0-9]+', text)) * 1.5 + 0.5)
 
   # ============================== Generation ============================== #
-  def generate_code(self,
-                    prompt: prompts.Prompt,
-                    response_dir: str,
-                    log_output: bool = False,
+  def query_llm(self,
+                prompt: prompts.Prompt,
+                response_dir: str,
+                log_output: bool = False,
                     build_spec=False) -> None:
-    """Generates code with internal LLM."""
+    """Queries a Google LLM and stores results in |response_dir|."""
     if not self.ai_binary:
-      print(f'Error: This model requires a local AI binary: {self.ai_binary}')
+      logger.info(
+          f'Error: This model requires a local AI binary: {self.ai_binary}')
       sys.exit(1)
     if self.temperature_list:
-      print('AI Binary does not implement temperature list: '
-            f'{self.temperature_list}')
+      logger.info('AI Binary does not implement temperature list: '
+                  f'{self.temperature_list}')
 
     with tempfile.NamedTemporaryFile(delete=False, mode='w') as f:
       f.write(prompt.get())
@@ -329,9 +406,9 @@ class GoogleModel(LLM):
       stdout, stderr = proc.communicate()
 
       if proc.returncode != 0:
-        print(f'Failed to generate targets with prompt {prompt.get()}')
-        print(f'stdout: {stdout}')
-        print(f'stderr: {stderr}')
+        logger.info(f'Failed to generate targets with prompt {prompt.get()}')
+        logger.info(f'stdout: {stdout}')
+        logger.info(f'stderr: {stderr}')
     finally:
       os.unlink(prompt_path)
 
@@ -368,14 +445,14 @@ class VertexAIModel(GoogleModel):
             self._max_output_tokens
     } for index in range(self.num_samples)]
 
-  def generate_code(self,
-                    prompt: prompts.Prompt,
-                    response_dir: str,
-                    log_output: bool = False,
+  def query_llm(self,
+                prompt: prompts.Prompt,
+                response_dir: str,
+                log_output: bool = False,
                     build_spec=False) -> None:
     del log_output
     if self.ai_binary:
-      print(f'VertexAI does not use local AI binary: {self.ai_binary}')
+      logger.info(f'VertexAI does not use local AI binary: {self.ai_binary}')
 
     model = self.get_model()
     parameters_list = self._prepare_parameters()
@@ -474,7 +551,7 @@ class GeminiV1D5(GeminiModel):
   context_window = 2000000
 
   name = 'vertex_ai_gemini-1-5'
-  _vertex_ai_model = 'gemini-1.5-pro-preview-0409'
+  _vertex_ai_model = 'gemini-1.5-pro-001'
 
 
 class AIBinaryModel(GoogleModel):
