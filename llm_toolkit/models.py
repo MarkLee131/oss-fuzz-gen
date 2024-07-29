@@ -132,7 +132,7 @@ class LLM:
                 prompt: prompts.Prompt,
                 response_dir: str,
                 log_output: bool = False,
-                    build_spec: bool = False) -> None:
+                build_spec: bool = False) -> None:
     """Queries the LLM and stores responses in |response_dir|."""
 
   @abstractmethod
@@ -234,7 +234,7 @@ class GPT(LLM):
                 prompt: prompts.Prompt,
                 response_dir: str,
                 log_output: bool = False,
-                    build_spec=False) -> None:
+                build_spec=False) -> None:
     """Queries OpenAI's API and stores response in |response_dir|."""
     if self.ai_binary:
       raise ValueError(f'OpenAI does not use local AI binary: {self.ai_binary}')
@@ -306,7 +306,9 @@ class Claude(LLM):
   def query_llm(self,
                 prompt: prompts.Prompt,
                 response_dir: str,
-                log_output: bool = False) -> None:
+                log_output: bool = False,
+                build_spec=False
+                  ) -> None:
     """Queries Claude's API and stores response in |response_dir|."""
     if self.ai_binary:
       raise ValueError(f'Claude does not use local AI binary: {self.ai_binary}')
@@ -371,7 +373,7 @@ class GoogleModel(LLM):
                 prompt: prompts.Prompt,
                 response_dir: str,
                 log_output: bool = False,
-                    build_spec=False) -> None:
+                build_spec=False) -> None:
     """Queries a Google LLM and stores results in |response_dir|."""
     if not self.ai_binary:
       logger.info(
@@ -449,7 +451,7 @@ class VertexAIModel(GoogleModel):
                 prompt: prompts.Prompt,
                 response_dir: str,
                 log_output: bool = False,
-                    build_spec=False) -> None:
+                build_spec=False) -> None:
     del log_output
     if self.ai_binary:
       logger.info(f'VertexAI does not use local AI binary: {self.ai_binary}')

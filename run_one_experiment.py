@@ -90,7 +90,7 @@ def generate_spec(benchmark: Benchmark,
   """
   print(f'Generating targets for {benchmark.project} '
         f'{benchmark.function_signature} using {model.name}..')
-  model.generate_code(prompt,
+  model.query_llm(prompt,
                       response_dir=work_dirs.raw_specification_dir,
                       log_output=debug,
                       build_spec=True)
