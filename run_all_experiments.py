@@ -152,7 +152,6 @@ def run_experiments(benchmark: benchmarklib.Benchmark,
         cloud_experiment_bucket=args.cloud_experiment_bucket,
         use_context=args.context,
         run_timeout=args.run_timeout,
-        manual_fix=args.manual_fix,
         dry_run=args.dry_run,
         prompt_builder_to_use=args.prompt_builder)
     return Result(benchmark, result)
@@ -270,12 +269,6 @@ def parse_args() -> argparse.Namespace:
                       '--prompt-builder',
                       help='The prompt builder to use for harness generation.',
                       default='DEFAULT')
-
-  parser.add_argument('-mf',
-                      '--manual-fix',
-                      action='store_true',
-                      default=False,
-                      help='Manually fix the harnesses.')
 
   args = parser.parse_args()
   if args.num_samples:

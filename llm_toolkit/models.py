@@ -307,8 +307,7 @@ class Claude(LLM):
                 prompt: prompts.Prompt,
                 response_dir: str,
                 log_output: bool = False,
-                build_spec=False
-                  ) -> None:
+                build_spec=False) -> None:
     """Queries Claude's API and stores response in |response_dir|."""
     if self.ai_binary:
       raise ValueError(f'Claude does not use local AI binary: {self.ai_binary}')
