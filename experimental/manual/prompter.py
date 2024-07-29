@@ -64,7 +64,9 @@ def setup_model() -> models.LLM:
 def construct_prompt() -> prompts.Prompt:
   with open(args.prompt, 'r') as prompt_file:
     content = prompt_file.read()
-  return model.prompt_type()(initial=content)
+  prompt = model.prompt_type()()
+  prompt.add_problem(content)
+  return prompt
 
 
 if __name__ == "__main__":
@@ -72,4 +74,4 @@ if __name__ == "__main__":
   model = setup_model()
   prompt = construct_prompt()
   os.makedirs(args.response_dir, exist_ok=True)
-  model.generate_code(prompt, response_dir=args.response_dir)
+  model.query_llm(prompt, response_dir=args.response_dir)
