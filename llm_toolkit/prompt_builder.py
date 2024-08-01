@@ -330,7 +330,8 @@ class DefaultTemplateBuilder(PromptBuilder):
     import json
     with open('prompts/template_spec/headerfiles.json') as f:
       headers_json_list = json.load(f)
-      header_list = headers_json_list[self.benchmark.project] #pyright: ignore[reportOptionalMemberAccess]
+      header_list = headers_json_list[
+          self.benchmark.project]  #pyright: ignore[reportOptionalMemberAccess]
     headers_to_include = header_list
 
     header_inclusion_string = ''
