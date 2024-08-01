@@ -428,7 +428,7 @@ def apply_llm_fix(
   )
 
   builder = prompt_builder.DefaultTemplateBuilder(fixer_model,
-                                                  template_dir=template_dir)
+                                                  template_dir=template_dir, benchmark=benchmark)
 
   context = _collect_context(benchmark, errors)
   instruction = _collect_instructions(benchmark, errors,

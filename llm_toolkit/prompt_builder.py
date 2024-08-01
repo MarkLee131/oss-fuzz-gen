@@ -143,6 +143,8 @@ class DefaultTemplateBuilder(PromptBuilder):
                                                       'solution.txt')
     self.context_template_file = self._find_template(template_dir,
                                                      'context.txt')
+    self.headers_file = self._find_template(template_dir, 'header_files.json')
+    
     self.fixer_priming_template_file = self._find_template(
         template_dir, 'fixer_priming.txt')
     self.fixer_problem_template_file = self._find_template(
@@ -211,8 +213,15 @@ class DefaultTemplateBuilder(PromptBuilder):
     context = jinja2.Template(self._get_template(self.context_template_file),
                               trim_blocks=True,
                               lstrip_blocks=True)
+    import json
+    with open(self.headers_file) as f:
+      headers_json_list = json.load(f)
+      header_list = headers_json_list[
+          self.benchmark.project]  # pyright: ignore[reportOptionalMemberAccess]
+    
+    context_info['header'] = '\n'.join(header_list)
     return context.render(
-        headers='\n'.join(context_info['files']),
+        headers='\n'.join(header_list),
         must_insert=context_info['decl'],
         func_source=context_info['func_source'],
         xrefs='\n'.join(context_info['xrefs']),
@@ -318,12 +327,16 @@ class DefaultTemplateBuilder(PromptBuilder):
         "Function declaration is:\n" + project_context_content['decl'] + '\n'
 
     # Set header inclusion string if there are any headers.
-    headers_to_include = introspector.query_introspector_header_files(
-        benchmark.project)
+    import json
+    with open('prompts/template_spec/headerfiles.json') as f:
+      headers_json_list = json.load(f)
+      header_list = headers_json_list[
+          self.benchmark.project]
+    headers_to_include = header_list
 
     header_inclusion_string = ''
     if headers_to_include:
-      header_inclusion_string = ', '.join(headers_to_include)
+      header_inclusion_string = '\n'.join(headers_to_include)
     # Add function arg types
     arg_types = introspector.query_introspector_function_debug_arg_types(
         benchmark.project, benchmark.function_signature)
