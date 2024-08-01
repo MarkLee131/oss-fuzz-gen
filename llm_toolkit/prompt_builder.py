@@ -144,7 +144,7 @@ class DefaultTemplateBuilder(PromptBuilder):
     self.context_template_file = self._find_template(template_dir,
                                                      'context.txt')
     self.headers_file = self._find_template(template_dir, 'header_files.json')
-    
+
     self.fixer_priming_template_file = self._find_template(
         template_dir, 'fixer_priming.txt')
     self.fixer_problem_template_file = self._find_template(
@@ -218,7 +218,7 @@ class DefaultTemplateBuilder(PromptBuilder):
       headers_json_list = json.load(f)
       header_list = headers_json_list[
           self.benchmark.project]  # pyright: ignore[reportOptionalMemberAccess]
-    
+
     context_info['header'] = '\n'.join(header_list)
     return context.render(
         headers='\n'.join(header_list),
@@ -330,8 +330,7 @@ class DefaultTemplateBuilder(PromptBuilder):
     import json
     with open('prompts/template_spec/headerfiles.json') as f:
       headers_json_list = json.load(f)
-      header_list = headers_json_list[
-          self.benchmark.project]
+      header_list = headers_json_list[self.benchmark.project] #pyright: ignore[reportOptionalMemberAccess]
     headers_to_include = header_list
 
     header_inclusion_string = ''

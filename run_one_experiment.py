@@ -296,10 +296,10 @@ def generate_targets_for_analysis(model: models.LLM,
                                                       template_dir)
 
   prompt = builder.build_planning_prompt(
-                         benchmark, 
-                         example_pair,
-                         project_example_content=project_examples,
-                         project_context_content=context_info)
+      benchmark,
+      example_pair,
+      project_example_content=project_examples,
+      project_context_content=context_info)
   prompt.save(work_dirs.prompt)
 
   if dry_run:
