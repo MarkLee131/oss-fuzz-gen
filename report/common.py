@@ -354,7 +354,7 @@ class Results:
     """Gets the prompt for a given benchmark."""
     root_dir = os.path.join(self._results_dir, benchmark)
     for name in FileSystem(root_dir).listdir():
-      if re.match(r'^prompt.*txt$', name):
+      if re.match(r'^.*prompt.*txt$', name):
         with FileSystem(os.path.join(root_dir, name)).open() as f:
           content = f.read()
 

@@ -47,7 +47,7 @@ DEBUG: bool = True
 # WARN: Avoid large NUM_SAMPLES in highly parallelized local experiments.
 # It controls the number of LLM responses per prompt, which may exceed your
 # LLM's limit on query-per-second.
-NUM_SAMPLES = 100
+NUM_SAMPLES = 10
 MAX_TOKENS: int = 4096
 RUN_TIMEOUT: int = 30
 TEMPERATURE: float = 1
@@ -295,11 +295,22 @@ def generate_targets_for_analysis(model: models.LLM,
       builder = prompt_builder.DefaultTemplateBuilder(model, benchmark,
                                                       template_dir)
 
-  prompt = builder.build_planning_prompt(
+  planning_prompt = builder.build_planning_prompt(
       benchmark,
       example_pair,
       project_example_content=project_examples,
       project_context_content=context_info)
+  
+  planning_prompt.save(work_dirs.planning_prompt)
+  
+  spec_filepath_list = generate_spec(benchmark,
+                                       model,
+                                       planning_prompt,
+                                       work_dirs,
+                                       builder,
+                                       debug=debug)  # list
+  
+  prompt = builder.build_from_spec(spec_filepath_list)
   prompt.save(work_dirs.prompt)
 
   if dry_run:
