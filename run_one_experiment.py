@@ -300,16 +300,16 @@ def generate_targets_for_analysis(model: models.LLM,
       example_pair,
       project_example_content=project_examples,
       project_context_content=context_info)
-  
+
   planning_prompt.save(work_dirs.planning_prompt)
-  
+
   spec_filepath_list = generate_spec(benchmark,
-                                       model,
-                                       planning_prompt,
-                                       work_dirs,
-                                       builder,
-                                       debug=debug)  # list
-  
+                                     model,
+                                     planning_prompt,
+                                     work_dirs,
+                                     builder,
+                                     debug=debug)  # list
+
   prompt = builder.build_from_spec(spec_filepath_list)
   prompt.save(work_dirs.prompt)
 

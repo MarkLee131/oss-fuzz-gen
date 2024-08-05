@@ -341,7 +341,7 @@ class DefaultTemplateBuilder(PromptBuilder):
     arg_types = introspector.query_introspector_function_debug_arg_types(
         benchmark.project, benchmark.function_signature)
 
-    header_related_text = 'You MUST include these header files:\n <code>extern "C"{' + header_inclusion_string + '}<\code>.\n'
+    header_related_text = 'You MUST include these header files:\n <code>extern "C"{' + header_inclusion_string + '}</code>.\n'
 
     arg_types_text = ''
     if arg_types:
