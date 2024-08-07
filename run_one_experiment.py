@@ -50,7 +50,7 @@ DEBUG: bool = True
 NUM_SAMPLES = 10
 MAX_TOKENS: int = 4096
 RUN_TIMEOUT: int = 30
-TEMPERATURE: float = 1
+TEMPERATURE: float = 0.4
 
 RESULTS_DIR = './results'
 
