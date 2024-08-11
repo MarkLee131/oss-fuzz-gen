@@ -153,7 +153,7 @@ def generate_targets(benchmark: Benchmark,
 
     ### refine the code by addressing the comments; first we need to add a prompt into the |prompt| object
 
-    prompt = builder.build_refined_prompt(code_content)
+    prompt = builder.build_refined_prompt(code_content) #
 
     # print the last prompt within the prompt object
     print(prompt.get()[-1])

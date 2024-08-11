@@ -119,7 +119,7 @@ class PromptBuilder:
     # return the same by default
     return generated_code
 
-  def build_refined_prompt(self, code_content: str) -> prompts.Prompt:
+  def build_refined_prompt(self, code_content: str) -> Optional[prompts.Prompt]:
     """Add a refined prompt to guide the driver generation"""
 
 
