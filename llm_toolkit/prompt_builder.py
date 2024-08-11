@@ -119,6 +119,10 @@ class PromptBuilder:
     # return the same by default
     return generated_code
 
+  def build_refined_prompt(self, code_content: str) -> prompts.Prompt:
+    """Add a refined prompt to guide the driver generation"""
+
+
 
 class DefaultTemplateBuilder(PromptBuilder):
   """Default builder for C/C++."""
@@ -380,38 +384,25 @@ class DefaultTemplateBuilder(PromptBuilder):
   ) -> prompts.Prompt:
     """Constructs a prompt using the templates in |self| and saves it."""
 
-    ### spec_list is a list of string for the spec path, we need to select the longest one as the final spec
-    best_spec = ''
-    for spec_path in spec_list:
-      with open(spec_path, 'r') as f:
-        spec = f.read()
-        if len(spec) > len(best_spec):
-          best_spec = spec
+    spec_path = spec_list[0] # now only one spec in our list.
+    with open(spec_path, 'r') as f:
+      spec = f.read()
+      best_spec = spec
 
     # embed the spec into the specification
     spec_priming = self._get_template(self.spec_guided_template_file)
     spec_priming = spec_priming.replace('{SPECIFICATION}', best_spec)
     self._prompt.add_priming(spec_priming)
     return self._prompt
-
-  # def build(self,
-  #           function_signature: str,
-  #           target_file_type: FileType,
-  #           example_pair: list[list[str]],
-  #           project_example_content: Optional[list[list[str]]] = None,
-  #           project_context_content: Optional[dict] = None) -> prompts.Prompt:
-  #   """Constructs a prompt using the templates in |self| and saves it."""
-  #   priming = self._format_priming(target_file_type)
-  #   final_problem = self.format_problem(function_signature)
-  #   final_problem += (f'You MUST call <code>\n'
-  #                     f'{function_signature}\n'
-  #                     f'</code> in your solution!\n')
-  #   if project_context_content:
-  #     final_problem += self.format_context(project_context_content)
-  #   final_problem += '\n<solution>'
-  #   self._prepare_prompt(priming, final_problem, example_pair,
-  #                        project_example_content)
-  #   return self._prompt
+  
+  def build_refined_prompt(self,
+                          code_content: str
+                          ):
+    """Add a refined prompt to guide the driver generation"""
+    priming = f'You MUST refine the following fuzz driver code by addressing the code comments within it. Keep in mind that you MUST finish all the TODOs in the code.\n<code>{code_content}</code>\nYou MUST remove all comments after you finish refining the code.\n'
+    self._prompt.add_priming(priming)
+    
+    return self._prompt
 
   def build_fixer_prompt(self,
                          benchmark: Benchmark,

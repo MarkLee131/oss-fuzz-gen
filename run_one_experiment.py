@@ -47,7 +47,7 @@ DEBUG: bool = True
 # WARN: Avoid large NUM_SAMPLES in highly parallelized local experiments.
 # It controls the number of LLM responses per prompt, which may exceed your
 # LLM's limit on query-per-second.
-NUM_SAMPLES = 10
+NUM_SAMPLES = 5
 MAX_TOKENS: int = 4096
 RUN_TIMEOUT: int = 30
 TEMPERATURE: float = 0.4
@@ -130,6 +130,7 @@ def generate_targets(benchmark: Benchmark,
 
   _, target_ext = os.path.splitext(benchmark.target_path)
   generated_targets = []
+  refined_targets = []
   for file in os.listdir(work_dirs.raw_targets):
     if not output_parser.is_raw_output(file):
       continue
@@ -146,6 +147,37 @@ def generate_targets(benchmark: Benchmark,
     targets_relpath = map(os.path.relpath, generated_targets)
     targets_relpath_str = '\n '.join(targets_relpath)
     logger.info('Generated:\n %s', targets_relpath_str)
+    
+    ## refine the targets by quering LLM again
+    code_content = open(target_path, 'r').read()
+    
+    ### refine the code by addressing the comments; first we need to add a prompt into the |prompt| object
+    
+    prompt = builder.build_refined_prompt(code_content)
+    
+    # print the last prompt within the prompt object
+    print(prompt.get()[-1])
+
+    model.query_llm(prompt, response_dir=work_dirs.refined_targets, log_output=debug, build_spec=True)
+    
+    # then extract the refined code like before, but we only refine one code at a time
+    for file in os.listdir(work_dirs.refined_targets):
+      if not output_parser.is_raw_output(file):
+          continue
+      raw_refined_output = os.path.join(work_dirs.refined_targets, file)
+      target_code = output_parser.parse_code(raw_refined_output)
+      target_code = builder.post_process_generated_code(target_code)
+      target_id, _ = os.path.splitext(raw_refined_output)
+      target_file = f'{target_id}{target_ext}'
+      target_path = os.path.join(work_dirs.refined_targets, target_file)
+      output_parser.save_output(target_code, target_path)
+      refined_targets.append(target_path)
+      
+    targets_relpath = map(os.path.relpath, refined_targets)
+    targets_relpath_str = '\n '.join(targets_relpath)
+        
+    logger.info('Refined:\n %s', targets_relpath_str)
+
   else:
     logger.info('Failed to generate targets: %s', generated_targets)
   return generated_targets

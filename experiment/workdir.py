@@ -40,6 +40,7 @@ class WorkDirs:
     os.makedirs(self.build_logs, exist_ok=True)
     os.makedirs(self.run_logs, exist_ok=True)
     os.makedirs(self._corpus_base, exist_ok=True)
+    os.makedirs(self.refined_targets, exist_ok=True)
 
   @property
   def base(self):
@@ -74,6 +75,10 @@ class WorkDirs:
   @property
   def raw_targets(self):
     return os.path.join(self._base_dir, 'raw_targets')
+  
+  @property
+  def refined_targets(self):
+    return os.path.join(self._base_dir, 'refined_targets')
 
   @property
   def fixed_targets(self):
