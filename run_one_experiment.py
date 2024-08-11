@@ -149,14 +149,9 @@ def generate_targets(benchmark: Benchmark,
     logger.info('Generated:\n %s', targets_relpath_str)
 
     ## refine the targets by quering LLM again
-    if target_path:
-      # disable the lint for the following line: (reportPossiblyUnboundVariable)
-      code_content = open(target_path, 'r').read() # type: ignore
-    else:
-      logger.error('No target path found for refining')
+    code_content = open(target_path, 'r').read()  # type: ignore
 
     ### refine the code by addressing the comments
-
     prompt = builder.build_refined_prompt(code_content)  # type: ignore
 
     # # print the last prompt within the prompt object
