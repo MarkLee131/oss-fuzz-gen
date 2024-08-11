@@ -394,7 +394,7 @@ class DefaultTemplateBuilder(PromptBuilder):
     self._prompt.add_priming(spec_priming)
     return self._prompt
 
-  def build_refined_prompt(self, code_content: str):
+  def build_refined_prompt(self, code_content: str) -> Optional[prompts.Prompt]:
     """Add a refined prompt to guide the driver generation"""
     priming = f'You MUST refine the following fuzz driver code by addressing the code comments within it. Keep in mind that you MUST finish all the TODOs in the code.\n<code>{code_content}</code>\nYou MUST remove all comments after you finish refining the code.\n'
     self._prompt.add_priming(priming)
