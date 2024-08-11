@@ -148,9 +148,8 @@ def generate_targets(benchmark: Benchmark,
     targets_relpath_str = '\n '.join(targets_relpath)
     logger.info('Generated:\n %s', targets_relpath_str)
 
-
     for target_path in generated_targets:
-      
+
       ## refine the targets by quering LLM again
       code_content = open(target_path, 'r').read()  # type: ignore
 
@@ -161,25 +160,24 @@ def generate_targets(benchmark: Benchmark,
       # print(prompt.get()[-1])
 
       import openai
-      
+
       client = openai.OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
 
       refined_complation = model.with_retry_on_error(
-            lambda: client.chat.completions.create(messages=prompt.get(),
-                                                  model=model.name,
-                                                  n=1,
-                                                  temperature=model.temperature,
-                                                  max_tokens=model.max_tokens,
-                                                  stop=None), openai.OpenAIError)
+          lambda: client.chat.completions.create(messages=prompt.get(),
+                                                 model=model.name,
+                                                 n=1,
+                                                 temperature=model.temperature,
+                                                 max_tokens=model.max_tokens,
+                                                 stop=None), openai.OpenAIError)
 
       logger.info('Refined response: %s', refined_complation)
       for _, choice in enumerate(refined_complation.choices):  # type: ignore
         content = choice.message.content
-        
+
         index = target_path.split('/')[-1].split('.')[0]
-        index = int(index) -1
+        index = int(index) - 1
         model._save_output(index, content, work_dirs.refined_targets)
-      
 
     # then extract the refined code like before, but we only refine one code at a time
     for file in os.listdir(work_dirs.refined_targets):
@@ -192,10 +190,9 @@ def generate_targets(benchmark: Benchmark,
       refined_target_id, _ = os.path.splitext(raw_refined_output)
       refined_target_file = f'{refined_target_id}{target_ext}'
       refined_target_path = os.path.join(work_dirs.refined_targets,
-                                        refined_target_file)
+                                         refined_target_file)
       output_parser.save_output(refined_target_code, refined_target_path)
       refined_targets.append(refined_target_path)
-  
 
     refined_targets_relpath = map(os.path.relpath, refined_targets)
     refined_targets_relpath_str = '\n '.join(refined_targets_relpath)
@@ -204,8 +201,7 @@ def generate_targets(benchmark: Benchmark,
 
   else:
     logger.info('Failed to generate targets: %s', generated_targets)
-    
-    
+
   return refined_targets
 
 
