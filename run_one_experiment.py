@@ -149,14 +149,17 @@ def generate_targets(benchmark: Benchmark,
     logger.info('Generated:\n %s', targets_relpath_str)
 
     ## refine the targets by quering LLM again
-    code_content = open(target_path, 'r').read()
-
+    if target_path:
+      code_content = open(target_path, 'r').read()
+    else:
+      logger.error('No target path found for refining')
+      
     ### refine the code by addressing the comments; first we need to add a prompt into the |prompt| object
-    
+
     prompt = builder.build_refined_prompt(code_content)  #
 
-    # print the last prompt within the prompt object
-    print(prompt.get()[-1])
+    # # print the last prompt within the prompt object
+    # print(prompt.get()[-1])
 
     model.query_llm(prompt,
                     response_dir=work_dirs.refined_targets,
@@ -169,10 +172,12 @@ def generate_targets(benchmark: Benchmark,
         continue
       raw_refined_output = os.path.join(work_dirs.refined_targets, file)
       refined_target_code = output_parser.parse_code(raw_refined_output)
-      refined_target_code = builder.post_process_generated_code(refined_target_code)
+      refined_target_code = builder.post_process_generated_code(
+          refined_target_code)
       refined_target_id, _ = os.path.splitext(raw_refined_output)
       refined_target_file = f'{refined_target_id}{target_ext}'
-      refined_target_path = os.path.join(work_dirs.refined_targets, refined_target_file)
+      refined_target_path = os.path.join(work_dirs.refined_targets,
+                                         refined_target_file)
       output_parser.save_output(refined_target_code, refined_target_path)
       refined_targets.append(refined_target_path)
 
