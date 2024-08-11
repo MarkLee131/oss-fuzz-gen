@@ -123,7 +123,6 @@ class PromptBuilder:
     """Add a refined prompt to guide the driver generation"""
 
 
-
 class DefaultTemplateBuilder(PromptBuilder):
   """Default builder for C/C++."""
 
@@ -384,7 +383,7 @@ class DefaultTemplateBuilder(PromptBuilder):
   ) -> prompts.Prompt:
     """Constructs a prompt using the templates in |self| and saves it."""
 
-    spec_path = spec_list[0] # now only one spec in our list.
+    spec_path = spec_list[0]  # now only one spec in our list.
     with open(spec_path, 'r') as f:
       spec = f.read()
       best_spec = spec
@@ -394,14 +393,12 @@ class DefaultTemplateBuilder(PromptBuilder):
     spec_priming = spec_priming.replace('{SPECIFICATION}', best_spec)
     self._prompt.add_priming(spec_priming)
     return self._prompt
-  
-  def build_refined_prompt(self,
-                          code_content: str
-                          ):
+
+  def build_refined_prompt(self, code_content: str):
     """Add a refined prompt to guide the driver generation"""
     priming = f'You MUST refine the following fuzz driver code by addressing the code comments within it. Keep in mind that you MUST finish all the TODOs in the code.\n<code>{code_content}</code>\nYou MUST remove all comments after you finish refining the code.\n'
     self._prompt.add_priming(priming)
-    
+
     return self._prompt
 
   def build_fixer_prompt(self,

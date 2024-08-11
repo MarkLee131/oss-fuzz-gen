@@ -75,7 +75,7 @@ class WorkDirs:
   @property
   def raw_targets(self):
     return os.path.join(self._base_dir, 'raw_targets')
-  
+
   @property
   def refined_targets(self):
     return os.path.join(self._base_dir, 'refined_targets')
