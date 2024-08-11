@@ -152,7 +152,7 @@ def generate_targets(benchmark: Benchmark,
     code_content = open(target_path, 'r').read()
 
     ### refine the code by addressing the comments; first we need to add a prompt into the |prompt| object
-
+    
     prompt = builder.build_refined_prompt(code_content)  #
 
     # print the last prompt within the prompt object
@@ -168,18 +168,18 @@ def generate_targets(benchmark: Benchmark,
       if not output_parser.is_raw_output(file):
         continue
       raw_refined_output = os.path.join(work_dirs.refined_targets, file)
-      target_code = output_parser.parse_code(raw_refined_output)
-      target_code = builder.post_process_generated_code(target_code)
-      target_id, _ = os.path.splitext(raw_refined_output)
-      target_file = f'{target_id}{target_ext}'
-      target_path = os.path.join(work_dirs.refined_targets, target_file)
-      output_parser.save_output(target_code, target_path)
-      refined_targets.append(target_path)
+      refined_target_code = output_parser.parse_code(raw_refined_output)
+      refined_target_code = builder.post_process_generated_code(refined_target_code)
+      refined_target_id, _ = os.path.splitext(raw_refined_output)
+      refined_target_file = f'{refined_target_id}{target_ext}'
+      refined_target_path = os.path.join(work_dirs.refined_targets, refined_target_file)
+      output_parser.save_output(refined_target_code, refined_target_path)
+      refined_targets.append(refined_target_path)
 
-    targets_relpath = map(os.path.relpath, refined_targets)
-    targets_relpath_str = '\n '.join(targets_relpath)
+    refined_targets_relpath = map(os.path.relpath, refined_targets)
+    refined_targets_relpath_str = '\n '.join(refined_targets_relpath)
 
-    logger.info('Refined:\n %s', targets_relpath_str)
+    logger.info('Refined:\n %s', refined_targets_relpath_str)
 
   else:
     logger.info('Failed to generate targets: %s', generated_targets)
