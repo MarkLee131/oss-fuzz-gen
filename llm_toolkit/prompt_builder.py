@@ -1254,9 +1254,10 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {}
           'extern "C" int LLVMFuzzerTestOneInput', 'int LLVMFuzzerTestOneInput')
     return generated_code
 
+
 class FilterAPITemplateBuilder:
   """Prompt builder for filter API."""
-  
+
   def __init__(self,
                model: models.LLM,
                benchmark: Optional[Benchmark] = None,
@@ -1275,7 +1276,7 @@ class FilterAPITemplateBuilder:
   def _format_priming(self) -> str:
     """Formats a priming based on the prompt template."""
     priming = self._get_template(self.priming_template_file)
-    
+
     return priming
 
   def _find_template(self, template_dir: str, template_name: str) -> str:
@@ -1293,56 +1294,39 @@ class FilterAPITemplateBuilder:
     with open(template_file) as file:
       return file.read()
 
-  def format_context(self, context_info: dict, project_name:str) -> str:
+  def format_context(self, context_info: dict, project_name: str) -> str:
     context = jinja2.Template(self._get_template(self.context_template_file),
                               trim_blocks=True,
                               lstrip_blocks=True)
-    return context.render(
-        project_name = project_name,
-        func_source=context_info['func_source']
-    )
+    return context.render(project_name=project_name,
+                          func_source=context_info['func_source'])
 
-  def build(self,
-            project_context_content: Optional[dict] = None
-            ):
+  def build(self, project_context_content: Optional[dict] = None):
     """Constructs a prompt using the templates in |self| and saves it."""
     if not self.benchmark:
       return None
-    
+
     priming = self._format_priming()
     final_problem = ''
     if project_context_content:
-      final_problem = self.format_context(project_context_content, self.benchmark.project)
+      final_problem = self.format_context(project_context_content,
+                                          self.benchmark.project)
 
-    prompt = self._prepare_prompt(priming, final_problem) # construct the payload
+    prompt = self._prepare_prompt(priming,
+                                  final_problem)  # construct the payload
     return prompt
 
-  def _prepare_prompt(
-      self,
-      priming: str,
-      final_problem: str):
+  def _prepare_prompt(self, priming: str, final_problem: str):
     """Constructs a prompt using the parameters and saves it."""
-    
+
     # prepare system prompt
-    priming_dict = {
-        'type': 'text',
-        'text': priming
-    }
+    priming_dict = {'type': 'text', 'text': priming}
 
-    system_dict = {
-        'role': 'system',
-        'content': [priming_dict]
-    }
+    system_dict = {'role': 'system', 'content': [priming_dict]}
 
-    final_problem_dict = {
-        'type': 'text',
-        'text': final_problem
-    }
+    final_problem_dict = {'type': 'text', 'text': final_problem}
 
-    problem_dict = {
-        'role': 'user',
-        'content': [final_problem_dict]
-    }
+    problem_dict = {'role': 'user', 'content': [final_problem_dict]}
 
     final_prompt = [system_dict, problem_dict]
 

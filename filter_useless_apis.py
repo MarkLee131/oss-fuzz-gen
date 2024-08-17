@@ -56,18 +56,17 @@ RESULTS_DIR = './results'
 
 
 def analzye_api_prompt_llm(benchmark: Benchmark,
-                     model: models.LLM,
-                     prompt:dict,
-                     work_dirs: WorkDirs,
-                     builder: prompt_builder.PromptBuilder,
-                     debug: bool = DEBUG) -> list[str]:
+                           model: models.LLM,
+                           prompt: dict,
+                           work_dirs: WorkDirs,
+                           debug: bool = DEBUG) -> list[str]:
   """Generates fuzz target with LLM."""
   # logger.info('Generating targets for %s %s using %s..', benchmark.project,
-              # benchmark.function_signature, model.name)
-              
+  # benchmark.function_signature, model.name)
+
   logger.info('Analyzing %s %s using %s..', benchmark.project,
               benchmark.function_signature, model.name)
-  
+
   model.query_llm(prompt, response_dir=work_dirs.raw_targets, log_output=debug)
 
   # _, target_ext = os.path.splitext(benchmark.target_path)
@@ -100,23 +99,23 @@ def analzye_api_prompt_llm(benchmark: Benchmark,
   # return generated_targets
 
 
-
 def prepare(oss_fuzz_dir: str) -> None:
   """Prepares the experiment environment."""
   oss_fuzz_checkout.clone_oss_fuzz(oss_fuzz_dir)
   oss_fuzz_checkout.postprocess_oss_fuzz()
 
 
-def analyze_api(model: models.LLM,
-                                  benchmark: Benchmark,
-                                  work_dirs: WorkDirs,
-                                  template_dir: str,
-                                  use_context: bool,
-                                  example_pair: list[list[str]],
-                                  debug: bool = DEBUG,
-                                  prompt_builder_to_use: str = 'DEFAULT',
-                                  # cloud_experiment_bucket: str = '',
-                                  dry_run: bool = False) -> List[str]:
+def analyze_api(
+    model: models.LLM,
+    benchmark: Benchmark,
+    work_dirs: WorkDirs,
+    template_dir: str,
+    use_context: bool,
+    example_pair: list[list[str]],
+    debug: bool = DEBUG,
+    prompt_builder_to_use: str = 'DEFAULT',
+    # cloud_experiment_bucket: str = '',
+    dry_run: bool = False) -> List[str]:
   """Generates a set of harnesses and build scripts ready to be evaluated
     by `check_targets`. This is where the core first LLM logic is used to
     generate harnesses.
@@ -127,7 +126,6 @@ def analyze_api(model: models.LLM,
   logger.info('Analyzing %s %s using %s..', benchmark.project,
               benchmark.function_signature, model.name)
 
-
   retriever = ContextRetriever(benchmark)
   context_info = retriever.get_context_info()
 
@@ -136,47 +134,44 @@ def analyze_api(model: models.LLM,
 
   prompt_list = builder.build(project_context_content=context_info)
   prompt = {
-    "messages": prompt_list,
-    "temperature": TEMPERATURE,
-    "max_tokens": 300,
-    "top_p": 1.0,
+      "messages": prompt_list,
+      "temperature": TEMPERATURE,
+      "max_tokens": 300,
+      "top_p": 1.0,
   }
-  
-  os.makedirs("./results_kx", exist_ok=True)
-  import json
-  with open(f'./results_kx/{benchmark.project}_{benchmark.function_name}.json', 'w') as f:
-    # save the prompt to a file
-    json.dump(prompt, f)
 
+  import json
+  with open(os.path.join(template_dir, 'prompt.json'), 'w') as f:
+    json.dump(prompt, f, indent=4)
 
   if dry_run:
     return []
 
   generated_targets = analzye_api_prompt_llm(benchmark,
-                                       model,
-                                       prompt,
-                                       work_dirs,
-                                       builder,
-                                       debug=debug)
+                                             model,
+                                             prompt,
+                                             work_dirs,
+                                            #  builder,
+                                             debug=debug)
   # generated_targets = fix_code(work_dirs, generated_targets)
   return generated_targets
 
 
 def run_filter_api(benchmark: Benchmark,
-        model: models.LLM,
-        template_dir: str,
-        work_dirs: WorkDirs,
-        example_pair: Optional[list[list[str]]] = None,
-        debug: bool = DEBUG,
-        cloud_experiment_name: str = '',
-        cloud_experiment_bucket: str = '',
-        use_context: bool = False,
-        run_timeout: int = RUN_TIMEOUT,
-        dry_run: bool = False,
-        prompt_builder_to_use: str = 'DEFAULT'):
+                   model: models.LLM,
+                   template_dir: str,
+                   work_dirs: WorkDirs,
+                   example_pair: Optional[list[list[str]]] = None,
+                   debug: bool = DEBUG,
+                   cloud_experiment_name: str = '',
+                   cloud_experiment_bucket: str = '',
+                   use_context: bool = False,
+                   run_timeout: int = RUN_TIMEOUT,
+                   dry_run: bool = False,
+                   prompt_builder_to_use: str = 'DEFAULT'):
   """Generates code via LLM, and evaluates them."""
-  
-  model.cloud_setup() # Setup cloud environment if needed.
+
+  model.cloud_setup()  # Setup cloud environment if needed.
 
   if example_pair is None:
     example_pair = prompt_builder.EXAMPLES[benchmark.language]
@@ -197,7 +192,7 @@ def run_filter_api(benchmark: Benchmark,
   if not generated_targets:
     logger.error('No targets generated.')
     return None
-  
+
   return generated_targets
 
   # return check_targets(model.ai_binary, benchmark, work_dirs, generated_targets,

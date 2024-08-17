@@ -25,8 +25,8 @@ from datetime import timedelta
 from multiprocessing import Pool
 from typing import Any
 
-import run_one_experiment
 import filter_useless_apis
+import run_one_experiment
 from data_prep import introspector
 from experiment import benchmark as benchmarklib
 from experiment import evaluator, oss_fuzz_checkout, textcov
@@ -441,8 +441,9 @@ def main():
 
   # Capture time at end
   end = time.time()
-  
-  logger.info('Finished experiments in %s.', str(timedelta(seconds=end - start)))
+
+  logger.info('Finished experiments in %s.',
+              str(timedelta(seconds=end - start)))
 
 
 if __name__ == '__main__':
