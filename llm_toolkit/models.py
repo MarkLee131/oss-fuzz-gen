@@ -26,6 +26,7 @@ import time
 import traceback
 from abc import abstractmethod
 from typing import Any, Callable, Optional, Type
+import requests
 
 import anthropic
 import openai
@@ -248,6 +249,81 @@ class GPT(LLM):
       logger.info(completion)
     for index, choice in enumerate(completion.choices):  # type: ignore
       content = choice.message.content
+      self._save_output(index, content, response_dir)
+      
+      
+class GPT_Azure(LLM):
+  """Azure's GPT model encapsulator."""
+  
+  name = 'azure-gpt-4o'
+
+  # ================================ Prompt ================================ #
+  def estimate_token_num(self, text) -> int:
+    """Estimates the number of tokens in |text|."""
+    # https://cookbook.openai.com/examples/how_to_count_tokens_with_tiktoken
+    try:
+      encoder = tiktoken.encoding_for_model('gpt-4o')
+    except KeyError:
+      logger.info('Could not get a tiktoken encoding for %s.', self.name)
+      encoder = tiktoken.get_encoding('cl100k_base')
+
+    num_tokens = 0
+    for message in text:
+      num_tokens += 3
+      for key, value in message.items():
+        num_tokens += len(encoder.encode(value))
+        if key == 'name':
+          num_tokens += 1
+    num_tokens += 3
+    return num_tokens
+
+  def prompt_type(self) -> type[prompts.Prompt]:
+    """Returns the expected prompt type."""
+    return prompts.OpenAIPrompt
+
+
+  # ============================== Generation ============================== #
+  def query_llm(self,
+                prompt,
+                response_dir: str,
+                log_output: bool = False) -> None:
+    """Queries OpenAI's API and stores response in |response_dir|."""
+    if self.ai_binary:
+      raise ValueError(f'OpenAI does not use local AI binary: {self.ai_binary}')
+    
+    if self.temperature_list:
+      logger.info('OpenAI does not allow temperature list: %s',
+                  self.temperature_list)
+      
+      
+    API_KEY = os.getenv("AZURE_OPENAI_API_KEY", '')
+    ENDPOINT = os.getenv("AZURE_OPENAI_API_ENDPOINT", '')
+    
+    headers = {
+        "Content-Type": "application/json",
+        "api-key": API_KEY,
+    }
+    
+    # try:
+    #   response = requests.post(ENDPOINT, headers=headers, json=prompt)
+    #   response.raise_for_status(
+    #   )  # Will raise an HTTPError if the HTTP request returned an unsuccessful status code
+    
+    # except requests.RequestException as e:
+    #   raise SystemExit(f"Failed to make the request. Error: {e}")
+
+    logger.info(f"Sending request to Azure OpenAI API: {ENDPOINT}")
+
+    completion = self.with_retry_on_error(
+      lambda: requests.post(ENDPOINT, headers=headers, json=prompt),
+      openai.OpenAIError)
+
+
+    if log_output:
+      logger.info(completion)
+      # logger.info(completion.json())
+    for index, choice in enumerate(completion.json()['choices']):  # type: ignore
+      content = choice['message']['content']
       self._save_output(index, content, response_dir)
 
 

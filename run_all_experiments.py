@@ -26,6 +26,7 @@ from multiprocessing import Pool
 from typing import Any
 
 import run_one_experiment
+import filter_useless_apis
 from data_prep import introspector
 from experiment import benchmark as benchmarklib
 from experiment import evaluator, oss_fuzz_checkout, textcov
@@ -142,7 +143,7 @@ def run_experiments(benchmark: benchmarklib.Benchmark,
         temperature_list=args.temperature_list,
     )
 
-    result = run_one_experiment.run(
+    result = filter_useless_apis.run_filter_api(
         benchmark=benchmark,
         model=model,
         template_dir=args.template_directory,
@@ -414,7 +415,7 @@ def main():
   run_one_experiment.prepare(args.oss_fuzz_dir)
 
   experiment_targets = prepare_experiment_targets(args)
-  experiment_results = []
+  # experiment_results = []
 
   if oss_fuzz_checkout.ENABLE_CACHING:
     oss_fuzz_checkout.prepare_cached_images(experiment_targets)
@@ -424,9 +425,9 @@ def main():
 
   if NUM_EXP == 1:
     for target_benchmark in experiment_targets:
-      result = run_experiments(target_benchmark, args)
-      experiment_results.append(result)
-      _print_experiment_result(result)
+      run_experiments(target_benchmark, args)
+      # experiment_results.append(result)
+      # _print_experiment_result(result)
   else:
     experiment_tasks = []
     with Pool(NUM_EXP) as p:
@@ -438,18 +439,10 @@ def main():
         time.sleep(args.delay)
       experiment_results = [task.get() for task in experiment_tasks]
 
-  # Process total gain from all generated harnesses for each projects
-  coverage_gain_dict = _process_total_coverage_gain(experiment_results)
-  add_to_json_report(args.work_dir, 'project_summary', coverage_gain_dict)
-
   # Capture time at end
   end = time.time()
-  add_to_json_report(args.work_dir, 'completion_time',
-                     time.strftime(TIME_STAMP_FMT, time.gmtime(end)))
-  add_to_json_report(args.work_dir, 'total_run_time',
-                     str(timedelta(seconds=end - start)))
-
-  _print_experiment_results(experiment_results, coverage_gain_dict)
+  
+  logger.info('Finished experiments in %s.', str(timedelta(seconds=end - start)))
 
 
 if __name__ == '__main__':

@@ -163,18 +163,18 @@ class ContextRetriever:
 
   def get_context_info(self) -> dict:
     """Retrieves contextual information and stores them in a dictionary."""
-    xrefs = self._get_xrefs_to_function()
+    # xrefs = self._get_xrefs_to_function()
     func_source = self._get_function_implementation()
-    files = self._get_files_to_include()
-    decl = self._get_embeddable_declaration()
-    header = self.get_prefixed_header_file()
+    # files = self._get_files_to_include()
+    # decl = self._get_embeddable_declaration()
+    # header = self.get_prefixed_header_file()
 
     context_info = {
-        'xrefs': xrefs,
+        # 'xrefs': xrefs,
         'func_source': func_source,
-        'files': files,
-        'decl': decl,
-        'header': header,
+        # 'files': files,
+        # 'decl': decl,
+        # 'header': header,
     }
 
     logging.debug('Context: %s', context_info)

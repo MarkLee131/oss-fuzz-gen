@@ -1253,3 +1253,97 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {}
       generated_code = generated_code.replace(
           'extern "C" int LLVMFuzzerTestOneInput', 'int LLVMFuzzerTestOneInput')
     return generated_code
+
+class FilterAPITemplateBuilder:
+  """Prompt builder for filter API."""
+  
+  def __init__(self,
+               model: models.LLM,
+               benchmark: Optional[Benchmark] = None,
+               template_dir: str = DEFAULT_TEMPLATE_DIR):
+    self._model = model
+    self._prompt = model.prompt_type()()
+    self._template_dir = template_dir
+    self.benchmark = benchmark
+
+    # Load templates.
+    self.priming_template_file = self._find_template(template_dir,
+                                                     'priming_filter.txt')
+    self.context_template_file = self._find_template(template_dir,
+                                                     'context_filter.txt')
+
+  def _format_priming(self) -> str:
+    """Formats a priming based on the prompt template."""
+    priming = self._get_template(self.priming_template_file)
+    
+    return priming
+
+  def _find_template(self, template_dir: str, template_name: str) -> str:
+    """Finds template file based on |template_dir|."""
+    preferred_template = os.path.join(template_dir, template_name)
+    # Use the preferred template if it exists.
+    if os.path.isfile(preferred_template):
+      return preferred_template
+    # Fall back to the default template.
+    default_template = os.path.join(DEFAULT_TEMPLATE_DIR, template_name)
+    return default_template
+
+  def _get_template(self, template_file: str) -> str:
+    """Reads the template for prompts."""
+    with open(template_file) as file:
+      return file.read()
+
+  def format_context(self, context_info: dict, project_name:str) -> str:
+    context = jinja2.Template(self._get_template(self.context_template_file),
+                              trim_blocks=True,
+                              lstrip_blocks=True)
+    return context.render(
+        project_name = project_name,
+        func_source=context_info['func_source']
+    )
+
+  def build(self,
+            project_context_content: Optional[dict] = None
+            ):
+    """Constructs a prompt using the templates in |self| and saves it."""
+    if not self.benchmark:
+      return None
+    
+    priming = self._format_priming()
+    final_problem = ''
+    if project_context_content:
+      final_problem = self.format_context(project_context_content, self.benchmark.project)
+
+    prompt = self._prepare_prompt(priming, final_problem) # construct the payload
+    return prompt
+
+  def _prepare_prompt(
+      self,
+      priming: str,
+      final_problem: str):
+    """Constructs a prompt using the parameters and saves it."""
+    
+    # prepare system prompt
+    priming_dict = {
+        'type': 'text',
+        'text': priming
+    }
+
+    system_dict = {
+        'role': 'system',
+        'content': [priming_dict]
+    }
+
+    final_problem_dict = {
+        'type': 'text',
+        'text': final_problem
+    }
+
+    problem_dict = {
+        'role': 'user',
+        'content': [final_problem_dict]
+    }
+
+    final_prompt = [system_dict, problem_dict]
+
+    return final_prompt
