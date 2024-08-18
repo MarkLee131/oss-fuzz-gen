@@ -361,15 +361,6 @@ def llm_fix(ai_binary: str, target_path: str, benchmark: benchmarklib.Benchmark,
   os.makedirs(response_dir, exist_ok=True)
   prompt_path = os.path.join(response_dir, 'prompt.txt')
 
-  apply_llm_fix(ai_binary,
-                benchmark,
-                fuzz_target_source_code,
-                error_desc,
-                errors,
-                prompt_path,
-                response_dir,
-                fixer_model_name,
-                temperature=0.5 - llm_fix_id * 0.04)
 
   fixed_code_candidates = []
   for file in os.listdir(response_dir):
@@ -401,34 +392,6 @@ def llm_fix(ai_binary: str, target_path: str, benchmark: benchmarklib.Benchmark,
   parser.save_output(preferred_fix_code, fixed_target_path)
   parser.save_output(preferred_fix_code, target_path)
 
-
-def apply_llm_fix(ai_binary: str,
-                  benchmark: benchmarklib.Benchmark,
-                  fuzz_target_source_code: str,
-                  error_desc: Optional[str],
-                  errors: list[str],
-                  prompt_path: str,
-                  response_dir: str,
-                  fixer_model_name: str = models.DefaultModel.name,
-                  temperature: float = 0.4):
-  """Queries LLM to fix the code."""
-  fixer_model = models.LLM.setup(
-      ai_binary=ai_binary,
-      name=fixer_model_name,
-      num_samples=1,
-      temperature=temperature,
-  )
-
-  builder = prompt_builder.DefaultTemplateBuilder(fixer_model)
-
-  context = _collect_context(benchmark, errors)
-  instruction = _collect_instructions(benchmark, errors,
-                                      fuzz_target_source_code)
-  prompt = builder.build_fixer_prompt(benchmark, fuzz_target_source_code,
-                                      error_desc, errors, context, instruction)
-  prompt.save(prompt_path)
-
-  fixer_model.query_llm(prompt, response_dir)
 
 
 def _collect_context(benchmark: benchmarklib.Benchmark,

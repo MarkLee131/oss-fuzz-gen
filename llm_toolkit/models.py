@@ -18,24 +18,14 @@ LLM models and their functions.
 import logging
 import os
 import random
-import re
-import subprocess
-import sys
-import tempfile
 import time
 import traceback
 from abc import abstractmethod
 from typing import Any, Callable, Optional, Type
 
-import anthropic
 import openai
 import requests
 import tiktoken
-import vertexai
-from google.api_core.exceptions import GoogleAPICallError
-from vertexai import generative_models
-from vertexai.preview.generative_models import GenerativeModel
-from vertexai.preview.language_models import CodeGenerationModel
 
 from llm_toolkit import prompts
 
@@ -115,7 +105,7 @@ class LLM:
     """Returns the current model name and all child model names."""
     names = []
     for subcls in cls.all_llm_subclasses():
-      if hasattr(subcls, 'name') and subcls.name != AIBinaryModel.name:
+      if hasattr(subcls, 'name'):
         names.append(subcls.name)
     return names
 
@@ -259,13 +249,6 @@ class GPT_Azure():
         "api-key": API_KEY,
     }
 
-    # try:
-    #   response = requests.post(ENDPOINT, headers=headers, json=prompt)
-    #   response.raise_for_status(
-    #   )  # Will raise an HTTPError if the HTTP request returned an unsuccessful status code
-
-    # except requests.RequestException as e:
-    #   raise SystemExit(f"Failed to make the request. Error: {e}")
 
     logger.info(f"Sending request to Azure OpenAI API: {ENDPOINT}")
 
@@ -280,3 +263,8 @@ class GPT_Azure():
         completion.json()['choices']):  # type: ignore
       content = choice['message']['content']
       self._save_output(index, content, response_dir)
+
+
+# set default model
+
+LLM = GPT_Azure
