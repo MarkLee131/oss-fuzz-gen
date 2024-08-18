@@ -249,7 +249,6 @@ class GPT_Azure():
         "api-key": API_KEY,
     }
 
-
     logger.info(f"Sending request to Azure OpenAI API: {ENDPOINT}")
 
     completion = self.with_retry_on_error(
@@ -267,4 +266,4 @@ class GPT_Azure():
 
 # set default model
 
-LLM = GPT_Azure
+DefaultModel = GPT_Azure

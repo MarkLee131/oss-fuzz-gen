@@ -361,7 +361,6 @@ def llm_fix(ai_binary: str, target_path: str, benchmark: benchmarklib.Benchmark,
   os.makedirs(response_dir, exist_ok=True)
   prompt_path = os.path.join(response_dir, 'prompt.txt')
 
-
   fixed_code_candidates = []
   for file in os.listdir(response_dir):
     if not parser.is_raw_output(file):
@@ -391,7 +390,6 @@ def llm_fix(ai_binary: str, target_path: str, benchmark: benchmarklib.Benchmark,
                                    f'{preferred_fix_name}{target_ext}')
   parser.save_output(preferred_fix_code, fixed_target_path)
   parser.save_output(preferred_fix_code, target_path)
-
 
 
 def _collect_context(benchmark: benchmarklib.Benchmark,
