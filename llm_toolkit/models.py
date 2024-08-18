@@ -182,25 +182,23 @@ class LLM:
       output_file.write(content)
 
 
-class GPT_Azure():
+class GPT_Azure(LLM):
   """Azure's GPT model encapsulator."""
 
-  # Should be set by the subclass.
-  name: str
   # TODO(mihaimaruseac): Should this be MAX_TOKENS or a different global?
   context_window: int = 2000  # Default token size.
 
   _max_attempts = 5  # Maximum number of attempts to get prediction response
 
-  def __init__(
-      self,
-      ai_binary: str,
-      temperature_list: Optional[list[float]] = None,
-  ):
-    self.ai_binary = ai_binary
+  # def __init__(
+  #     self,
+  #     ai_binary: str,
+  #     temperature_list: Optional[list[float]] = None,
+  # ):
+  #   self.ai_binary = ai_binary
 
-    if temperature_list:
-      self.temperature_list = temperature_list
+  #   if temperature_list:
+  #     self.temperature_list = temperature_list
 
   name = 'azure-gpt-4o'
 
