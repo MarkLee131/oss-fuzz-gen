@@ -194,6 +194,7 @@ class LLM:
     with open(raw_output_path, 'w+') as output_file:
       output_file.write(content)
 
+
 class GPT_Azure():
   """Azure's GPT model encapsulator."""
 
@@ -210,7 +211,7 @@ class GPT_Azure():
       temperature_list: Optional[list[float]] = None,
   ):
     self.ai_binary = ai_binary
-    
+
     if temperature_list:
       self.temperature_list = temperature_list
 

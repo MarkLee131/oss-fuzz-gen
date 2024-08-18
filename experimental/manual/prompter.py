@@ -37,7 +37,7 @@ def parse_args() -> argparse.Namespace:
             'Gemini-1.0 models'))
   parser.add_argument('-l',
                       '--model',
-                      default=models.DefaultModel.name,
+                      default=models.GPT_Azure.name,
                       help=('Models available: '
                             f'{", ".join(models.LLM.all_llm_names())}'))
   parser.add_argument('-p',
