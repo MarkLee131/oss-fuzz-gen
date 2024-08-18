@@ -129,7 +129,7 @@ class LLM:
   # ============================== Generation ============================== #
   @abstractmethod
   def query_llm(self,
-                prompt: prompts.Prompt|dict[str, Any],
+                prompt: prompts.Prompt | dict[str, Any],
                 response_dir: str,
                 log_output: bool = False) -> None:
     """Queries the LLM and stores responses in |response_dir|."""
@@ -252,9 +252,26 @@ class GPT(LLM):
       self._save_output(index, content, response_dir)
 
 
-class GPT_Azure(LLM):
+class GPT_Azure():
   """Azure's GPT model encapsulator."""
 
+  # Should be set by the subclass.
+  name: str
+  # TODO(mihaimaruseac): Should this be MAX_TOKENS or a different global?
+  context_window: int = 2000  # Default token size.
+
+  _max_attempts = 5  # Maximum number of attempts to get prediction response
+
+  def __init__(
+      self,
+      ai_binary: str,
+      max_tokens: int = MAX_TOKENS,
+      num_samples: int = NUM_SAMPLES,
+      temperature: float = TEMPERATURE,
+      temperature_list: Optional[list[float]] = None,
+  ):
+    self.ai_binary = ai_binary
+    
   name = 'azure-gpt-4o'
 
   # ================================ Prompt ================================ #

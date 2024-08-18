@@ -147,12 +147,13 @@ def analyze_api(
   if dry_run:
     return []
 
-  generated_targets = analzye_api_prompt_llm(benchmark,
-                                             model,
-                                             prompt,
-                                             work_dirs,
-                                            #  builder,
-                                             debug=debug)
+  generated_targets = analzye_api_prompt_llm(
+      benchmark,
+      model,
+      prompt,
+      work_dirs,
+      #  builder,
+      debug=debug)
   # generated_targets = fix_code(work_dirs, generated_targets)
   return generated_targets
 
