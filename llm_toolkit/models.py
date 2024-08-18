@@ -317,10 +317,11 @@ class AzureGPT(GPT):
       logger.info('OpenAI does not allow temperature list: %s',
                   self.temperature_list)
 
-    client = openai.AzureOpenAI(
-        azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
-        api_key=os.getenv("AZURE_OPENAI_API_KEY"),
-        api_version="2024-02-01")
+    client = openai.AzureOpenAI(azure_endpoint=os.getenv(
+        "AZURE_OPENAI_ENDPOINT", "https://api.openai.com"),
+                                api_key=os.getenv("AZURE_OPENAI_API_KEY",
+                                                  "YOUR_API_KEY"),
+                                api_version="2024-02-01")
 
     if build_spec:
       completion = self.with_retry_on_error(
