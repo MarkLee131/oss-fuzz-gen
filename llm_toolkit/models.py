@@ -205,7 +205,7 @@ class GPT(LLM):
     """Estimates the number of tokens in |text|."""
     # https://cookbook.openai.com/examples/how_to_count_tokens_with_tiktoken
     try:
-        encoder = tiktoken.encoding_for_model(self.name)
+      encoder = tiktoken.encoding_for_model(self.name)
     except KeyError:
       logger.info('Could not get a tiktoken encoding for %s.', self.name)
       encoder = tiktoken.get_encoding('cl100k_base')
@@ -277,12 +277,11 @@ class GPT4o(GPT):
   name = 'gpt-4o'
 
 
-class GPT_Azure(GPT):
+class AzureGPT(GPT):
   """Azure's GPT model."""
 
   name = 'gpt-3.5-turbo-azure'
-  
-  
+
   # ================================ Prompt ================================ #
   def estimate_token_num(self, text) -> int:
     """Estimates the number of tokens in |text|."""
@@ -304,7 +303,7 @@ class GPT_Azure(GPT):
           num_tokens += 1
     num_tokens += 3
     return num_tokens
-  
+
     # ============================== Generation ============================== #
   def query_llm(self,
                 prompt: prompts.Prompt,
@@ -319,11 +318,10 @@ class GPT_Azure(GPT):
                   self.temperature_list)
 
     client = openai.AzureOpenAI(
-      azure_endpoint = os.getenv("AZURE_OPENAI_ENDPOINT"), 
-      api_key=os.getenv("AZURE_OPENAI_API_KEY"),  
-      api_version="2024-02-01"
-    )
-    
+        azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
+        api_key=os.getenv("AZURE_OPENAI_API_KEY"),
+        api_version="2024-02-01")
+
     if build_spec:
       completion = self.with_retry_on_error(
           lambda: client.chat.completions.create(messages=prompt.get(),
@@ -349,16 +347,18 @@ class GPT_Azure(GPT):
       content = choice.message.content
       self._save_output(index, content, response_dir)
 
-class GPT4Azure(GPT_Azure):
+
+class AzureGPT4(AzureGPT):
   """Azure's GPTi-4 model."""
 
   name = 'gpt-4-azure'
-  
-  
-class GPT4oAzure(GPT_Azure):
+
+
+class AzureGPT4oAzure(AzureGPT):
   """Azure's GPTi-4 model."""
 
   name = 'gpt-4o-azure'
+
 
 class Claude(LLM):
   """Anthropic's Claude model encapsulator."""
