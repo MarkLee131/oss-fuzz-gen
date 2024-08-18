@@ -48,7 +48,7 @@ DEBUG: bool = True
 # It controls the number of LLM responses per prompt, which may exceed your
 # LLM's limit on query-per-second.
 NUM_SAMPLES = 1
-MAX_TOKENS: int = 2000
+MAX_TOKENS: int = 200
 RUN_TIMEOUT: int = 30
 TEMPERATURE: float = 0
 
@@ -136,7 +136,7 @@ def analyze_api(
   prompt = {
       "messages": prompt_list,
       "temperature": TEMPERATURE,
-      "max_tokens": 300,
+      "max_tokens": 100,
       "top_p": 1.0,
   }
 
