@@ -90,9 +90,6 @@ class LLM:
       temperature_list: Optional[list[float]] = None,
   ):
     """Prepares the LLM for fuzz target generation."""
-    if ai_binary:
-      return AIBinaryModel(name, ai_binary, max_tokens, num_samples,
-                           temperature)
 
     for subcls in cls.all_llm_subclasses():
       if getattr(subcls, 'name', None) == name:
