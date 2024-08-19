@@ -70,10 +70,10 @@ def _parse_code_block_by_marker(lines: list[str], start_marker: str,
 
 def parse_code(response_path: str) -> str:
   """Parses the expected output from the |response_path|."""
-  
+
   # TODO: @kaixuan - we need to filter the multi-line comments and remove them
   # or we add the instructions for filtering them out within the fix prompt.
-  
+
   with open(response_path) as file:
     response = file.read()
   solution = response.split('</solution>')[0]
