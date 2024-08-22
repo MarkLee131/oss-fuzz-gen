@@ -212,10 +212,24 @@ class GPT(LLM):
     """Returns the OpenAI client."""
     return openai.OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
 
+  def _get_tiktoken_encoding(self):
+    """Returns the tiktoken encoding for the model."""
+    try:
+      return tiktoken.encoding_for_model(self.name)
+    except KeyError:
+      logger.info('Could not get a tiktoken encoding for %s.', self.name)
+      return tiktoken.get_encoding('cl100k_base')
+
+  def _get_client(self):
+    """Returns the OpenAI client."""
+    return openai.OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
+
   # ================================ Prompt ================================ #
   def estimate_token_num(self, text) -> int:
     """Estimates the number of tokens in |text|."""
     # https://cookbook.openai.com/examples/how_to_count_tokens_with_tiktoken
+
+    encoder = self._get_tiktoken_encoding()
 
     encoder = self._get_tiktoken_encoding()
 
@@ -246,6 +260,7 @@ class GPT(LLM):
       logger.info('OpenAI does not allow temperature list: %s',
                   self.temperature_list)
 
+    client = self._get_client()
     client = self._get_client()
 
     if build_spec:
