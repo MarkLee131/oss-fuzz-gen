@@ -219,7 +219,6 @@ class GPT(LLM):
 
     encoder = self._get_tiktoken_encoding(self.name)
 
-
     num_tokens = 0
     for message in text:
       num_tokens += 3
