@@ -19,7 +19,6 @@ from llm_toolkit import models, output_parser, prompt_builder, prompts
 
 logger = logging.getLogger(__name__)
 
-
 NUM_EVA = int(os.getenv('LLM_NUM_EVA', '3'))
 DEBUG: bool = True
 
@@ -33,15 +32,12 @@ RESULTS_DIR = './results_summary'
 
 # Use Chain of Thought to guide the specification generation
 
+
 # 1. prompt LLM to determine whether we need to fuzz the function by reading the function definition and the project context
 def determine_fuzz(benchmark: Benchmark, context_info: dict) -> bool:
   """Determines whether we need to fuzz the function by reading the function
   definition and the project context."""
   return False
-
-
-
-
 
 
 def generate_spec(benchmark: Benchmark,
