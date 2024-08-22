@@ -212,7 +212,6 @@ class GPT(LLM):
     """Returns the OpenAI client."""
     return openai.OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
 
-
   # ================================ Prompt ================================ #
   def estimate_token_num(self, text) -> int:
     """Estimates the number of tokens in |text|."""
