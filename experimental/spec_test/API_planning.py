@@ -53,7 +53,6 @@ def generate_spec(benchmark: Benchmark,
         f'{benchmark.function_signature} using {model.name}..')
   model.query_llm(prompt,
                   response_dir=work_dirs.raw_specification_dir,
-                  log_output=debug,
                   build_spec=True)
 
   generated_specs = []
