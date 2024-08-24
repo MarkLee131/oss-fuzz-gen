@@ -81,10 +81,8 @@ class AggregatedResult:
         f'max coverage diff report: {self.max_coverage_diff_report or "None"}')
 
 
-def generate_spec(benchmark: Benchmark,
-                  model: models.LLM,
-                  prompt: prompts.Prompt,
-                  work_dirs: WorkDirs,
+def generate_spec(benchmark: Benchmark, model: models.LLM,
+                  prompt: prompts.Prompt, work_dirs: WorkDirs,
                   builder: prompt_builder.PromptBuilder) -> list[str]:
   """Generates specification with LLM.
   Returns a filepath list of generated specifications
@@ -93,7 +91,6 @@ def generate_spec(benchmark: Benchmark,
         f'{benchmark.function_signature} using {model.name}..')
   model.query_llm(prompt,
                   response_dir=work_dirs.raw_specification_dir,
-                  log_output=debug,
                   build_spec=True)
 
   generated_specs = []
@@ -367,8 +364,7 @@ def generate_targets_for_analysis(
                                      model,
                                      planning_prompt,
                                      work_dirs,
-                                     builder,
-                                     debug=debug)  # list
+                                     builder)  # list
 
   prompt = builder.build_from_spec(spec_filepath_list)
   prompt.save(work_dirs.prompt)
