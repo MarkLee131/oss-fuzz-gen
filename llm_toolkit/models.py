@@ -127,10 +127,7 @@ class LLM:
 
   # ============================== Generation ============================== #
   @abstractmethod
-  def query_llm(self,
-                prompt: prompts.Prompt,
-                response_dir: str,
-                log_output: bool = False,
+  def query_llm(self, prompt: prompts.Prompt, response_dir: str,
                 build_spec: bool = False) -> None:
     """Queries the LLM and stores responses in |response_dir|."""
 
@@ -234,10 +231,7 @@ class GPT(LLM):
     return prompts.OpenAIPrompt
 
   # ============================== Generation ============================== #
-  def query_llm(self,
-                prompt: prompts.Prompt,
-                response_dir: str,
-                log_output: bool = False,
+  def query_llm(self, prompt: prompts.Prompt, response_dir: str,
                 build_spec=False) -> None:
     """Queries OpenAI's API and stores response in |response_dir|."""
     if self.ai_binary:
@@ -261,12 +255,11 @@ class GPT(LLM):
     else:
 
       completion = self.with_retry_on_error(
-          lambda: client.chat.completions.create(messages=prompt.get(),
-                                                 model=self.name,
-                                                 n=self.num_samples,
-                                                 temperature=self.temperature),
-          openai.OpenAIError)
-
+         lambda: client.chat.completions.create(messages=prompt.get(),
+                                               model=self.name,
+                                               n=self.num_samples,
+                                               temperature=self.temperature),
+         openai.OpenAIError)
     # TODO: Add a default value for completion.
     if log_output:
       logger.info(completion)
@@ -338,10 +331,7 @@ class Claude(LLM):
     return self._vertex_ai_model
 
   # ============================== Generation ============================== #
-  def query_llm(self,
-                prompt: prompts.Prompt,
-                response_dir: str,
-                log_output: bool = False,
+  def query_llm(self, prompt: prompts.Prompt, response_dir: str,
                 build_spec=False) -> None:
     """Queries Claude's API and stores response in |response_dir|."""
     if self.ai_binary:
@@ -362,8 +352,6 @@ class Claude(LLM):
                                        model=self.get_model(),
                                        temperature=self.temperature),
         anthropic.AnthropicError)
-    if log_output:
-      logger.info(completion)
     for index, choice in enumerate(completion.content):
       content = choice.text
       self._save_output(index, content, response_dir)
@@ -403,10 +391,7 @@ class GoogleModel(LLM):
     return int(len(re.split('[^a-zA-Z0-9]+', text)) * 1.5 + 0.5)
 
   # ============================== Generation ============================== #
-  def query_llm(self,
-                prompt: prompts.Prompt,
-                response_dir: str,
-                log_output: bool = False,
+  def query_llm(self, prompt: prompts.Prompt, response_dir: str,
                 build_spec=False) -> None:
     """Queries a Google LLM and stores results in |response_dir|."""
     if not self.ai_binary:
@@ -430,7 +415,6 @@ class GoogleModel(LLM):
           f'-max-tokens={self.max_tokens}',
           f'-expected-samples={self.num_samples}',
           f'-temperature={self.temperature}',
-          f'-log-output={log_output}',
       ]
 
       proc = subprocess.Popen(
@@ -480,12 +464,8 @@ class VertexAIModel(GoogleModel):
             self._max_output_tokens
     } for index in range(self.num_samples)]
 
-  def query_llm(self,
-                prompt: prompts.Prompt,
-                response_dir: str,
-                log_output: bool = False,
+  def query_llm(self, prompt: prompts.Prompt, response_dir: str,
                 build_spec=False) -> None:
-    del log_output
     if self.ai_binary:
       logger.info('VertexAI does not use local AI binary: %s', self.ai_binary)
 
