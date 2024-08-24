@@ -360,11 +360,8 @@ def generate_targets_for_analysis(
 
   planning_prompt.save(work_dirs.planning_prompt)
 
-  spec_filepath_list = generate_spec(benchmark,
-                                     model,
-                                     planning_prompt,
-                                     work_dirs,
-                                     builder)  # list
+  spec_filepath_list = generate_spec(benchmark, model, planning_prompt,
+                                     work_dirs, builder)  # list
 
   prompt = builder.build_from_spec(spec_filepath_list)
   prompt.save(work_dirs.prompt)

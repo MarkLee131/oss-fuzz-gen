@@ -265,7 +265,7 @@ class GPT(LLM):
                                                  temperature=self.temperature),
           openai.OpenAIError)
     # TODO: Add a default value for completion.
-    
+
     for index, choice in enumerate(completion.choices):  # type: ignore
       content = choice.message.content
       self._save_output(index, content, response_dir)
