@@ -5,11 +5,11 @@ import os
 import sys
 
 sys.path.append(os.path.abspath('../../'))
+import argparse
 import logging
 from typing import List
 
 import openai
-import argparse
 
 import run_all_experiments
 from data_prep import introspector, project_targets
