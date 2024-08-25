@@ -9,6 +9,7 @@ import logging
 from typing import List
 
 import openai
+import argparse
 
 import run_all_experiments
 from data_prep import introspector, project_targets
@@ -44,10 +45,10 @@ model = models.LLM.setup(ai_binary='',
                          temperature=TEMPERATURE)
 
 
-def construct_prompt() -> str:
+def construct_prompt():
   """Constructs a prompt for the given benchmark and context."""
   ## need to mimic args, by hardcode the values, just need the `args.benchmark_yaml` or `args.benchmarks_directory`
-  import argparse
+
   args = argparse.Namespace()
   args.introspector_endpoint = introspector.DEFAULT_INTROSPECTOR_ENDPOINT
   args.benchmark_yaml = '../../benchmark-sets/comparison/ada-url.yaml'
@@ -80,10 +81,11 @@ def query_llm(prompt: str, response_dir: str, build_spec=False) -> None:
                               api_version=os.getenv("AZURE_OPENAI_API_VERSION",
                                                     "2024-02-01"))
 
-  completion = client.chat.completions.create(messages=prompt_dict, # type: ignore
-                                              model=model.name,
-                                              n=model.num_samples,
-                                              temperature=model.temperature)
+  completion = client.chat.completions.create(
+      messages=prompt_dict,  # type: ignore
+      model=model.name,
+      n=model.num_samples,
+      temperature=model.temperature)
 
   for index, choice in enumerate(completion.choices):  # type: ignore
     content = choice.message.content
