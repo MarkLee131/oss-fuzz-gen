@@ -245,7 +245,6 @@ class GPT(LLM):
                   self.temperature_list)
 
     client = self._get_client()
-    client = self._get_client()
 
     if build_spec:
       completion = self.with_retry_on_error(
