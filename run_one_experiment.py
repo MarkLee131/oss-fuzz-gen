@@ -266,8 +266,7 @@ def generate_targets_for_analysis(
   #                        project_example_content=project_examples,
   #                        project_context_content=context_info)
   prompt = builder._build_cot_specification(
-      project_example_content=project_examples) # pylint: disable=protected-access
-  prompt.save(work_dirs.prompt)
+      project_example_content=project_examples)  # type: ignore
 
   generated_targets = generate_targets(benchmark, model, prompt, work_dirs,
                                        builder)
