@@ -34,6 +34,9 @@ from llm_toolkit import models, prompts
 logger = logging.getLogger(__name__)
 
 DEFAULT_TEMPLATE_DIR: str = 'prompts/template_xml/'
+COT_SPECIFICATION_DIR: str = 'experimental/spec_test/results_summary'
+
+
 
 # TODO(Dongge): Refactor this tot avoid hard-coding.
 # Example files.
@@ -121,6 +124,8 @@ class DefaultTemplateBuilder(PromptBuilder):
     # Load templates.
     self.priming_template_file = self._find_template(template_dir,
                                                      'priming.txt')
+    self.cot_priming_template_file = self._find_template('prompts/cot_prompt',
+                                                          'priming.txt')
     self.cpp_priming_filler_file = self._find_template(
         template_dir, 'cpp-specific-priming-filler.txt')
     self.problem_template_file = self._find_template(template_dir,
@@ -299,6 +304,38 @@ class DefaultTemplateBuilder(PromptBuilder):
     final_problem += '\n<solution>'
     self._prepare_prompt(priming, final_problem, example_pair,
                          project_example_content)
+    return self._prompt
+  
+  def _build_cot_specification(self,
+            project_example_content: Optional[list[list[str]]] = None) -> prompts.Prompt:
+    """Constructs a prompt using the templates in |self| and saves it."""
+    if not self.benchmark:
+      return self._prompt
+    
+    # priming = self._format_priming(self.benchmark.file_type,
+    #                                self.benchmark.needs_extern)
+    with open(self.cot_priming_template_file) as f:
+      priming = f.read().strip()
+    priming = priming.replace('{API_Name}', self.benchmark.function_name).replace('{project_name}', self.benchmark.project)
+    
+    with open(os.path.join(COT_SPECIFICATION_DIR, self.benchmark.project + '_' + self.benchmark.function_name + '.txt')) as f:
+      spec_content = f.read().strip()
+      
+    final_problem = 'Finish the fuzz driver: <specification>' + spec_content + '</specification>\nDO NOT leave any TODOs in the driver code.\n' 
+    import json
+    # experimental/spec_test/prompts/headerfiles.json
+    with open('experimental/spec_test/prompts/headerfiles.json') as f:
+      headerfiles = json.load(f)
+    try:
+      headerfiles2use = headerfiles[self.benchmark.project] #pyright: ignore[reportOptionalMemberAccess]
+      headerfiles2use = '\n'.join(headerfiles2use)
+      
+      final_problem += (f'The header files needed for the driver are:\n {headerfiles2use}\n')
+      
+    except KeyError:
+      pass
+
+    self._prepare_prompt(priming, final_problem)
     return self._prompt
 
   def build_fixer_prompt(self,

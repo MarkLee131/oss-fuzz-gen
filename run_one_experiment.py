@@ -262,9 +262,10 @@ def generate_targets_for_analysis(
     builder = prompt_builder.DefaultTemplateBuilder(model, benchmark,
                                                     template_dir)
 
-  prompt = builder.build(example_pair,
-                         project_example_content=project_examples,
-                         project_context_content=context_info)
+  # prompt = builder.build(example_pair,
+  #                        project_example_content=project_examples,
+  #                        project_context_content=context_info)
+  prompt = builder._build_cot_specification(project_example_content=project_examples)
   prompt.save(work_dirs.prompt)
 
   generated_targets = generate_targets(benchmark, model, prompt, work_dirs,
