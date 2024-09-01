@@ -1,0 +1,99 @@
+```cpp
+#include <fuzzer/FuzzedDataProvider.h>
+#include <archive.h>
+#include <archive_entry.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <stdlib.h>
+
+extern "C" int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    // Initialize the library or any resources needed for the fuzzing process
+    return 0;
+}
+
+extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    /**
+     * Goal: The fuzz driver should test `_archive_entry_acl_text_l` within the `libarchive` project.
+     *        - libarchive is an open-source project that provides a consistent interface for reading and writing various archive formats.
+     *        - `_archive_entry_acl_text_l` is a function that converts an archive entry's ACL (Access Control List) to a text representation.
+
+     * Precondition: 1. The function is provided by the library `archive_entry.h` and implemented in `archive_entry_acl.c`.
+     *               2. The function `_archive_entry_acl_text_l` is called with the following parameters:
+     *                 - @entry: a pointer to a `struct archive_entry` structure, which represents an archive entry.
+     *                   - Precondition:
+     *                       a. Non-Null Requirement: The `entry` pointer must be non-null before calling `_archive_entry_acl_text_l`. If `entry` is null, the function should handle it gracefully.
+     *                       b. Proper Initialization: The `archive_entry` structure pointed to by `entry` should be properly initialized, particularly ensuring that any previous pointers or lengths are correctly set or reset prior to the call to prevent unintended behavior.
+     *                       c. ACL Initialization: The `acl` field within the `archive_entry` structure should be properly initialized.
+     *                   - Postcondition:
+     *                       a. Resource Management: The `acl` field should be properly released and reset after the function call.
+     *                       b. ACL Text: The `acl_text` field within the `acl` structure should be updated with the new text representation.
+
+     *                 - @flags: an integer that specifies the flags for the ACL conversion. This argument allows the user to specify various options for the conversion process.
+     *                    * - Precondition:
+     *                        - a. `flags` should be an integer. It can be any valid flag value supported by the function.
+     *                    * - Postcondition:
+     *                        - a. The value of `flags` should not be modified by the function.
+     *                        - b. The function should handle the flags as specified by the input value.
+
+     *                 - @acl_text: a pointer to a `const char *` that will store the text representation of the ACL.
+     *                   * - Preconditions: 
+     *                       a. Non-Null Requirement: The `acl_text` pointer must be non-null before calling `_archive_entry_acl_text_l`. If `acl_text` is null, the function should handle it gracefully.
+     *                       b. Proper Initialization: The `acl_text` pointer should be properly initialized.
+     *                   * - Postconditions:
+     *                       a. ACL Text Storage: On successful execution, the `acl_text` pointer should point to the new text representation of the ACL.
+     *                       b. Memory Management: The memory pointed to by `acl_text` should be managed properly to prevent leaks.
+
+     *                 - @len: a pointer to a `size_t` that will store the length of the text representation of the ACL.
+     *                   * - Preconditions: 
+     *                       a. Non-Null Requirement: The `len` pointer must be non-null before calling `_archive_entry_acl_text_l`. If `len` is null, the function should handle it gracefully.
+     *                       b. Proper Initialization: The `len` pointer should be properly initialized.
+     *                   * - Postconditions:
+     *                       a. Length Storage: On successful execution, the `len` pointer should be updated with the length of the text representation of the ACL.
+     *                       b. Memory Management: The memory pointed to by `len` should be managed properly to prevent leaks.
+
+     *                 - @sc: a pointer to a `struct archive_string_conv` that specifies the string conversion options.
+     *                   * - Preconditions: 
+     *                       a. Non-Null Requirement: The `sc` pointer must be non-null before calling `_archive_entry_acl_text_l`. If `sc` is null, the function should handle it gracefully.
+     *                       b. Proper Initialization: The `archive_string_conv` structure pointed to by `sc` should be properly initialized.
+     *                   * - Postconditions:
+     *                       a. String Conversion: The function should handle the string conversion options as specified by the input value.
+     *                       b. Memory Management: The memory pointed to by `sc` should be managed properly to prevent leaks.
+
+     * Postcondition: 1. The function should be called with the mutated data to test the functionality of the function, returning 0 if successful and -1 if an error occurs.
+     *                   a. ACL Text Validation: Ensure the ACL text is correctly formatted according to the specified flags and string conversion options, regardless of input variations.
+     *                   b. Resource Management: Properly manage memory to prevent leaks or double frees, especially for fields with shared pointers.
+     *                2. Resources should be released properly after the function call. Note that the specified API is preferred to use for resource release if available.
+    **/
+
+    FuzzedDataProvider dataProvider(data, size);
+
+    // Create and initialize `struct archive_entry`
+    struct archive_entry *entry = archive_entry_new();
+    if (!entry) {
+        return 0;
+    }
+
+    // Create and initialize `struct archive_string_conv`
+    struct archive_string_conv *sc = archive_string_conversion_from_charset(NULL, "UTF-8", 1);
+    if (!sc) {
+        archive_entry_free(entry);
+        return 0;
+    }
+
+    // Generate random flags
+    int flags = dataProvider.ConsumeIntegral<int>();
+
+    // Prepare pointers for output
+    const char *acl_text = NULL;
+    size_t len = 0;
+
+    // Call the function with the fuzzed data
+    _archive_entry_acl_text_l(entry, flags, &acl_text, &len, sc);
+
+    // Clean up
+    archive_entry_free(entry);
+    archive_string_conversion_free(sc);
+
+    return 0;
+}
+```

@@ -1,0 +1,76 @@
+```cpp
+#include <fuzzer/FuzzedDataProvider.h>
+#include <libical/ical.h>
+
+extern "C" int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    // Initialize the library or any resources needed for the fuzzing process
+    return 0;
+}
+
+extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    /**
+     * Goal: The fuzz driver should test `icalcomponent_foreach_recurrence` within the `libical` project.
+     *        - libical is an open-source library for parsing and manipulating iCalendar data.
+     *        - `icalcomponent_foreach_recurrence` is a function that iterates over all recurrence instances of a component within a specified time range and invokes a callback function for each instance.
+     *
+     * Preconditions:
+     * 1. The function is provided by the library `libical` and implemented in the source code provided.
+     * 2. The function `icalcomponent_foreach_recurrence` is called with the following parameters:
+     *    - @comp: a pointer to an `icalcomponent` structure, which represents an iCalendar component.
+     *      - Precondition:
+     *        a. Non-Null Requirement: The `comp` pointer must be non-null before calling `icalcomponent_foreach_recurrence`. If `comp` is null, the function returns immediately.
+     *        b. Proper Initialization: The `icalcomponent` structure pointed to by `comp` should be properly initialized, particularly ensuring that any previous pointers or lengths are correctly set or reset prior to the call to prevent unintended behavior.
+     *    - @start: a `struct icaltimetype` representing the start time of the range.
+     *      - Precondition:
+     *        a. Proper Initialization: The `start` time must be a valid `icaltimetype`.
+     *    - @end: a `struct icaltimetype` representing the end time of the range.
+     *      - Precondition:
+     *        a. Proper Initialization: The `end` time must be a valid `icaltimetype`.
+     *    - @callback: a pointer to a callback function that is invoked for each recurrence instance.
+     *      - Precondition:
+     *        a. Non-Null Requirement: The `callback` pointer must be non-null before calling `icalcomponent_foreach_recurrence`. If `callback` is null, the function returns immediately.
+     *    - @callback_data: a pointer to user data that is passed to the callback function.
+     *      - Precondition:
+     *        a. Proper Initialization: The `callback_data` pointer should be properly initialized, particularly ensuring that any previous pointers or lengths are correctly set or reset prior to the call to prevent unintended behavior.
+     *
+     * Postconditions:
+     * 1. The function should iterate over all recurrence instances within the specified time range and invoke the callback function for each instance.
+     * 2. Resources should be released properly after the function call. Note that the specified API is preferred to use for resource release if available.
+     */
+
+    if (size < sizeof(icalcomponent)) {
+        return 0; // Not enough data to create a valid icalcomponent
+    }
+
+    FuzzedDataProvider dataProvider(data, size);
+
+    // Create an icalcomponent from the provided data
+    char *ical_string = (char *)malloc(size + 1);
+    memcpy(ical_string, data, size);
+    ical_string[size] = '\0';
+
+    icalcomponent *comp = icalcomponent_new_from_string(ical_string);
+    if (comp == NULL) {
+        free(ical_string);
+        return 0;
+    }
+
+    // Generate random start and end times
+    struct icaltimetype start = icaltime_from_timet_with_zone(dataProvider.ConsumeIntegral<time_t>(), 0, icaltimezone_get_utc_timezone());
+    struct icaltimetype end = icaltime_from_timet_with_zone(dataProvider.ConsumeIntegral<time_t>(), 0, icaltimezone_get_utc_timezone());
+
+    // Define a dummy callback function
+    void callback(icalcomponent *comp, struct icaltime_span *span, void *data) {
+        // Dummy callback logic
+    }
+
+    // Call the function with the generated inputs
+    icalcomponent_foreach_recurrence(comp, start, end, callback, NULL);
+
+    // Free resources
+    icalcomponent_free(comp);
+    free(ical_string);
+
+    return 0;
+}
+```

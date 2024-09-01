@@ -1,0 +1,91 @@
+```cpp
+#include <fuzzer/FuzzedDataProvider.h>
+#include <sodium.h>
+#include <stdlib.h>
+
+extern "C" {
+#include "argon2.h"
+#include "argon2_core.h"
+}
+
+extern "C" int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    // Initialize the sodium library, which is required by the argon2 functions.
+    if (sodium_init() < 0) {
+        // Initialization failed.
+        return -1;
+    }
+    return 0;
+}
+
+extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    /**
+     * Goal: The fuzz driver should test `argon2_initialize` within the `libsodium` project.
+     *       - `libsodium` is a modern, easy-to-use software library for encryption, decryption, signatures, password hashing, and more.
+     *       - `argon2_initialize` is a function that initializes an Argon2 instance with the provided context.
+     *
+     * Precondition: 1. The function is provided by the library `argon2.h` and implemented in `argon2_core.c`.
+     *               2. The function `argon2_initialize` is called with the following parameters:
+     *                 - @instance: a pointer to an `argon2_instance_t` structure, which represents the state of the Argon2 computation.
+     *                   - Precondition:
+     *                       a. Non-Null Requirement: The `instance` pointer must be non-null before calling `argon2_initialize`. If `instance` is null, the function returns `ARGON2_INCORRECT_PARAMETER`.
+     *                       b. Proper Initialization: The `argon2_instance_t` structure pointed to by `instance` should be properly initialized, particularly ensuring that any previous pointers or lengths are correctly set or reset prior to the call to prevent unintended behavior.
+     *                       c. Memory Allocation: The `pseudo_rands` field should be allocated memory of size `sizeof(uint64_t) * instance->segment_length`.
+     *                       d. Memory Blocks: The `region` field should be allocated memory blocks using `allocate_memory`.
+     *                   - Postcondition:
+     *                       a. Resource Management: The `instance` pointer should be properly released after the function call by using `argon2_free_instance` if available.
+     *                       b. Memory Management: Properly manage memory to prevent leaks or double frees, especially for fields with shared pointers.
+     *
+     *                 - @context: a pointer to an `argon2_context` structure, which contains the parameters for the Argon2 computation.
+     *                   - Precondition:
+     *                       a. Non-Null Requirement: The `context` pointer must be non-null before calling `argon2_initialize`. If `context` is null, the function returns `ARGON2_INCORRECT_PARAMETER`.
+     *                       b. Proper Initialization: The `argon2_context` structure pointed to by `context` should be properly initialized, particularly ensuring that any previous pointers or lengths are correctly set or reset prior to the call to prevent unintended behavior.
+     *                   - Postcondition:
+     *                       a. Resource Management: The `context` pointer should be properly released after the function call if necessary.
+     *                       b. Memory Management: Properly manage memory to prevent leaks or double frees, especially for fields with shared pointers.
+     *
+     * Postcondition: 1. The function should be called with the mutated data to test the functionality of the function, returning `ARGON2_OK` if successful and an error code if an error occurs.
+     *                2. Resources should be released properly after the function call. Note that the specified API is preferred to use for resource release if available.
+     */
+
+    FuzzedDataProvider data_provider(data, size);
+
+    // Create and initialize an argon2_instance_t structure.
+    argon2_instance_t instance;
+    instance.segment_length = data_provider.ConsumeIntegralInRange<uint32_t>(1, 1024);
+    instance.memory_blocks = data_provider.ConsumeIntegralInRange<uint32_t>(1, 1024);
+    instance.pseudo_rands = nullptr;
+    instance.region = nullptr;
+
+    // Create and initialize an argon2_context structure.
+    argon2_context context;
+    context.flags = data_provider.ConsumeIntegralInRange<uint32_t>(0, 1);
+    context.out = nullptr;
+    context.outlen = data_provider.ConsumeIntegralInRange<uint32_t>(1, 1024);
+    context.pwd = nullptr;
+    context.pwdlen = data_provider.ConsumeIntegralInRange<uint32_t>(1, 1024);
+    context.salt = nullptr;
+    context.saltlen = data_provider.ConsumeIntegralInRange<uint32_t>(1, 1024);
+    context.secret = nullptr;
+    context.secretlen = data_provider.ConsumeIntegralInRange<uint32_t>(1, 1024);
+    context.ad = nullptr;
+    context.adlen = data_provider.ConsumeIntegralInRange<uint32_t>(1, 1024);
+    context.t_cost = data_provider.ConsumeIntegralInRange<uint32_t>(1, 10);
+    context.m_cost = data_provider.ConsumeIntegralInRange<uint32_t>(1, 1024);
+    context.lanes = data_provider.ConsumeIntegralInRange<uint32_t>(1, 8);
+    context.threads = data_provider.ConsumeIntegralInRange<uint32_t>(1, 8);
+    context.version = data_provider.ConsumeIntegralInRange<uint32_t>(0, 1);
+
+    // Call the function with the initialized structures.
+    int result = argon2_initialize(&instance, &context);
+
+    // Free allocated resources.
+    if (instance.pseudo_rands != nullptr) {
+        free(instance.pseudo_rands);
+    }
+    if (instance.region != nullptr) {
+        free(instance.region);
+    }
+
+    return 0;
+}
+```

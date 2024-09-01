@@ -1,0 +1,86 @@
+```cpp
+#include <fuzzer/FuzzedDataProvider.h>
+extern "C" { 
+#include "ldacBT.h"
+}
+
+extern "C" int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    // Initialize the library or any resources needed for the fuzzing process
+    return 0;
+}
+
+extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    /**
+     * Goal: The fuzz driver should test `ldacBT_alter_eqmid_priority` within the `libldac` project.
+     *        - `libldac` is an open-source library for LDAC codec, which is widely used for high-quality audio transmission over Bluetooth.
+     *        - `ldacBT_alter_eqmid_priority` is a function that alters the EQMID (Equalizer Mode ID) priority for an LDAC Bluetooth handle.
+
+     * Precondition: 
+     * 1. The function is provided by the library `ldacBT.h` and implemented in `ldacBT.c`.
+     * 2. The function `ldacBT_alter_eqmid_priority` is called with the following parameters:
+     *    - @hLdacBT: a handle to an LDAC Bluetooth instance.
+     *      - Precondition:
+     *          a. Non-Null Requirement: The `hLdacBT` pointer must be non-null before calling `ldacBT_alter_eqmid_priority`. If `hLdacBT` is null, the function returns `LDACBT_E_FAIL`.
+     *          b. Proper Initialization: The `hLdacBT` structure should be properly initialized, particularly ensuring that `proc_mode` is set to `LDACBT_PROCMODE_ENCODE`.
+     *          c. Error Handling: The `hLdacBT` structure should have an `error_code_api` field to store error codes.
+     *    - @priority: an integer that specifies the EQMID priority.
+     *      - Precondition:
+     *          a. Valid Values: The `priority` should be either `LDACBT_EQMID_INC_QUALITY` or `LDACBT_EQMID_INC_CONNECTION`. Any other value will cause the function to return `LDACBT_E_FAIL`.
+
+     * Postcondition: 
+     * 1. The function should be called with the mutated data to test the functionality of the function, returning `LDACBT_S_OK` if successful and `LDACBT_E_FAIL` if an error occurs.
+     *    a. Error Codes: The `error_code_api` field in `hLdacBT` should be set appropriately based on the error encountered.
+     *    b. EQMID Alteration: If the function succeeds, the EQMID should be altered as per the priority specified.
+     *    c. Resource Management: Ensure that any resources allocated during the function call are properly released after the function call.
+
+     * Example Usage:
+     * ```
+     * HANDLE_LDAC_BT handle = ldacBT_get_handle();
+     * ldacBT_init_handle_encode(handle, ...);
+     * int result = ldacBT_alter_eqmid_priority(handle, LDACBT_EQMID_INC_QUALITY);
+     * if (result == LDACBT_S_OK) {
+     *     // Success handling
+     * } else {
+     *     // Error handling
+     * }
+     * ldacBT_close_handle(handle);
+     * ldacBT_free_handle(handle);
+     * ```
+     */
+
+    FuzzedDataProvider fdp(data, size);
+
+    // Initialize LDAC handle
+    HANDLE_LDAC_BT hLdacBT = ldacBT_get_handle();
+    if (hLdacBT == NULL) {
+        return 0;
+    }
+
+    // Ensure the handle is in encode mode
+    hLdacBT->proc_mode = LDACBT_PROCMODE_ENCODE;
+
+    // Fuzz the priority value
+    int priority = fdp.ConsumeIntegral<int>();
+
+    // Call the target function
+    int result = ldacBT_alter_eqmid_priority(hLdacBT, priority);
+
+    // Check the result and handle errors if needed
+    if (result == LDACBT_E_FAIL) {
+        // Handle error scenarios
+        if (hLdacBT->error_code_api == LDACBT_ERR_HANDLE_NOT_INIT) {
+            // Handle not initialized error
+        } else if (hLdacBT->error_code_api == LDACBT_ERR_ILL_PARAM) {
+            // Handle illegal parameter error
+        } else if (hLdacBT->error_code_api == LDACBT_ERR_ALTER_EQMID_LIMITED) {
+            // Handle EQMID alteration limited error
+        }
+    }
+
+    // Clean up
+    ldacBT_close_handle(hLdacBT);
+    ldacBT_free_handle(hLdacBT);
+
+    return 0;
+}
+```

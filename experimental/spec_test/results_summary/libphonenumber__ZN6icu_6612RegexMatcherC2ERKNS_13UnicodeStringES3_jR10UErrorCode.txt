@@ -1,0 +1,82 @@
+```cpp
+#include <fuzzer/FuzzedDataProvider.h>
+#include <unicode/unistr.h>
+#include <unicode/regex.h>
+#include <unicode/utypes.h>
+#include <unicode/utext.h>
+
+extern "C" int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    // Initialize the ICU library or any resources needed for the fuzzing process.
+    return 0;
+}
+
+extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    /**
+     * Goal: The fuzz driver should test `icu_66::RegexMatcher::RegexMatcher` within the `libphonenumber` project.
+     *       - `libphonenumber` is an open-source library for parsing, formatting, and validating international phone numbers.
+     *       - `RegexMatcher` is a class used for matching regular expressions against Unicode strings.
+     *       - The constructor `RegexMatcher::RegexMatcher` initializes a regex matcher with a given pattern and input string.
+
+     * Precondition: The function is provided by the ICU library and implemented in `regex.cpp`.
+     *               The function `RegexMatcher::RegexMatcher` is called with the following parameters:
+     *                 - @regexp: a constant reference to a `UnicodeString` that contains the regular expression pattern.
+     *                   - Precondition:
+     *                       a. Non-Null Requirement: The `regexp` reference must be valid and point to a properly initialized `UnicodeString`.
+     *                       b. Proper Initialization: The `UnicodeString` should contain a valid regular expression pattern.
+     *                   - Postcondition:
+     *                       a. Pattern Compilation: The `regexp` should be compiled into a `RegexPattern` object.
+     *                       b. Error Handling: If the pattern is invalid, the `status` should be set to an error code.
+
+     *                 - @input: a constant reference to a `UnicodeString` that contains the input string to be matched against the pattern.
+     *                   - Precondition:
+     *                       a. Non-Null Requirement: The `input` reference must be valid and point to a properly initialized `UnicodeString`.
+     *                       b. Proper Initialization: The `UnicodeString` should contain the input string for matching.
+     *                   - Postcondition:
+     *                       a. Input Initialization: The `input` should be converted to a `UText` object for processing.
+     *                       b. Error Handling: If the input string is invalid, the `status` should be set to an error code.
+
+     *                 - @flags: an unsigned 32-bit integer that specifies the regex compilation flags.
+     *                   - Precondition:
+     *                       a. Valid Flags: The `flags` should be a valid combination of ICU regex flags.
+     *                   - Postcondition:
+     *                       a. Flag Handling: The `flags` should be used to compile the regex pattern accordingly.
+
+     *                 - @status: a reference to a `UErrorCode` that indicates the success or failure of the operation.
+     *                   - Precondition:
+     *                       a. Initialization: The `status` should be initialized to `U_ZERO_ERROR` before calling the constructor.
+     *                   - Postcondition:
+     *                       a. Error Reporting: The `status` should be updated to reflect any errors that occur during the construction of the `RegexMatcher`.
+
+     * Postcondition: The function should be called with the mutated data to test the functionality of the constructor, returning 0 if successful and -1 if an error occurs.
+     *                - Resource Management: Properly manage memory to prevent leaks or double frees, especially for the `UText` object.
+     *                - Pattern and Input Validation: Ensure the regex pattern and input string are correctly processed and any errors are properly reported.
+     *                - Flag Handling: Verify that the regex compilation flags are correctly applied.
+     */
+
+    FuzzedDataProvider fuzzed_data(data, size);
+
+    // Generate random Unicode strings for the regular expression and input.
+    std::string regexp_str = fuzzed_data.ConsumeRandomLengthString();
+    std::string input_str = fuzzed_data.ConsumeRandomLengthString();
+
+    // Convert the random strings to UnicodeString.
+    icu::UnicodeString regexp = icu::UnicodeString::fromUTF8(regexp_str);
+    icu::UnicodeString input = icu::UnicodeString::fromUTF8(input_str);
+
+    // Generate random flags for regex compilation.
+    uint32_t flags = fuzzed_data.ConsumeIntegral<uint32_t>();
+
+    // Initialize the error code.
+    UErrorCode status = U_ZERO_ERROR;
+
+    // Create the RegexMatcher object.
+    icu::RegexMatcher matcher(regexp, input, flags, status);
+
+    // Check for errors.
+    if (U_FAILURE(status)) {
+        return -1;
+    }
+
+    return 0;
+}
+```

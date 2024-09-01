@@ -1,0 +1,84 @@
+```cpp
+#include <fuzzer/FuzzedDataProvider.h>
+extern "C" {
+#include "ldaclib.h"
+}
+
+extern "C" int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    // Initialize the library or any resources `ldaclib_check_nlnn_shift` within `libldac` project needed for the fuzzing process
+    return 0;
+}
+
+extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    /**
+     * Goal: The fuzz driver should test `ldaclib_check_nlnn_shift` within the `libldac` project.
+     *        - `libldac` is an open-source library for LDAC codec, which is used for high-resolution audio streaming.
+     *        - `ldaclib_check_nlnn_shift` is a function that validates the sampling rate index and the NLNN shift value.
+
+     * Precondition: 1. The function is provided by the library `ldaclib.h` and implemented in `ldaclib.c`.
+     *               2. The function `ldaclib_check_nlnn_shift` is called with the following parameters:
+     *                 - @smplrate_id: an integer that specifies the sampling rate index.
+     *                   - Precondition:
+     *                       a. Valid Range: The `smplrate_id` should be within the valid range of sampling rate indices supported by the library.
+     *                       b. Proper Initialization: The `smplrate_id` should be properly initialized and should correspond to a valid sampling rate.
+     *                   - Postcondition:
+     *                       a. Sampling Rate Validation: The function should validate the sampling rate index using `ldaclib_assert_sampling_rate_index` and `ldaclib_assert_supported_sampling_rate_index`.
+     *                       b. Error Handling: If the sampling rate index is invalid, the function should return `LDAC_E_FAIL`.
+
+     *                 - @nlnn_shift: an integer that specifies the NLNN shift value.
+     *                   - Precondition:
+     *                       a. Valid Range: The `nlnn_shift` should be within the valid range of NLNN shift values supported by the library.
+     *                       b. Proper Initialization: The `nlnn_shift` should be properly initialized and should correspond to a valid NLNN shift value.
+     *                   - Postcondition:
+     *                       a. NLNN Shift Validation: The function should validate the NLNN shift value using `ldaclib_assert_nlnn_shift`.
+     *                       b. Error Handling: If the NLNN shift value is invalid, the function should return `LDAC_E_FAIL`.
+
+     * Postcondition: 1. The function should be called with the mutated data to test the functionality of the function, returning `LDAC_S_OK` if successful and `LDAC_E_FAIL` if an error occurs.
+     *                   a. Sampling Rate and NLNN Shift Validation: Ensure the sampling rate index and NLNN shift value are correctly validated.
+     *                   b. Error Handling: Verify that the function correctly handles invalid sampling rate indices and NLNN shift values by returning `LDAC_E_FAIL`.
+     *                   c. Array Bounds: Ensure that the function correctly accesses the `gaa_nlnn_shift_ldac` array without causing out-of-bounds errors.
+     *                2. Resources should be released properly after the function call.
+    **/
+
+    FuzzedDataProvider fuzzed_data(data, size);
+
+    // Generate random values for smplrate_id and nlnn_shift within a reasonable range
+    int smplrate_id = fuzzed_data.ConsumeIntegralInRange<int>(0, 10); // Assuming the valid range for smplrate_id is 0 to 10
+    int nlnn_shift = fuzzed_data.ConsumeIntegralInRange<int>(-2, 2); // Assuming the valid range for nlnn_shift is -2 to 2
+
+    // Call the function with the fuzzed data
+    LDAC_RESULT result = ldaclib_check_nlnn_shift(smplrate_id, nlnn_shift);
+
+    // Validate the result
+    if (result != LDAC_S_OK && result != LDAC_E_FAIL) {
+        // Unexpected result, handle the error
+        return -1;
+    }
+
+    return 0;
+}
+```
+
+### Explanation:
+
+1. **Function Signature and Source Code**: The function `ldaclib_check_nlnn_shift` is provided by the `libldac` library and has the signature `LDAC_RESULT ldaclib_check_nlnn_shift(int smplrate_id, int nlnn_shift)`. The source code validates the sampling rate index and NLNN shift value.
+
+2. **Preconditions**:
+   - **smplrate_id**:
+     - **Valid Range**: Should be within the valid range of sampling rate indices.
+     - **Proper Initialization**: Should correspond to a valid sampling rate.
+   - **nlnn_shift**:
+     - **Valid Range**: Should be within the valid range of NLNN shift values.
+     - **Proper Initialization**: Should correspond to a valid NLNN shift value.
+
+3. **Postconditions**:
+   - **Sampling Rate and NLNN Shift Validation**: Ensure the function correctly validates the sampling rate index and NLNN shift value.
+   - **Error Handling**: Verify that the function correctly handles invalid inputs by returning `LDAC_E_FAIL`.
+   - **Array Bounds**: Ensure the function correctly accesses the `gaa_nlnn_shift_ldac` array without causing out-of-bounds errors.
+
+4. **Fuzz Driver Implementation**:
+   - **FuzzedDataProvider**: Used to generate random values for `smplrate_id` and `nlnn_shift` within a reasonable range.
+   - **Function Call**: Call `ldaclib_check_nlnn_shift` with the fuzzed data.
+   - **Result Validation**: Validate the result to ensure it is either `LDAC_S_OK` or `LDAC_E_FAIL`.
+
+This detailed specification ensures that the fuzz driver thoroughly tests the `ldaclib_check_nlnn_shift` function, covering various edge cases and validating the function's behavior under different inputs.

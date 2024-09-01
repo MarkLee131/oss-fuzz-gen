@@ -1,0 +1,94 @@
+```cpp
+#include <fuzzer/FuzzedDataProvider.h>
+extern "C" {
+#include "dwarf.h"
+#include "libdwarf.h"
+}
+
+extern "C" int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    // Initialize the library or any resources needed for the fuzzing process
+    return 0;
+}
+
+extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    /**
+    * Goal: The fuzz driver should test `dwarf_get_pubtypes` within the `libdwarf` project.
+    *       - libdwarf is a library that provides APIs for reading and manipulating DWARF debugging information.
+    *       - `dwarf_get_pubtypes` is a function that retrieves public types from the DWARF debugging information.
+
+    * Precondition: 
+    * 1. The function is provided by the library `libdwarf.h` and implemented in `libdwarf.c`.
+    * 2. The function `dwarf_get_pubtypes` is called with the following parameters:
+    *    - @dbg: a `Dwarf_Debug` structure, which represents the debugging context.
+    *      - Precondition:
+    *        a. Non-Null Requirement: The `dbg` pointer must be non-null before calling `dwarf_get_pubtypes`. If `dbg` is null, the function returns `DW_DLV_ERROR`.
+    *        b. Proper Initialization: The `Dwarf_Debug` structure should be properly initialized using `dwarf_init` or `dwarf_init_path`.
+    *      - Postcondition:
+    *        a. Resource Management: The `dbg` pointer should be properly released after the function call by using `dwarf_finish`.
+
+    *    - @types: a pointer to a `Dwarf_Global` pointer, which will store the retrieved public types.
+    *      - Precondition:
+    *        a. Non-Null Requirement: The `types` pointer must be non-null before calling `dwarf_get_pubtypes`. If `types` is null, the function returns `DW_DLV_ERROR`.
+    *        b. Proper Initialization: The `Dwarf_Global` pointer should be properly initialized or set to null before the call.
+    *      - Postcondition:
+    *        a. Memory Allocation: On successful execution, the `types` pointer will point to an array of `Dwarf_Global` structures.
+    *        b. Memory Management: The caller is responsible for deallocating the memory pointed to by `types` using `dwarf_globals_dealloc`.
+
+    *    - @return_count: a pointer to a `Dwarf_Signed` variable that will store the number of retrieved public types.
+    *      - Precondition:
+    *        a. Non-Null Requirement: The `return_count` pointer must be non-null before calling `dwarf_get_pubtypes`. If `return_count` is null, the function returns `DW_DLV_ERROR`.
+    *      - Postcondition:
+    *        a. Count Storage: On successful execution, the `return_count` variable will be updated to reflect the number of retrieved public types.
+
+    *    - @error: a pointer to a `Dwarf_Error` structure that will store any error information.
+    *      - Precondition:
+    *        a. Non-Null Requirement: The `error` pointer must be non-null before calling `dwarf_get_pubtypes`. If `error` is null, the function may not provide detailed error information.
+    *      - Postcondition:
+    *        a. Error Handling: If an error occurs, the `error` structure will be populated with relevant error information. The caller is responsible for deallocating the error using `dwarf_dealloc_error`.
+
+    * Postcondition:
+    * 1. The function should be called with the mutated data to test the functionality of the function, returning `DW_DLV_OK` if successful and `DW_DLV_ERROR` if an error occurs.
+    *    a. Public Types Retrieval: Ensure that the public types are correctly retrieved and stored in the `types` pointer.
+    *    b. Count Accuracy: Verify that the `return_count` variable accurately reflects the number of retrieved public types.
+    *    c. Error Handling: Confirm that any errors are correctly reported and managed using the `error` structure.
+    * 2. Resources should be released properly after the function call. Note that the specified API is preferred to use for resource release if available.
+    */
+
+    // Create a temporary file to simulate a DWARF file
+    char filepath[256];
+    sprintf(filepath, "/tmp/libfuzzer.%d", getpid());
+
+    FILE *fp = fopen(filepath, "wb");
+    if (!fp) {
+        return 0;
+    }
+    fwrite(data, size, 1, fp);
+    fclose(fp);
+
+    Dwarf_Debug dbg = 0;
+    Dwarf_Error error = 0;
+    Dwarf_Global *types = nullptr;
+    Dwarf_Signed return_count = 0;
+
+    // Initialize the Dwarf_Debug structure
+    int res = dwarf_init_path(filepath, 0, 0, DW_GROUPNUMBER_ANY, 0, 0, &dbg, &error);
+    if (res == DW_DLV_ERROR) {
+        dwarf_dealloc_error(dbg, error);
+        dwarf_finish(dbg);
+    } else {
+        // Call the target function with the initialized parameters
+        res = dwarf_get_pubtypes(dbg, &types, &return_count, &error);
+        if (res == DW_DLV_OK) {
+            // Deallocate the retrieved public types
+            dwarf_globals_dealloc(dbg, types, return_count);
+        } else if (res == DW_DLV_ERROR) {
+            dwarf_dealloc_error(dbg, error);
+        }
+        dwarf_finish(dbg);
+    }
+
+    // Clean up the temporary file
+    unlink(filepath);
+    return 0;
+}
+```

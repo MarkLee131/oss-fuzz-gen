@@ -1,0 +1,93 @@
+```cpp
+#include <fuzzer/FuzzedDataProvider.h>
+extern "C" {
+#include "ldacBT.h"
+}
+
+extern "C" int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    // Initialize the library or any resources needed for the fuzzing process.
+    return 0;
+}
+
+extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    /**
+     * Goal: The fuzz driver should test `ldacBT_get_error_code` within the `libldac` project.
+     *       - `libldac` is an open-source library that provides LDAC codec functionalities.
+     *       - `ldacBT_get_error_code` is a function that retrieves the error code from an LDAC handle.
+     *
+     * Precondition: 1. The function is provided by the library `ldacBT.h` and implemented in `ldacBT.c`.
+     *               2. The function `ldacBT_get_error_code` is called with the following parameter:
+     *                 - @hLdacBT: a handle to an LDAC BT structure.
+     *                   - Precondition:
+     *                       a. Non-Null Requirement: The `hLdacBT` pointer must be non-null before calling `ldacBT_get_error_code`. If `hLdacBT` is null, the function returns `LDACBT_ERR_FATAL_HANDLE << 10`.
+     *                       b. Proper Initialization: The `HANDLE_LDAC_BT` structure pointed to by `hLdacBT` should be properly initialized, particularly ensuring that any previous pointers or fields are correctly set or reset prior to the call to prevent unintended behavior.
+     *                       c. Error Code Setup: The `error_code_api` and `error_code` fields within the `HANDLE_LDAC_BT` structure should be set to appropriate values to simulate different error conditions.
+     *                   - Postcondition:
+     *                       a. Resource Management: The `hLdacBT` pointer should be properly released after the function call by using `ldacBT_free_handle` if available.
+     *                       b. Error Code Retrieval: The function should correctly retrieve and return the error code based on the internal state of `hLdacBT`.
+     *
+     * Postcondition: 1. The function should be called with the mutated data to test the functionality of the function, returning the appropriate error code based on the internal state of `hLdacBT`.
+     *                   a. Error Code Validation: Ensure the error code is correctly calculated and returned based on the conditions specified in the function implementation.
+     *                   b. Handle Null Check: Verify that the function returns `LDACBT_ERR_FATAL_HANDLE << 10` when `hLdacBT` is null.
+     *                   c. Error Code Calculation: Confirm that the error code is calculated correctly based on the values of `error_code_api` and `error_code` fields within `hLdacBT`.
+     *                2. Resources should be released properly after the function call. Note that the specified API is preferred to use for resource release if available.
+     */
+
+    FuzzedDataProvider fuzzed_data(data, size);
+
+    // Allocate and initialize a HANDLE_LDAC_BT structure
+    HANDLE_LDAC_BT hLdacBT = ldacBT_get_handle();
+    if (hLdacBT) {
+        // Set up the internal state of the handle with fuzzed data
+        hLdacBT->error_code_api = fuzzed_data.ConsumeIntegral<int>();
+        hLdacBT->error_code = fuzzed_data.ConsumeIntegral<int>();
+
+        // Call the target function
+        int error_code = ldacBT_get_error_code(hLdacBT);
+
+        // Validate the returned error code (optional, based on specific test requirements)
+        // Ensure the error code is within expected ranges or matches expected patterns
+
+        // Release the handle
+        ldacBT_free_handle(hLdacBT);
+    } else {
+        // Handle allocation failure (if applicable)
+    }
+
+    return 0;
+}
+```
+
+### Detailed Specification for Creating a Fuzz Driver for `ldacBT_get_error_code` API
+
+#### Precondition
+1. **Library and Function Availability**:
+   - The function `ldacBT_get_error_code` is provided by the library `ldacBT.h` and implemented in `ldacBT.c`.
+   
+2. **Function Parameters**:
+   - **`hLdacBT`**: A handle to an LDAC BT structure.
+     - **Non-Null Requirement**: The `hLdacBT` pointer must be non-null before calling `ldacBT_get_error_code`. If `hLdacBT` is null, the function returns `LDACBT_ERR_FATAL_HANDLE << 10`.
+     - **Proper Initialization**: The `HANDLE_LDAC_BT` structure pointed to by `hLdacBT` should be properly initialized, particularly ensuring that any previous pointers or fields are correctly set or reset prior to the call to prevent unintended behavior.
+     - **Error Code Setup**: The `error_code_api` and `error_code` fields within the `HANDLE_LDAC_BT` structure should be set to appropriate values to simulate different error conditions.
+
+#### Postcondition
+1. **Function Execution**:
+   - The function should be called with the mutated data to test the functionality, returning the appropriate error code based on the internal state of `hLdacBT`.
+     - **Error Code Validation**: Ensure the error code is correctly calculated and returned based on the conditions specified in the function implementation.
+     - **Handle Null Check**: Verify that the function returns `LDACBT_ERR_FATAL_HANDLE << 10` when `hLdacBT` is null.
+     - **Error Code Calculation**: Confirm that the error code is calculated correctly based on the values of `error_code_api` and `error_code` fields within `hLdacBT`.
+
+2. **Resource Management**:
+   - The `hLdacBT` pointer should be properly released after the function call by using `ldacBT_free_handle` if available.
+   - Ensure proper memory management to prevent leaks or double frees, especially for fields with shared pointers.
+
+#### Implementation Steps
+1. **Initialize Fuzzed Data Provider**: Use `FuzzedDataProvider` to consume and provide fuzzed data for testing.
+2. **Allocate and Initialize Handle**:
+   - Use `ldacBT_get_handle` to allocate a `HANDLE_LDAC_BT` structure.
+   - Set the internal state of the handle (`error_code_api` and `error_code` fields) using fuzzed data.
+3. **Call Target Function**: Invoke `ldacBT_get_error_code` with the initialized handle.
+4. **Validate Returned Error Code**: Optionally, validate that the returned error code matches expected patterns or ranges.
+5. **Release Handle**: Use `ldacBT_free_handle` to release the handle and ensure proper resource management.
+
+By following this detailed specification, the fuzz driver for `ldacBT_get_error_code` can be implemented effectively, ensuring thorough testing of the function's behavior under various conditions.

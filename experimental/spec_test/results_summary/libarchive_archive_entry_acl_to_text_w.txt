@@ -1,0 +1,82 @@
+```cpp
+#include <fuzzer/FuzzedDataProvider.h>
+#include <archive.h>
+#include <archive_entry.h>
+
+extern "C" int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    // Initialize the library or any resources needed for the fuzzing process.
+    return 0;
+}
+
+extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    /**
+     * Goal: The fuzz driver should test `archive_entry_acl_to_text_w` within the `libarchive` project.
+     *        - `libarchive` is an open-source library for reading and writing streaming archive formats.
+     *        - `archive_entry_acl_to_text_w` is a function that converts ACL (Access Control List) entries to a wide-character string.
+
+     * Precondition: 1. The function is provided by the library `archive_entry.h` and implemented in `archive_entry_acl.c`.
+     *               2. The function `archive_entry_acl_to_text_w` is called with the following parameters:
+     *                 - @entry: a pointer to a `struct archive_entry` structure, which represents an archive entry.
+     *                   - Precondition:
+     *                       a. Non-Null Requirement: The `entry` pointer must be non-null before calling `archive_entry_acl_to_text_w`. If `entry` is null, the function should handle it gracefully.
+     *                       b. Proper Initialization: The `struct archive_entry` structure pointed to by `entry` should be properly initialized, particularly ensuring that the ACL field is set up correctly.
+     *                       c. Memory Management: Ensure that the `entry` structure is properly allocated and initialized before passing it to the function.
+     *                   - Postcondition:
+     *                       a. Resource Management: the `entry` pointer should be properly released after the function call by using `archive_entry_free` if available.
+     *                       b. ACL Integrity: The ACL field within the `entry` structure should be correctly converted to a wide-character string.
+
+     *                 - @len: a pointer to a `la_ssize_t` variable that will store the length of the resulting wide-character string.
+     *                   - Precondition:
+     *                       a. Non-Null Requirement: The `len` pointer must be non-null before calling `archive_entry_acl_to_text_w`. If `len` is null, the function should handle it gracefully.
+     *                       b. Proper Initialization: The `la_ssize_t` variable pointed to by `len` should be properly initialized.
+     *                   - Postcondition:
+     *                       a. Length Storage: On successful execution, the `len` pointer’s value should be updated to reflect the length of the wide-character string.
+
+     *                 - @flags: an integer that specifies the flags for the conversion process.
+     *                   - Precondition:
+     *                       a. Flags should be an integer. It can be any valid flag value accepted by the function.
+     *                   - Postcondition:
+     *                       a. The value of `flags` should not be modified by the function.
+     *                       b. The function should handle the flags as specified by the input value.
+
+     * Postcondition: 1. The function should be called with the mutated data to test the functionality of the function, returning a wide-character string if successful and null if an error occurs.
+     *                   a. ACL Conversion: Ensure the ACL entries are correctly converted to a wide-character string.
+     *                   b. Length Validation: Verify that the length of the resulting string is correctly stored in the `len` variable.
+     *                   c. Memory Safety: Ensure there are no memory leaks or buffer overflows during the conversion process.
+     *                2. Resources should be released properly after the function call. Note that the specified API is preferred to use for resource release if available.
+     **/
+
+    // Use FuzzedDataProvider to generate fuzzed inputs.
+    FuzzedDataProvider fuzzed_data(data, size);
+
+    // Create a new archive entry.
+    struct archive_entry *entry = archive_entry_new();
+    if (entry == nullptr) {
+        return 0;
+    }
+
+    // Initialize the ACL field within the entry.
+    // Note: This is a simplified example. In a real scenario, you would set up the ACL field with valid data.
+    archive_entry_acl_clear(entry);
+
+    // Generate a random integer for flags.
+    int flags = fuzzed_data.ConsumeIntegral<int>();
+
+    // Create a variable to store the length of the resulting wide-character string.
+    la_ssize_t len;
+
+    // Call the function with the fuzzed inputs.
+    wchar_t *result = archive_entry_acl_to_text_w(entry, &len, flags);
+
+    // Validate the result.
+    if (result != nullptr) {
+        // Free the resulting wide-character string.
+        free(result);
+    }
+
+    // Free the archive entry.
+    archive_entry_free(entry);
+
+    return 0;
+}
+```

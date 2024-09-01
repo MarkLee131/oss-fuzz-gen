@@ -1,0 +1,75 @@
+```cpp
+#include <fuzzer/FuzzedDataProvider.h>
+extern "C" {
+#include "ldacBT.h"
+}
+
+extern "C" int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    // Initialize the library or any resources needed for the fuzzing process.
+    return 0;
+}
+
+extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    /**
+     * Goal: The fuzz driver should test `ldacBT_set_eqmid` within the `libldac` project.
+     *        - `libldac` is an open-source library for LDAC codec, which is used in Bluetooth audio transmission.
+     *        - `ldacBT_set_eqmid` is a function that sets the EQMID (Equalizer Mode ID) for a given LDAC handle.
+     *
+     * Precondition: 1. The function is provided by the library `ldacBT.h` and implemented in `ldacBT.c`.
+     *               2. The function `ldacBT_set_eqmid` is called with the following parameters:
+     *                 - @hLdacBT: a handle to an LDAC codec instance.
+     *                   - Precondition:
+     *                       a. Non-Null Requirement: The `hLdacBT` pointer must be non-null before calling `ldacBT_set_eqmid`. If `hLdacBT` is null, the function returns `LDACBT_E_FAIL`.
+     *                       b. Proper Initialization: The `hLdacBT` handle should be properly initialized and in encoding mode (`LDACBT_PROCMODE_ENCODE`).
+     *                       c. Error Code Management: The `error_code_api` field in the `hLdacBT` structure should be properly managed to reflect the function's result.
+     *                   - Postcondition:
+     *                       a. Resource Management: Ensure that the `hLdacBT` handle is properly managed and released if necessary.
+     *                       b. Error Handling: The `error_code_api` field should be set appropriately based on the function's execution.
+     *
+     *                 - @eqmid: an integer that specifies the EQMID to be set.
+     *                   - Precondition:
+     *                       a. Valid Range: The `eqmid` value should be within the valid range defined by the library (e.g., `LDACBT_EQMID_HQ`, `LDACBT_EQMID_SQ`, `LDACBT_EQMID_MQ`).
+     *                       b. Assertion: The function `ldacBT_assert_eqmid` should be used to validate the `eqmid` value.
+     *                   - Postcondition:
+     *                       a. EQMID Setting: The `eqmid` value should be correctly set within the LDAC handle.
+     *
+     * Postcondition: 1. The function should be called with the mutated data to test the functionality, returning `LDACBT_S_OK` if successful and `LDACBT_E_FAIL` if an error occurs.
+     *                   a. EQMID Validation: Ensure the EQMID is correctly set according to the provided value.
+     *                   b. Error Code: Verify that the `error_code_api` field is set correctly based on the function's outcome.
+     *                2. Resources should be released properly after the function call. Note that the specified API is preferred to use for resource release if available.
+     */
+
+    // Create a FuzzedDataProvider to provide input data
+    FuzzedDataProvider provider(data, size);
+
+    // Initialize a handle for LDAC
+    HANDLE_LDAC_BT hLdacBT = ldacBT_get_handle();
+    if (hLdacBT == NULL) {
+        return 0;
+    }
+
+    // Set the handle to encoding mode
+    hLdacBT->proc_mode = LDACBT_PROCMODE_ENCODE;
+
+    // Generate a random EQMID value
+    int eqmid = provider.ConsumeIntegral<int>();
+
+    // Call the function with the fuzzed parameters
+    int result = ldacBT_set_eqmid(hLdacBT, eqmid);
+
+    // Perform postcondition checks
+    if (result == LDACBT_S_OK) {
+        // Check if the EQMID was set correctly
+        // (This would require additional functions or access to internal state for verification)
+    } else {
+        // Check if the error code was set correctly
+        // (This would require additional functions or access to internal state for verification)
+    }
+
+    // Release the LDAC handle
+    ldacBT_close_handle(hLdacBT);
+    ldacBT_free_handle(hLdacBT);
+
+    return 0;
+}
+```

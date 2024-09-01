@@ -1,0 +1,72 @@
+```cpp
+#include <fuzzer/FuzzedDataProvider.h>
+#include <libical/ical.h>
+
+extern "C" int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    // Initialize the library or any resources needed for the fuzzing process
+    return 0;
+}
+
+extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    /**
+     * Goal: The fuzz driver should test `icalcomponent_set_due` within the `libical` project.
+     *       - libical is an open-source library for parsing and manipulating iCalendar data.
+     *       - `icalcomponent_set_due` is a function that sets the due date of an iCalendar component.
+     *
+     * Precondition:
+     * 1. The function is provided by the library `libical` and implemented in `icalcomponent.c`.
+     * 2. The function `icalcomponent_set_due` is called with the following parameters:
+     *    - @comp: a pointer to an `icalcomponent` structure, which represents an iCalendar component.
+     *      - Precondition:
+     *        a. Non-Null Requirement: The `comp` pointer must be non-null before calling `icalcomponent_set_due`.
+     *        b. Proper Initialization: The `icalcomponent` structure pointed to by `comp` should be properly initialized.
+     *        c. Component Type: The `icalcomponent` should be of a type that can have a due date, such as a VTODO.
+     *      - Postcondition:
+     *        a. Resource Management: The `comp` pointer should be properly released after the function call.
+     *        b. Due Date Property: The `comp` should have its due date property set or updated based on the input.
+     *    - @v: a structure of type `icaltimetype` that represents the due date and time.
+     *      - Precondition:
+     *        a. Proper Initialization: The `icaltimetype` structure should be properly initialized with valid date and time values.
+     *      - Postcondition:
+     *        a. Timezone Handling: If the due date has a timezone, it should be correctly handled and set in the `comp`.
+     *        b. UTC Handling: If the due date is in UTC, it should be correctly recognized and set in the `comp`.
+     *
+     * Postcondition:
+     * 1. The function should be called with the mutated data to test the functionality of the function, returning 0 if successful.
+     * 2. Resources should be released properly after the function call.
+     */
+
+    // Create a FuzzedDataProvider to extract data for our parameters
+    FuzzedDataProvider provider(data, size);
+
+    // Generate a random iCalendar component string
+    std::string ical_string = provider.ConsumeRandomLengthString(size);
+    ical_string.push_back('\0'); // Null-terminate the string
+
+    // Create an iCalendar component from the string
+    icalcomponent *comp = icalcomponent_new_from_string(ical_string.c_str());
+    if (comp == NULL) {
+        return 0; // If the component creation fails, exit early
+    }
+
+    // Generate random values for the icaltimetype structure
+    struct icaltimetype due_time;
+    due_time.year = provider.ConsumeIntegralInRange<int>(1900, 2100);
+    due_time.month = provider.ConsumeIntegralInRange<int>(1, 12);
+    due_time.day = provider.ConsumeIntegralInRange<int>(1, 31);
+    due_time.hour = provider.ConsumeIntegralInRange<int>(0, 23);
+    due_time.minute = provider.ConsumeIntegralInRange<int>(0, 59);
+    due_time.second = provider.ConsumeIntegralInRange<int>(0, 59);
+    due_time.is_date = provider.ConsumeBool();
+    due_time.is_daylight = provider.ConsumeBool();
+    due_time.zone = icaltimezone_get_utc_timezone();
+
+    // Call the target function with the generated parameters
+    icalcomponent_set_due(comp, due_time);
+
+    // Free the iCalendar component
+    icalcomponent_free(comp);
+
+    return 0;
+}
+```

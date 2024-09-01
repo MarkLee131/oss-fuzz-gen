@@ -1,0 +1,79 @@
+```cpp
+#include <fuzzer/FuzzedDataProvider.h>
+#include <plist/plist.h>
+#include <stdio.h>
+
+extern "C" int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    // Initialize the library or any resources needed for the fuzzing process
+    return 0;
+}
+
+extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    /**
+     * Goal: The fuzz driver should test `plist_write_to_stream` within the `libplist` project.
+     *       - libplist is a library for handling Apple Property Lists (plist) format.
+     *       - `plist_write_to_stream` is a function that writes a plist structure to a stream in a specified format.
+     *
+     * Precondition: 1. The function is provided by the library `plist.h` and implemented in `plist.c`.
+     *               2. The function `plist_write_to_stream` is called with the following parameters:
+     *                 - @plist: a plist_t structure representing the plist to be written.
+     *                   - Precondition:
+     *                       a. Non-Null Requirement: The `plist` pointer must be non-null before calling `plist_write_to_stream`. If `plist` is null, the function returns `PLIST_ERR_INVALID_ARG`.
+     *                       b. Proper Initialization: The `plist_t` structure should be properly initialized and populated with valid plist data.
+     *                       c. Memory Management: Ensure that the `plist_t` structure is properly managed and freed after use.
+     *                   - Postcondition:
+     *                       a. Resource Management: The `plist` pointer should be properly released after the function call by using `plist_free` if available.
+     *                 - @stream: a FILE pointer to the output stream where the plist will be written.
+     *                   - Precondition:
+     *                       a. Non-Null Requirement: The `stream` pointer must be non-null before calling `plist_write_to_stream`. If `stream` is null, the function returns `PLIST_ERR_INVALID_ARG`.
+     *                       b. Proper Initialization: The FILE stream should be properly opened and writable.
+     *                   - Postcondition:
+     *                       a. Stream Integrity: Ensure that the stream is correctly written to and closed after use.
+     *                 - @format: a plist_format_t enumeration value specifying the format of the output plist.
+     *                   - Precondition:
+     *                       a. Valid Format: The `format` value should be one of the supported formats (e.g., PLIST_FORMAT_BINARY, PLIST_FORMAT_XML, etc.).
+     *                   - Postcondition:
+     *                       a. Format Handling: The function should handle the specified format correctly and return an appropriate error code for unsupported formats.
+     *                 - @options: a plist_write_options_t value specifying options for writing the plist.
+     *                   - Precondition:
+     *                       a. Valid Options: The `options` value should be a valid combination of plist_write_options_t flags.
+     *                   - Postcondition:
+     *                       a. Option Handling: The function should handle the specified options correctly and apply them to the output format.
+     *
+     * Postcondition: 1. The function should be called with the mutated data to test the functionality of the function, returning PLIST_ERR_SUCCESS if successful and an appropriate error code if an error occurs.
+     *                2. Resources should be released properly after the function call. Note that the specified API is preferred to use for resource release if available.
+     **/
+
+    // Use FuzzedDataProvider to extract data for the parameters
+    FuzzedDataProvider fuzzed_data(data, size);
+
+    // Extract a portion of data to simulate plist content
+    std::vector<uint8_t> plist_data = fuzzed_data.ConsumeBytes<uint8_t>(fuzzed_data.remaining_bytes() / 2);
+    plist_t plist = NULL;
+    plist_from_bin(reinterpret_cast<const char *>(plist_data.data()), plist_data.size(), &plist);
+
+    // Extract a portion of data to simulate the format and options
+    plist_format_t format = static_cast<plist_format_t>(fuzzed_data.ConsumeIntegralInRange<int>(0, 5));
+    plist_write_options_t options = fuzzed_data.ConsumeIntegral<plist_write_options_t>();
+
+    // Create a temporary file to simulate the stream
+    FILE *stream = tmpfile();
+    if (!stream) {
+        if (plist) {
+            plist_free(plist);
+        }
+        return 0;
+    }
+
+    // Call the function with the fuzzed data
+    plist_err_t result = plist_write_to_stream(plist, stream, format, options);
+
+    // Clean up resources
+    if (plist) {
+        plist_free(plist);
+    }
+    fclose(stream);
+
+    return 0;
+}
+```

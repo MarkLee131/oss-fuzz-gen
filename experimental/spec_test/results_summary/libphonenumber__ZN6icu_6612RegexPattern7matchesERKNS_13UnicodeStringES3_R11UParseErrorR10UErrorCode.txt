@@ -1,0 +1,91 @@
+```cpp
+#include <fuzzer/FuzzedDataProvider.h>
+#include <unicode/unistr.h>
+#include <unicode/regex.h>
+#include <unicode/utypes.h>
+#include <unicode/parseerr.h>
+
+extern "C" int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    // Initialize the ICU library or any resources needed for the fuzzing process
+    return 0;
+}
+
+extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    /**
+    * Goal: The fuzz driver should test `icu_66::RegexPattern::matches` within the `libphonenumber` project.
+    *        - `libphonenumber` is an open-source project for parsing, formatting, and validating international phone numbers.
+    *        - `icu_66::RegexPattern::matches` is a function that checks if a given input string matches a specified regular expression pattern.
+
+    * Precondition: 1. The function is provided by the ICU library and implemented in `regex.cpp`.
+    *               2. The function `icu_66::RegexPattern::matches` is called with the following parameters:
+    *                 - @regex: a reference to a `UnicodeString` object representing the regular expression pattern.
+    *                   - Precondition:
+    *                       a. Proper Initialization: The `UnicodeString` object should be properly initialized with a valid string value representing the regex pattern.
+    *                   - Postcondition:
+    *                       a. Resource Management: The `UnicodeString` object should be properly managed and released after the function call if necessary.
+    *                 - @input: a reference to a `UnicodeString` object representing the input string to be matched against the regex pattern.
+    *                   - Precondition:
+    *                       a. Proper Initialization: The `UnicodeString` object should be properly initialized with a valid string value representing the input string.
+    *                   - Postcondition:
+    *                       a. Resource Management: The `UnicodeString` object should be properly managed and released after the function call if necessary.
+    *                 - @pe: a reference to a `UParseError` structure that will store any parsing errors encountered during the regex compilation.
+    *                   - Precondition:
+    *                       a. Proper Initialization: The `UParseError` structure should be properly initialized to store parsing errors.
+    *                   - Postcondition:
+    *                       a. Error Reporting: The `UParseError` structure should be updated with any parsing errors encountered during the regex compilation.
+    *                 - @status: a reference to a `UErrorCode` enumeration value indicating the status of the operation.
+    *                   - Precondition:
+    *                       a. Proper Initialization: The `UErrorCode` value should be set to `U_ZERO_ERROR` before calling the function.
+    *                   - Postcondition:
+    *                       a. Error Handling: The `UErrorCode` value should be updated with any errors encountered during the operation.
+    *                       b. Function Return: The function should return `FALSE` if `U_FAILURE(status)` is true.
+
+    * Postcondition: 1. The function should be called with the mutated data to test the functionality of the function, returning `TRUE` if the input string matches the regex pattern and `FALSE` otherwise.
+    *                2. Resources should be released properly after the function call. Note that the specified API is preferred to use for resource release if available.
+    **/
+
+    FuzzedDataProvider fuzzed_data(data, size);
+
+    // Generate random strings for regex pattern and input string
+    std::string regex_str = fuzzed_data.ConsumeRandomLengthString();
+    std::string input_str = fuzzed_data.ConsumeRandomLengthString();
+
+    // Convert strings to UnicodeString
+    icu::UnicodeString regex_unicode_str = icu::UnicodeString::fromUTF8(regex_str);
+    icu::UnicodeString input_unicode_str = icu::UnicodeString::fromUTF8(input_str);
+
+    // Initialize UParseError and UErrorCode
+    UParseError pe;
+    UErrorCode status = U_ZERO_ERROR;
+
+    // Call the function with the fuzzed data
+    icu_66::RegexPattern::matches(regex_unicode_str, input_unicode_str, pe, status);
+
+    return 0;
+}
+```
+
+### Specification Details
+
+#### Precondition
+1. **UnicodeString Initialization**:
+   - `regex`: A `UnicodeString` object representing the regular expression pattern.
+     - Proper Initialization: Ensure `regex` is a valid `UnicodeString` object containing a valid regex pattern.
+   - `input`: A `UnicodeString` object representing the input string to be matched against the regex pattern.
+     - Proper Initialization: Ensure `input` is a valid `UnicodeString` object containing the input string.
+2. **UParseError Initialization**:
+   - `pe`: A `UParseError` structure to store any parsing errors encountered during regex compilation.
+     - Proper Initialization: Ensure `pe` is properly initialized to store parsing errors.
+3. **UErrorCode Initialization**:
+   - `status`: A `UErrorCode` enumeration value indicating the status of the operation.
+     - Proper Initialization: Set `status` to `U_ZERO_ERROR` before calling the function.
+
+#### Postcondition
+1. **Function Return**:
+   - The function should return `TRUE` if the input string matches the regex pattern and `FALSE` otherwise.
+   - If `U_FAILURE(status)` is true, the function should return `FALSE`.
+2. **Resource Management**:
+   - Properly manage and release resources for `UnicodeString` objects and any other allocated resources.
+3. **Error Reporting**:
+   - Update `UParseError` structure with any parsing errors encountered during regex compilation.
+   - Update `UErrorCode` value with any errors encountered during the operation.

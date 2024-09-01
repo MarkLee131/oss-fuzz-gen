@@ -1,0 +1,70 @@
+```cpp
+#include <fuzzer/FuzzedDataProvider.h>
+#include <stdlib.h>
+
+extern "C" {
+    char *af_gb_alloc_data(size_t len);
+}
+
+extern "C" int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    // Initialize any resources required for fuzzing af_gb_alloc_data
+    return 0;
+}
+
+extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    /**
+     * Goal: The fuzz driver should test `af_gb_alloc_data` within the `libfuse` project.
+     *       - `libfuse` is an open-source project that provides the Filesystem in Userspace (FUSE) interface.
+     *       - `af_gb_alloc_data` is a function that allocates memory and stores the pointer in a global array.
+     *
+     * Precondition:
+     * 1. The function is provided by the library and implemented as follows:
+     *    ```c
+     *    char *af_gb_alloc_data(size_t len) {
+     *      char *ptr = calloc(1, len);
+     *      pointer_arr[pointer_idx++] = (void*)ptr;
+     *      return ptr;
+     *    }
+     *    ```
+     * 2. The function `af_gb_alloc_data` is called with the following parameter:
+     *    - @len: a size_t value representing the length of memory to allocate.
+     *      - Precondition:
+     *        a. Valid Range: The `len` parameter should be a non-negative integer. The function should handle cases where `len` is zero by returning a valid pointer or NULL.
+     *        b. Memory Constraints: The function should handle large values of `len` gracefully, either by successfully allocating the memory or by returning NULL if the allocation fails.
+     *      - Postcondition:
+     *        a. Memory Allocation: The function should return a pointer to the allocated memory of size `len`. If the allocation fails, it should return NULL.
+     *        b. Zero Initialization: The allocated memory should be zero-initialized.
+     *        c. Pointer Management: The allocated pointer should be stored in the global array `pointer_arr` at the current index `pointer_idx`, which should then be incremented.
+     *        d. Resource Management: The caller should ensure that the allocated memory is properly freed after use to avoid memory leaks.
+     *
+     * Postcondition:
+     * 1. The function should be called with the mutated data to test the functionality of the function, returning the allocated pointer or NULL.
+     *    a. Allocation Success: If the function returns a non-NULL pointer, the allocated memory should be checked to ensure it is zero-initialized.
+     *    b. Allocation Failure: If the function returns NULL, it should be verified that the allocation failed gracefully without causing crashes or undefined behavior.
+     * 2. Resources should be released properly after the function call. Note that the specified API is preferred to use for resource release if available.
+     */
+
+    FuzzedDataProvider dataProvider(data, size);
+
+    // Generate a size_t value for the length of memory to allocate
+    size_t len = dataProvider.ConsumeIntegral<size_t>();
+
+    // Call the target function with the generated length
+    char *result = af_gb_alloc_data(len);
+
+    // Postcondition checks
+    if (result != NULL) {
+        // Verify that the allocated memory is zero-initialized
+        for (size_t i = 0; i < len; ++i) {
+            if (result[i] != 0) {
+                // If any byte is not zero, report an error
+                __builtin_trap();
+            }
+        }
+        // Free the allocated memory to avoid memory leaks
+        free(result);
+    }
+
+    return 0;
+}
+```

@@ -1,0 +1,115 @@
+```cpp
+#include <fuzzer/FuzzedDataProvider.h>
+#include <sodium.h>
+#include <stdlib.h>
+#include <stdint.h>
+
+extern "C" {
+#include "blake2b.h" // Assuming the header file where `blake2b_compress_avx2` is declared.
+}
+
+extern "C" int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    // Initialize the libsodium library, which is required for using BLAKE2 functions.
+    if (sodium_init() < 0) {
+        // Initialization failed
+        return -1;
+    }
+    return 0;
+}
+
+extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    /**
+     * Goal: The fuzz driver should test `blake2b_compress_avx2` within the `libsodium` project.
+     *        - libsodium is a widely-used library for encryption, decryption, signatures, etc.
+     *        - `blake2b_compress_avx2` is a function that performs a compression step in the BLAKE2b hash function using AVX2 instructions.
+     *
+     * Precondition: 
+     * 1. The function is provided by the library `blake2b.h` and implemented in `blake2b.c`.
+     * 2. The function `blake2b_compress_avx2` is called with the following parameters:
+     *    - @S: a pointer to a `blake2b_state` structure, which maintains the state of the BLAKE2b hash function.
+     *      - Precondition:
+     *          a. Non-Null Requirement: The `S` pointer must be non-null before calling `blake2b_compress_avx2`. If `S` is null, the function should not be called.
+     *          b. Proper Initialization: The `blake2b_state` structure pointed to by `S` should be properly initialized, particularly ensuring that the `h`, `t`, and `f` fields are set to appropriate values.
+     *      - Postcondition:
+     *          a. State Update: The `h` field of the `blake2b_state` structure should be updated with the new hash state after the compression step.
+     *          b. Resource Management: The `blake2b_state` structure should be properly managed to prevent memory leaks or corruption.
+     *    - @block: a pointer to a 128-byte array of data to be compressed.
+     *      - Precondition:
+     *          a. Non-Null Requirement: The `block` pointer must be non-null and point to a valid 128-byte array.
+     *      - Postcondition:
+     *          a. Data Integrity: The `block` data should remain unchanged after the function call.
+     *
+     * Postcondition:
+     * 1. The function should be called with the mutated data to test the functionality of the function, returning 0 if successful.
+     * 2. Resources should be released properly after the function call.
+     */
+    
+    // Check if the input size is sufficient for both blake2b_state and a 128-byte block
+    if (size < sizeof(blake2b_state) + BLAKE2B_BLOCKBYTES) {
+        return 0; // Not enough data to proceed
+    }
+
+    // Split the input data into the blake2b_state and the block
+    const uint8_t *state_data = data;
+    const uint8_t *block_data = data + sizeof(blake2b_state);
+
+    // Create and initialize the blake2b_state structure
+    blake2b_state S;
+    memcpy(&S, state_data, sizeof(blake2b_state));
+
+    // Call the function under test
+    blake2b_compress_avx2(&S, block_data);
+
+    // Postcondition checks (if any) can be added here
+
+    return 0;
+}
+```
+
+### Detailed Specification for Creating a Fuzz Driver for `blake2b_compress_avx2` API
+
+#### Precondition:
+1. **Non-Null Requirement**:
+   - The `blake2b_state` pointer (`S`) must be non-null before calling `blake2b_compress_avx2`.
+   - The `block` pointer must be non-null and point to a valid 128-byte array.
+
+2. **Proper Initialization**:
+   - The `blake2b_state` structure (`S`) should be properly initialized, ensuring that the `h`, `t`, and `f` fields are set to appropriate values.
+
+3. **Input Size**:
+   - The input data size must be at least the size of `blake2b_state` plus 128 bytes (BLAKE2B_BLOCKBYTES).
+
+#### Postcondition:
+1. **State Update**:
+   - The `h` field of the `blake2b_state` structure should be updated with the new hash state after the compression step.
+
+2. **Data Integrity**:
+   - The `block` data should remain unchanged after the function call.
+
+3. **Resource Management**:
+   - The `blake2b_state` structure should be properly managed to prevent memory leaks or corruption.
+
+4. **Return Value**:
+   - The function should return 0 if successful.
+
+#### Steps to Create the Fuzz Driver:
+1. **Initialize the Library**:
+   - Use `sodium_init()` to initialize the `libsodium` library.
+
+2. **Check Input Size**:
+   - Ensure the input data is large enough to contain both a `blake2b_state` structure and a 128-byte block.
+
+3. **Split Input Data**:
+   - Split the input data into the `blake2b_state` and the 128-byte block.
+
+4. **Initialize Structures**:
+   - Initialize the `blake2b_state` structure with the provided input data.
+
+5. **Call the API**:
+   - Call `blake2b_compress_avx2` with the initialized `blake2b_state` and the block data.
+
+6. **Postcondition Checks**:
+   - Verify the state update and data integrity as per the postconditions.
+
+7. **Return**:
+   - Return 0 after the function call.

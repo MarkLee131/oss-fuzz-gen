@@ -1,0 +1,118 @@
+```cpp
+#include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
+#include <libical/ical.h>
+#include <fuzzer/FuzzedDataProvider.h>
+
+extern "C" int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    // Initialize any resources needed for the fuzzing process.
+    return 0;
+}
+
+extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    /**
+     * Goal: The fuzz driver should test `icaltimezone_truncate_vtimezone` within the `libical` project.
+     *       - `libical` is an open-source implementation of the iCalendar protocols and data formats.
+     *       - `icaltimezone_truncate_vtimezone` truncates a VTIMEZONE component to a specified time window.
+     *
+     * Precondition:
+     * 1. The function `icaltimezone_truncate_vtimezone` is called with the following parameters:
+     *    - @vtz: a pointer to an `icalcomponent` structure representing a VTIMEZONE component.
+     *      - Precondition:
+     *          a. Non-Null Requirement: The `vtz` pointer must be non-null before calling `icaltimezone_truncate_vtimezone`.
+     *          b. Proper Initialization: The `icalcomponent` structure pointed to by `vtz` should be properly initialized and must represent a valid VTIMEZONE component.
+     *          c. Component Type: The `icalcomponent` should be of type VTIMEZONE.
+     *          d. Memory Management: Ensure that the `icalcomponent` is properly allocated and will be freed after the function call.
+     *    - @start: an `icaltimetype` structure representing the start of the truncation window.
+     *      - Precondition:
+     *          a. Proper Initialization: The `icaltimetype` structure should be properly initialized.
+     *          b. Valid Time: The `icaltimetype` should represent a valid time.
+     *    - @end: an `icaltimetype` structure representing the end of the truncation window.
+     *      - Precondition:
+     *          a. Proper Initialization: The `icaltimetype` structure should be properly initialized.
+     *          b. Valid Time: The `icaltimetype` should represent a valid time.
+     *    - @ms_compatible: an integer flag indicating Microsoft compatibility.
+     *      - Precondition:
+     *          a. Integer Value: The `ms_compatible` should be an integer (typically 0 or 1).
+     *
+     * Postcondition:
+     * 1. The function should correctly truncate the VTIMEZONE component to the specified time window.
+     * 2. The function should handle edge cases such as empty components, invalid dates, and overlapping time windows.
+     * 3. Resources should be released properly after the function call.
+     * 4. Ensure that the `icalcomponent` is still a valid VTIMEZONE component after truncation.
+     */
+
+    if (size < sizeof(icaltimetype) * 2 + sizeof(int)) {
+        // Not enough data to form valid inputs
+        return 0;
+    }
+
+    FuzzedDataProvider provider(data, size);
+
+    // Extract and create icalcomponent
+    size_t ical_size = provider.ConsumeIntegralInRange<size_t>(1, size - sizeof(icaltimetype) * 2 - sizeof(int));
+    char *ical_string = (char *)malloc(ical_size + 1);
+    memcpy(ical_string, provider.ConsumeBytes(ical_size).data(), ical_size);
+    ical_string[ical_size] = '\0';
+
+    icalcomponent *vtz = icalcomponent_new_from_string(ical_string);
+    if (!vtz || icalcomponent_isa(vtz) != ICAL_VTIMEZONE_COMPONENT) {
+        free(ical_string);
+        if (vtz) {
+            icalcomponent_free(vtz);
+        }
+        return 0;
+    }
+
+    // Extract icaltimetype start and end
+    icaltimetype start_time = provider.ConsumeIntegral<icaltimetype>();
+    icaltimetype end_time = provider.ConsumeIntegral<icaltimetype>();
+
+    // Extract ms_compatible flag
+    int ms_compatible = provider.ConsumeIntegral<int>();
+
+    // Call the function under test
+    icaltimezone_truncate_vtimezone(vtz, start_time, end_time, ms_compatible);
+
+    // Cleanup
+    icalcomponent_free(vtz);
+    free(ical_string);
+
+    return 0;
+}
+```
+
+### Detailed Specification for Fuzz Driver
+
+1. **Goal:**
+   - The fuzz driver should test the `icaltimezone_truncate_vtimezone` function within the `libical` project.
+
+2. **Preconditions:**
+   - **`vtz` (icalcomponent *):**
+     - Non-Null Requirement: The `vtz` pointer must be non-null before calling `icaltimezone_truncate_vtimezone`.
+     - Proper Initialization: The `icalcomponent` structure pointed to by `vtz` should be properly initialized and must represent a valid VTIMEZONE component.
+     - Component Type: The `icalcomponent` should be of type VTIMEZONE.
+     - Memory Management: Ensure that the `icalcomponent` is properly allocated and will be freed after the function call.
+   - **`start` (icaltimetype):**
+     - Proper Initialization: The `icaltimetype` structure should be properly initialized.
+     - Valid Time: The `icaltimetype` should represent a valid time.
+   - **`end` (icaltimetype):**
+     - Proper Initialization: The `icaltimetype` structure should be properly initialized.
+     - Valid Time: The `icaltimetype` should represent a valid time.
+   - **`ms_compatible` (int):**
+     - Integer Value: The `ms_compatible` should be an integer (typically 0 or 1).
+
+3. **Postconditions:**
+   - The function should correctly truncate the VTIMEZONE component to the specified time window.
+   - The function should handle edge cases such as empty components, invalid dates, and overlapping time windows.
+   - Resources should be released properly after the function call.
+   - Ensure that the `icalcomponent` is still a valid VTIMEZONE component after truncation.
+
+4. **Implementation Notes:**
+   - The fuzz driver will use `FuzzedDataProvider` to extract and create inputs for the `icaltimezone_truncate_vtimezone` function.
+   - The `icalcomponent` will be created from a fuzzed string.
+   - The `icaltimetype` structures for `start` and `end` will be extracted from the fuzzed data.
+   - The `ms_compatible` flag will be extracted from the fuzzed data.
+   - Proper cleanup of allocated resources will be ensured after the function call.
+```

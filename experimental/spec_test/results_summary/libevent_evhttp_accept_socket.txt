@@ -1,0 +1,72 @@
+```cpp
+#include <fuzzer/FuzzedDataProvider.h>
+extern "C" {
+#include "libevent/include/event2/http.h"
+#include "libevent/include/event2/util.h"
+}
+
+extern "C" int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    // Initialize the library or any resources `evhttp_accept_socket` within `libevent` project needed for the fuzzing process.
+    return 0;
+}
+
+extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    /**
+     * Goal: The fuzz driver should test `evhttp_accept_socket` within the `libevent` project.
+     *        - libevent is an event notification library for developing networked applications.
+     *        - `evhttp_accept_socket` is a function that binds a socket to an HTTP server and starts listening for incoming connections.
+     *
+     * Precondition: 1. The function is provided by the library `event2/http.h` and implemented in `http.c`.
+     *               2. The function `evhttp_accept_socket` is called with the following parameters:
+     *                 - @http: a pointer to an `evhttp` structure, which represents an HTTP server.
+     *                   - Precondition:
+     *                       a. Non-Null Requirement: The `http` pointer must be non-null before calling `evhttp_accept_socket`. If `http` is null, the function should return `-1`.
+     *                       b. Proper Initialization: The `evhttp` structure pointed to by `http` should be properly initialized using `evhttp_new` before calling `evhttp_accept_socket`.
+     *                       c. Event Base: The `evhttp` structure should be associated with a valid `event_base` to handle incoming connections.
+     *                   - Postcondition:
+     *                       a. Resource Management: The `http` pointer should be properly released after the function call by using `evhttp_free` if available.
+     *                       b. Socket Binding: The function should bind the provided socket to the HTTP server and start listening for incoming connections.
+     *
+     *                 - @fd: an integer that specifies the file descriptor of the socket to be accepted.
+     *                   - Precondition:
+     *                       a. Valid File Descriptor: The `fd` should be a valid socket file descriptor created using `socket` or similar functions.
+     *                       b. Socket State: The socket should be in a state ready to accept connections, typically created and bound to an address but not yet listening.
+     *                   - Postcondition:
+     *                       a. Socket Binding: The function should bind the provided socket to the HTTP server and start listening for incoming connections.
+     *                       b. Error Handling: If the socket cannot be accepted, the function should return `-1`.
+     *
+     * Postcondition: 1. The function should be called with the mutated data to test the functionality of the function, returning `0` if successful and `-1` if an error occurs.
+     *                   a. Socket Binding: Ensure the socket is correctly bound to the HTTP server and starts listening for incoming connections.
+     *                   b. Error Handling: Verify that the function handles invalid inputs gracefully and returns `-1` for errors.
+     *                   c. Resource Management: Ensure that resources are properly managed and released after the function call.
+     *                2. Resources should be released properly after the function call. Note that the specified API is preferred to use for resource release if available.
+     **/
+
+    FuzzedDataProvider data_provider(data, size);
+
+    // Create and initialize an event base
+    struct event_base *base = event_base_new();
+    if (!base) {
+        return 0;
+    }
+
+    // Create and initialize an evhttp structure
+    struct evhttp *http = evhttp_new(base);
+    if (!http) {
+        event_base_free(base);
+        return 0;
+    }
+
+    // Generate a random file descriptor
+    evutil_socket_t fd = data_provider.ConsumeIntegral<int>();
+
+    // Call the function with the generated inputs
+    int result = evhttp_accept_socket(http, fd);
+
+    // Clean up resources
+    evhttp_free(http);
+    event_base_free(base);
+
+    return 0;
+}
+```

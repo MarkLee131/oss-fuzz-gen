@@ -1,0 +1,73 @@
+```cpp
+#include <fuzzer/FuzzedDataProvider.h>
+extern "C" {
+#include "ldacBT.h"
+}
+
+extern "C" int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    // Initialize any resources needed for fuzzing ldacBT_set_eqmid_core
+    return 0;
+}
+
+extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    /**
+     * Goal: The fuzz driver should test `ldacBT_set_eqmid_core` within the `libldac` project.
+     *        - `libldac` is an open-source library for LDAC codec, which is used for high-resolution audio streaming.
+     *        - `ldacBT_set_eqmid_core` is a function that sets the equalizer mode ID for the LDAC codec handle.
+     *
+     * Precondition: 
+     * 1. The function is provided by the library `ldacBT.h` and implemented in `ldacBT.c`.
+     * 2. The function `ldacBT_set_eqmid_core` is called with the following parameters:
+     *    - @hLdacBT: a handle to the LDAC BT codec, represented by `HANDLE_LDAC_BT`.
+     *      - Precondition:
+     *          a. Non-Null Requirement: The `hLdacBT` pointer must be non-null before calling `ldacBT_set_eqmid_core`. If `hLdacBT` is null, the function behavior is undefined.
+     *          b. Proper Initialization: The `HANDLE_LDAC_BT` structure should be properly initialized using `ldacBT_get_handle` and `ldacBT_init_handle_encode`.
+     *          c. Valid Configuration: The handle should have a valid configuration, particularly ensuring that the `tx.pkt_type` field is set appropriately.
+     *          d. Resource Management: The handle should be properly released after the function call by using `ldacBT_close_handle` and `ldacBT_free_handle`.
+     *    - @eqmid: an integer that specifies the equalizer mode ID.
+     *      - Precondition:
+     *          a. Valid Range: The `eqmid` value should be within the valid range defined by the library (e.g., `LDACBT_EQMID_HQ`, `LDACBT_EQMID_SQ`, `LDACBT_EQMID_MQ`).
+     *          b. Proper Check: The `eqmid` value must be checked before calling this function.
+     *
+     * Postcondition:
+     * 1. The function should update the target equalizer mode ID (`tgt_eqmid`) and other related fields in the `HANDLE_LDAC_BT` structure.
+     *    - `tgt_eqmid` should be set to the provided `eqmid` value.
+     *    - `tgt_frmlen` should be calculated based on the channel count and frame length per channel, minus the LDAC frame header bytes.
+     *    - `tgt_nfrm_in_pkt` should be set according to the configuration obtained from `ldacBT_get_config`.
+     * 2. Resources should be released properly after the function call. Note that the specified API is preferred to use for resource release if available.
+     */
+
+    if (size < sizeof(int)) {
+        return 0; // Not enough data to extract an integer
+    }
+
+    FuzzedDataProvider dataProvider(data, size);
+
+    // Extract an integer value for eqmid
+    int eqmid = dataProvider.ConsumeIntegral<int>();
+
+    // Initialize the LDAC BT handle
+    HANDLE_LDAC_BT hLdacBT = ldacBT_get_handle();
+    if (hLdacBT == nullptr) {
+        return 0; // Failed to get handle
+    }
+
+    // Initialize the LDAC BT handle for encoding
+    int status = ldacBT_init_handle_encode(hLdacBT, 679, LDACBT_EQMID_HQ, LDACBT_CHANNEL_MODE_STEREO, LDACBT_SMPL_FMT_S16, 44100);
+    if (status != 0) {
+        ldacBT_free_handle(hLdacBT);
+        return 0; // Failed to initialize handle
+    }
+
+    // Call the target function with the fuzzed eqmid value
+    ldacBT_set_eqmid_core(hLdacBT, eqmid);
+
+    // Properly release the LDAC BT handle
+    ldacBT_close_handle(hLdacBT);
+    ldacBT_free_handle(hLdacBT);
+
+    return 0;
+}
+```
+
+This specification outlines the necessary steps to create a fuzz driver for the `ldacBT_set_eqmid_core` function within the `libldac` project. It includes detailed preconditions and postconditions to ensure the function is tested effectively and resources are managed properly.

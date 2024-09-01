@@ -1,0 +1,86 @@
+```cpp
+#include <fuzzer/FuzzedDataProvider.h>
+#include <sodium.h>
+#include <stdlib.h>
+#include <assert.h>
+#include "../src/argon2.h"  // Adjust the path to where argon2.h is located in the libsodium project
+
+extern "C" int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    // Initialize the sodium library, which is required for the argon2 functions
+    if (sodium_init() < 0) {
+        // Initialization failed
+        return -1;
+    }
+    return 0;
+}
+
+extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    /**
+     * Goal: The fuzz driver should test `argon2_finalize` within the `libsodium` project.
+     *       - `libsodium` is a popular cryptographic library.
+     *       - `argon2_finalize` is a function that finalizes the Argon2 hashing process.
+     *
+     * Precondition: 1. The function `argon2_finalize` is called with the following parameters:
+     *                 - @context: a pointer to an `argon2_context` structure.
+     *                   - Precondition:
+     *                       a. Non-Null Requirement: The `context` pointer must be non-null before calling `argon2_finalize`.
+     *                       b. Proper Initialization: The `argon2_context` structure should be properly initialized with valid parameters.
+     *                       c. Output Buffer: The `out` field in `argon2_context` should point to a valid memory location of at least `outlen` bytes.
+     *                       d. Output Length: The `outlen` field should be a positive integer indicating the length of the output hash.
+     *                   - Postcondition:
+     *                       a. Resource Management: The `context` pointer should be properly managed, ensuring no memory leaks.
+     *                       b. Output Integrity: The `out` buffer should contain the final Argon2 hash.
+     *
+     *                 - @instance: a pointer to an `argon2_instance_t` structure.
+     *                   - Precondition:
+     *                       a. Non-Null Requirement: The `instance` pointer must be non-null before calling `argon2_finalize`.
+     *                       b. Proper Initialization: The `argon2_instance_t` structure should be properly initialized, particularly ensuring that the memory region and lane lengths are valid.
+     *                   - Postcondition:
+     *                       a. Resource Management: The `instance` pointer should be properly released after the function call.
+     *                       b. Memory Integrity: The memory region within `instance` should be correctly managed and cleared as necessary.
+     *
+     * Postcondition: 1. The function should be called with the mutated data to test the functionality of the function, returning 0 if successful and -1 if an error occurs.
+     *                   a. Hash Validation: Ensure the final hash in the `out` buffer is correctly computed according to Argon2 specifications.
+     *                   b. Memory Management: Verify that all memory allocations are properly managed and freed to prevent leaks.
+     *                   c. Error Handling: Ensure that the function handles invalid inputs gracefully without crashes or undefined behavior.
+     **/
+
+    FuzzedDataProvider dataProvider(data, size);
+
+    // Create and initialize argon2_context
+    argon2_context context;
+    context.out = (uint8_t *)malloc(ARGON2_MAX_OUTLEN);
+    context.outlen = dataProvider.ConsumeIntegralInRange<uint32_t>(1, ARGON2_MAX_OUTLEN);
+    context.pwd = (uint8_t *)dataProvider.ConsumeBytes<uint8_t>(dataProvider.ConsumeIntegralInRange<size_t>(1, ARGON2_MAX_PWD_LENGTH)).data();
+    context.pwdlen = dataProvider.ConsumeIntegralInRange<uint32_t>(1, ARGON2_MAX_PWD_LENGTH);
+    context.salt = (uint8_t *)dataProvider.ConsumeBytes<uint8_t>(dataProvider.ConsumeIntegralInRange<size_t>(1, ARGON2_MAX_SALT_LENGTH)).data();
+    context.saltlen = dataProvider.ConsumeIntegralInRange<uint32_t>(1, ARGON2_MAX_SALT_LENGTH);
+    context.secret = NULL;
+    context.secretlen = 0;
+    context.ad = NULL;
+    context.adlen = 0;
+    context.t_cost = dataProvider.ConsumeIntegralInRange<uint32_t>(1, ARGON2_MAX_TIME_COST);
+    context.m_cost = dataProvider.ConsumeIntegralInRange<uint32_t>(ARGON2_MIN_MEMORY, ARGON2_MAX_MEMORY);
+    context.lanes = dataProvider.ConsumeIntegralInRange<uint32_t>(1, ARGON2_MAX_LANES);
+    context.threads = dataProvider.ConsumeIntegralInRange<uint32_t>(1, ARGON2_MAX_THREADS);
+    context.flags = ARGON2_DEFAULT_FLAGS;
+
+    // Create and initialize argon2_instance_t
+    argon2_instance_t instance;
+    instance.region = (memory_region *)malloc(sizeof(memory_region));
+    instance.region->memory = (block *)malloc(context.lanes * context.m_cost * sizeof(block));
+    instance.lane_length = context.m_cost / context.lanes;
+    instance.lanes = context.lanes;
+    instance.threads = context.threads;
+
+    // Call the function with the initialized context and instance
+    argon2_finalize(&context, &instance);
+
+    // Clean up
+    free(instance.region->memory);
+    free(instance.region);
+    free(context.out);
+
+    return 0;
+}
+```

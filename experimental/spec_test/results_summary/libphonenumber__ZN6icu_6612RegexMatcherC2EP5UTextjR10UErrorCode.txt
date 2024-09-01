@@ -1,0 +1,72 @@
+```cpp
+#include <fuzzer/FuzzedDataProvider.h>
+#include <unicode/utext.h>
+#include <unicode/uregex.h>
+#include <unicode/parseerr.h>
+#include <unicode/utypes.h>
+#include <unicode/regex.h>
+
+extern "C" int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    // Initialize the library or any resources needed for the fuzzing process
+    return 0;
+}
+
+extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    /**
+     * Goal: The fuzz driver should test `icu_66::RegexMatcher::RegexMatcher` within the `libphonenumber` project.
+     *        - `libphonenumber` is an open-source library for parsing, formatting, and validating international phone numbers.
+     *        - `icu_66::RegexMatcher::RegexMatcher` is a constructor used to initialize a RegexMatcher object with a given regular expression pattern and flags.
+     *
+     * Precondition: 1. The function is provided by the library `unicode/regex.h` and implemented in `regex.cpp`.
+     *               2. The function `icu_66::RegexMatcher::RegexMatcher` is called with the following parameters:
+     *                 - @regexp: a pointer to a `UText` structure, which represents the regular expression pattern.
+     *                   - Precondition:
+     *                       a. Non-Null Requirement: The `regexp` pointer must be non-null before calling `RegexMatcher`. If `regexp` is null, the function should handle it gracefully.
+     *                       b. Proper Initialization: The `UText` structure pointed to by `regexp` should be properly initialized, particularly ensuring that any previous pointers or lengths are correctly set or reset prior to the call to prevent unintended behavior.
+     *                   - Postcondition:
+     *                       a. Resource Management: The `regexp` pointer should be properly released after the function call if necessary.
+     *                       b. Pattern Compilation: The regular expression pattern should be compiled successfully if valid.
+     *                   
+     *                 - @flags: a 32-bit unsigned integer that specifies the compilation flags for the regular expression.
+     *                   - Precondition:
+     *                       a. The `flags` should be a valid combination of ICU regular expression flags.
+     *                   - Postcondition:
+     *                       a. The value of `flags` should not be modified by the function.
+     *                       b. The function should handle the flags as specified by the input value.
+     *
+     *                 - @status: a reference to a `UErrorCode` variable that will store the error status.
+     *                   - Precondition:
+     *                       a. The `status` should be a valid `UErrorCode` variable.
+     *                   - Postcondition:
+     *                       a. The `status` should reflect the success or failure of the function call.
+     *                       b. If an error occurs, `status` should be set to the appropriate error code.
+     *
+     * Postcondition: 1. The function should be called with the mutated data to test the functionality of the constructor, returning 0 if successful and -1 if an error occurs.
+     *                2. Resources should be released properly after the function call. Note that the specified API is preferred to use for resource release if available.
+     **/
+
+    FuzzedDataProvider fuzzed_data(data, size);
+
+    // Create a UText from the fuzzed data
+    UErrorCode status = U_ZERO_ERROR;
+    UText ut = UTEXT_INITIALIZER;
+    UText *regexp = utext_openUTF8(&ut, reinterpret_cast<const char*>(data), size, &status);
+    if (U_FAILURE(status)) {
+        return 0;
+    }
+
+    // Fuzz the flags
+    uint32_t flags = fuzzed_data.ConsumeIntegral<uint32_t>();
+
+    // Initialize the status variable
+    UErrorCode errorCode = U_ZERO_ERROR;
+
+    // Call the constructor
+    icu_66::RegexMatcher regexMatcher(regexp, flags, errorCode);
+
+    // Clean up
+    utext_close(regexp);
+
+    return 0;
+}
+```

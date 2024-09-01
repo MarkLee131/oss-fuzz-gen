@@ -1,0 +1,67 @@
+```cpp
+#include <fuzzer/FuzzedDataProvider.h>
+#include <libical/ical.h>
+
+extern "C" int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    // Initialize the library or any resources needed for the fuzzing process
+    return 0;
+}
+
+extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    /**
+     * Goal: The fuzz driver should test `icalcomponent_merge_component` within the `libical` project.
+     *       - libical is an open-source library for parsing and manipulating iCalendar data.
+     *       - `icalcomponent_merge_component` is a function that merges two VCALENDAR components, handling VTIMEZONE components and renaming TZIDs if necessary.
+     *
+     * Precondition: 1. The function is provided by the library `libical/ical.h` and implemented in `libical/icalcomponent.c`.
+     *               2. The function `icalcomponent_merge_component` is called with the following parameters:
+     *                 - @comp: a pointer to an `icalcomponent` structure representing the target VCALENDAR component.
+     *                   - Precondition:
+     *                       a. Non-Null Requirement: The `comp` pointer must be non-null before calling `icalcomponent_merge_component`. If `comp` is null, the function should not proceed.
+     *                       b. Proper Initialization: The `icalcomponent` structure pointed to by `comp` should be properly initialized as a VCALENDAR component.
+     *                       c. Component Type: The `comp` should be of type `ICAL_VCALENDAR_COMPONENT`.
+     *                   - Postcondition:
+     *                       a. Resource Management: The `comp` pointer should be properly managed after the function call, ensuring that no memory leaks occur.
+     *                       b. Component Integrity: The `comp` should contain all merged subcomponents from `comp_to_merge`, excluding VTIMEZONE components that are not needed.
+     *                       c. VTIMEZONE Handling: Any necessary VTIMEZONE components should be added to `comp`, and TZID references should be correctly renamed.
+     *                       d. Memory Management: Ensure that any dynamically allocated memory (e.g., `tzids_to_rename` array) is properly freed.
+     *
+     *                 - @comp_to_merge: a pointer to an `icalcomponent` structure representing the source VCALENDAR component to be merged.
+     *                   - Precondition:
+     *                       a. Non-Null Requirement: The `comp_to_merge` pointer must be non-null before calling `icalcomponent_merge_component`. If `comp_to_merge` is null, the function should not proceed.
+     *                       b. Proper Initialization: The `icalcomponent` structure pointed to by `comp_to_merge` should be properly initialized as a VCALENDAR component.
+     *                       c. Component Type: The `comp_to_merge` should be of type `ICAL_VCALENDAR_COMPONENT`.
+     *                   - Postcondition:
+     *                       a. Resource Management: The `comp_to_merge` pointer should be properly managed after the function call, ensuring that no memory leaks occur.
+     *                       b. Component Transfer: Most subcomponents of `comp_to_merge` should be moved to `comp`, excluding unnecessary VTIMEZONE components.
+     *                       c. Memory Management: Ensure that `comp_to_merge` is properly freed after its subcomponents have been moved.
+     *
+     * Postcondition: 1. The function should be called with the mutated data to test the functionality of the function, returning 0 if successful.
+     *                2. Resources should be released properly after the function call. Note that the specified API is preferred to use for resource release if available.
+     */
+
+    // Create a FuzzedDataProvider instance to interpret the input data
+    FuzzedDataProvider data_provider(data, size);
+
+    // Create two strings from the input data to represent the two VCALENDAR components
+    std::string ical_string1 = data_provider.ConsumeRandomLengthString(size / 2);
+    std::string ical_string2 = data_provider.ConsumeRemainingBytesAsString();
+
+    // Convert the strings to icalcomponent structures
+    icalcomponent *ical1 = icalcomponent_new_from_string(ical_string1.c_str());
+    icalcomponent *ical2 = icalcomponent_new_from_string(ical_string2.c_str());
+
+    // Ensure both components are non-null and of type VCALENDAR before merging
+    if (ical1 != NULL && ical2 != NULL && 
+        icalcomponent_isa(ical1) == ICAL_VCALENDAR_COMPONENT &&
+        icalcomponent_isa(ical2) == ICAL_VCALENDAR_COMPONENT) {
+        icalcomponent_merge_component(ical1, ical2);
+    }
+
+    // Free the icalcomponent structures
+    icalcomponent_free(ical1);
+    icalcomponent_free(ical2);
+
+    return 0;
+}
+```

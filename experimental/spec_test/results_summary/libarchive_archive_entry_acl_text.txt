@@ -1,0 +1,70 @@
+```cpp
+#include <fuzzer/FuzzedDataProvider.h>
+#include <archive.h>
+#include <archive_entry.h>
+
+extern "C" int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    // Initialize the library or any resources needed for the fuzzing process
+    return 0;
+}
+
+extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    /**
+     * Goal: The fuzz driver should test `archive_entry_acl_text` within the `libarchive` project.
+     *        - `libarchive` is a multi-format archive and compression library.
+     *        - `archive_entry_acl_text` is a function that returns a text representation of the access control list (ACL) for an archive entry.
+
+     * Precondition: 1. The function is provided by the library `archive_entry.h` and implemented in `archive_entry.c`.
+     *               2. The function `archive_entry_acl_text` is called with the following parameters:
+     *                 - @entry: a pointer to a `struct archive_entry` structure, which represents an entry within an archive.
+     *                   - Precondition:
+     *                       a. Non-Null Requirement: The `entry` pointer must be non-null before calling `archive_entry_acl_text`. If `entry` is null, the function should handle it gracefully without crashing.
+     *                       b. Proper Initialization: The `struct archive_entry` structure pointed to by `entry` should be properly initialized, particularly ensuring that any previous pointers or lengths are correctly set or reset prior to the call to prevent unintended behavior.
+     *                       c. ACL Setup: The `acl` field within `entry` should be properly set up, including any necessary initialization of `acl_text`.
+     *                   - Postcondition:
+     *                       a. Resource Management: The `acl_text` field should be properly managed, ensuring no memory leaks or double frees.
+     *                       b. Text Representation: The returned text representation should accurately reflect the ACL of the archive entry.
+
+     *                 - @flags: an integer that specifies the format and options for the text representation of the ACL.
+     *                   - Precondition:
+     *                       a. `flags` should be an integer. Valid values should be defined within the library's documentation.
+     *                   - Postcondition:
+     *                       a. The value of `flags` should not be modified by the function.
+     *                       b. The function should handle the flags as specified by the input value.
+
+     * Postcondition: 1. The function should be called with the mutated data to test the functionality of the function, returning the text representation of the ACL if successful or NULL if an error occurs.
+     *                   a. ACL Text Validation: Ensure the ACL text is correctly formatted according to the specified flags.
+     *                   b. Memory Management: Confirm that any allocated memory is properly managed, preventing leaks or double frees.
+     *                2. Resources should be released properly after the function call. Note that the specified API is preferred to use for resource release if available.
+     **/
+
+    // Create a FuzzedDataProvider to extract data from the input buffer
+    FuzzedDataProvider dataProvider(data, size);
+
+    // Allocate and initialize a struct archive_entry
+    struct archive_entry *entry = archive_entry_new();
+    if (entry == NULL) {
+        return 0; // Early exit if allocation fails
+    }
+
+    // Set up the ACL field within the entry
+    archive_entry_acl_clear(entry);
+
+    // Extract an integer for the flags parameter
+    int flags = dataProvider.ConsumeIntegral<int>();
+
+    // Call the target function with the fuzzed inputs
+    const char *acl_text = archive_entry_acl_text(entry, flags);
+
+    // Validate the returned ACL text if not NULL
+    if (acl_text != NULL) {
+        // Perform any necessary validation on the returned ACL text
+        // For example, check if the text is properly formatted
+    }
+
+    // Clean up and release resources
+    archive_entry_free(entry);
+
+    return 0;
+}
+```

@@ -1,0 +1,70 @@
+```cpp
+#include <fuzzer/FuzzedDataProvider.h>
+extern "C" {
+#include "libevent/include/event2/event.h"
+#include "libevent/include/event2/http.h"
+}
+
+extern "C" int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    // Initialize the library or any resources needed for the fuzzing process
+    event_enable_debug_logging(EVENT_DBG_ALL);
+    return 0;
+}
+
+extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    /**
+     * Goal: The fuzz driver should test `evhttp_bind_socket` within the `libevent` project.
+     *        - libevent is an event notification library for developing networked applications.
+     *        - `evhttp_bind_socket` is a function that binds an HTTP server to a specific address and port.
+
+     * Precondition:
+     * 1. The function is provided by the library `event2/http.h`.
+     * 2. The function `evhttp_bind_socket` is called with the following parameters:
+     *    - @http: a pointer to an `evhttp` structure, representing an HTTP server.
+     *      - Precondition:
+     *        a. Non-Null Requirement: The `http` pointer must be non-null before calling `evhttp_bind_socket`.
+     *        b. Proper Initialization: The `evhttp` structure pointed to by `http` should be properly initialized using `evhttp_new`.
+     *        c. Resource Management: The `http` pointer should be properly released after the function call using `evhttp_free` if available.
+     *    - @address: a pointer to a character string representing the address to bind to.
+     *      - Precondition:
+     *        a. Non-Null Requirement: The `address` pointer must be non-null before calling `evhttp_bind_socket`.
+     *        b. Valid Address: The `address` should be a valid IP address or hostname.
+     *    - @port: an unsigned 16-bit integer representing the port to bind to.
+     *      - Precondition:
+     *        a. Valid Range: The `port` should be within the valid range of 0 to 65535.
+     * 
+     * Postcondition:
+     * 1. The function should be called with the mutated data to test the functionality of the function, returning 0 if successful and -1 if an error occurs.
+     *    - Successful Bind: If the function returns 0, it indicates that the HTTP server has been successfully bound to the specified address and port.
+     *    - Error Handling: If the function returns -1, it indicates an error in binding the HTTP server.
+     * 2. Resources should be released properly after the function call. Note that the specified API is preferred to use for resource release if available.
+     */
+
+    FuzzedDataProvider data_provider(data, size);
+
+    // Generate fuzzed data for the `address` parameter
+    std::string address = data_provider.ConsumeRandomLengthString();
+
+    // Generate fuzzed data for the `port` parameter
+    ev_uint16_t port = data_provider.ConsumeIntegral<ev_uint16_t>();
+
+    // Initialize the `evhttp` structure
+    struct event_base *base = event_base_new();
+    struct evhttp *http = evhttp_new(base);
+
+    // Ensure the `http` structure is properly initialized
+    if (http == NULL) {
+        event_base_free(base);
+        return 0;
+    }
+
+    // Call the `evhttp_bind_socket` function with fuzzed data
+    int result = evhttp_bind_socket(http, address.c_str(), port);
+
+    // Release resources
+    evhttp_free(http);
+    event_base_free(base);
+
+    return 0;
+}
+```

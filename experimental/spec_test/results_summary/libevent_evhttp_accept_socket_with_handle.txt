@@ -1,0 +1,75 @@
+```cpp
+#include <fuzzer/FuzzedDataProvider.h>
+#include <event2/event.h>
+#include <event2/http.h>
+#include <event2/listener.h>
+
+extern "C" int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    // Initialize the library or any resources needed for the fuzzing process
+    event_enable_debug_mode();
+    return 0;
+}
+
+extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    /**
+     * Goal: The fuzz driver should test `evhttp_accept_socket_with_handle` within the `libevent` project.
+     *        - `libevent` is a library that provides asynchronous I/O.
+     *        - `evhttp_accept_socket_with_handle` is a function that binds a socket to an HTTP server and returns a handle to the bound socket.
+     *
+     * Precondition: 1. The function is provided by the library `event2/http.h` and implemented in `http.c`.
+     *               2. The function `evhttp_accept_socket_with_handle` is called with the following parameters:
+     *                 - @http: a pointer to an `evhttp` structure, which represents an HTTP server.
+     *                   - Precondition:
+     *                       a. Non-Null Requirement: The `http` pointer must be non-null before calling `evhttp_accept_socket_with_handle`. If `http` is null, the function should return `NULL`.
+     *                       b. Proper Initialization: The `evhttp` structure pointed to by `http` should be properly initialized using `evhttp_new` with a valid `event_base`.
+     *                   - Postcondition:
+     *                       a. Resource Management: The `http` pointer should be properly released after the function call by using `evhttp_free` if available.
+     *                       b. Listener Management: The listener created within the function should be properly managed and freed if the binding fails.
+     *
+     *                 - @fd: an integer that specifies the file descriptor of the socket to be bound.
+     *                   - Precondition:
+     *                       a. Valid File Descriptor: The `fd` should be a valid file descriptor for a socket. If `fd` is invalid, the function should return `NULL`.
+     *                   - Postcondition:
+     *                       a. Socket Binding: The socket should be successfully bound to the HTTP server if the file descriptor is valid.
+     *
+     * Postcondition: 1. The function should be called with the mutated data to test the functionality of the function, returning a pointer to `evhttp_bound_socket` if successful and `NULL` if an error occurs.
+     *                   a. Listener Creation: Ensure that the listener is created with the correct flags and bound to the specified file descriptor.
+     *                   b. Bound Socket: Verify that the returned `evhttp_bound_socket` is correctly initialized and associated with the HTTP server.
+     *                   c. Error Handling: Confirm that the function handles errors gracefully, returning `NULL` and freeing resources if necessary.
+     *                2. Resources should be released properly after the function call. Note that the specified API is preferred to use for resource release if available.
+     **/
+
+    FuzzedDataProvider data_provider(data, size);
+
+    // Create a new event base
+    struct event_base *base = event_base_new();
+    if (!base) {
+        return 0;
+    }
+
+    // Create a new HTTP server
+    struct evhttp *http = evhttp_new(base);
+    if (!http) {
+        event_base_free(base);
+        return 0;
+    }
+
+    // Consume an integer for the file descriptor
+    int fd = data_provider.ConsumeIntegral<int>();
+
+    // Call the function with the fuzzed data
+    struct evhttp_bound_socket *bound_socket = evhttp_accept_socket_with_handle(http, fd);
+
+    // Check the postconditions
+    if (bound_socket) {
+        // Successfully bound, ensure proper resource management
+        evhttp_del_accept_socket(http, bound_socket);
+    }
+
+    // Free the HTTP server and event base
+    evhttp_free(http);
+    event_base_free(base);
+
+    return 0;
+}
+```

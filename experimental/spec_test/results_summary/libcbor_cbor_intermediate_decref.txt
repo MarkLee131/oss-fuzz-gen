@@ -1,0 +1,62 @@
+```cpp
+#include <fuzzer/FuzzedDataProvider.h>
+#include "cbor.h" // Include libcbor headers
+
+extern "C" int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    // Initialize the library or any resources needed for the fuzzing process
+    return 0;
+}
+
+extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    /**
+     * Goal: The fuzz driver should test `cbor_intermediate_decref` within the `libcbor` project.
+     *        - libcbor is a library for parsing and generating CBOR (Concise Binary Object Representation) data format.
+     *        - `cbor_intermediate_decref` is a function that decrements the reference count of a CBOR item and frees it if the count reaches zero.
+     *
+     * Precondition: 1. The function is provided by the library `cbor.h` and implemented in `cbor.c`.
+     *               2. The function `cbor_intermediate_decref` is called with the following parameter:
+     *                 - @item: a pointer to a `cbor_item_t` structure, which represents a CBOR data item.
+     *                   - Precondition:
+     *                       a. Non-Null Requirement: The `item` pointer must be non-null before calling `cbor_intermediate_decref`. If `item` is null, the function should handle it gracefully without causing a crash.
+     *                       b. Proper Initialization: The `cbor_item_t` structure pointed to by `item` should be properly initialized, particularly ensuring that the reference count is correctly set.
+     *                       c. Memory Management: The memory for the `cbor_item_t` structure should be allocated using the libcbor allocation functions to ensure compatibility.
+     *                   - Postcondition:
+     *                       a. Resource Management: The `item` pointer should be properly released after the function call if the reference count reaches zero.
+     *                       b. Reference Count: The reference count of the `cbor_item_t` should be decremented by one.
+     *                       c. Memory Safety: Ensure that the function does not cause any memory leaks or double frees.
+     *
+     * Postcondition: 1. The function should be called with the mutated data to test the functionality of the function, ensuring it handles various edge cases and invalid inputs gracefully.
+     *                2. Resources should be released properly after the function call. Note that the specified API is preferred to use for resource release if available.
+     */
+
+    // Use FuzzedDataProvider to generate inputs
+    FuzzedDataProvider fuzzed_data(data, size);
+
+    // Generate a random size for the CBOR item data
+    size_t item_size = fuzzed_data.ConsumeIntegralInRange<size_t>(1, 1024);
+
+    // Allocate memory for the CBOR item
+    cbor_item_t *item = cbor_new_definite_bytestring();
+    if (item == nullptr) {
+        return 0; // Exit if memory allocation fails
+    }
+
+    // Fill the CBOR item with random data
+    unsigned char *item_data = cbor_bytestring_handle(item);
+    if (item_data == nullptr) {
+        cbor_decref(&item);
+        return 0; // Exit if memory allocation fails
+    }
+    fuzzed_data.ConsumeData(item_data, item_size);
+
+    // Set the reference count to a random value
+    item->refcount = fuzzed_data.ConsumeIntegralInRange<uint32_t>(1, 100);
+
+    // Call the function under test
+    cbor_intermediate_decref(item);
+
+    // No need to manually free the item, as cbor_intermediate_decref will handle it
+
+    return 0;
+}
+```
