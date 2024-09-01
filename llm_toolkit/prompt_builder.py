@@ -326,7 +326,7 @@ class DefaultTemplateBuilder(PromptBuilder):
             self.benchmark.function_name + '.txt')) as f:
       spec_content = f.read().strip()
 
-    final_problem = 'Finish the fuzz driver: <specification>' + spec_content + '</specification>\nDO NOT leave any TODOs in the driver code.\n'
+    final_problem = 'Finish the fuzz driver: <specification>' + spec_content + '</specification>\nDO NOT leave any TODOs in the driver code. Finally remove the main specification body within the comments, keep the driver code in your output only\n'
     import json
 
     # experimental/spec_test/prompts/headerfiles.json
