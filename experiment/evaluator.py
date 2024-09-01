@@ -34,7 +34,7 @@ from llm_toolkit.crash_triager import TriageResult
 
 logger = logging.getLogger(__name__)
 
-LLM_FIX_LIMIT = int(os.getenv('LLM_FIX_LIMIT', '5'))
+LLM_FIX_LIMIT = int(os.getenv('LLM_FIX_LIMIT', '0'))
 GENERATE_CORPUS = bool(os.getenv('LLM_GENERATE_CORPUS', ''))
 
 OSS_FUZZ_COVERAGE_BUCKET = 'oss-fuzz-coverage'

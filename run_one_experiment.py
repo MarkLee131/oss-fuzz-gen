@@ -47,7 +47,7 @@ NUM_EVA = int(os.getenv('LLM_NUM_EVA', '3'))
 # WARN: Avoid large NUM_SAMPLES in highly parallelized local experiments.
 # It controls the number of LLM responses per prompt, which may exceed your
 # LLM's limit on query-per-second.
-NUM_SAMPLES = 2
+NUM_SAMPLES = 5
 MAX_TOKENS: int = 4096
 RUN_TIMEOUT: int = 30
 TEMPERATURE: float = 0.4
@@ -267,6 +267,8 @@ def generate_targets_for_analysis(
   #                        project_context_content=context_info)
   prompt = builder._build_cot_specification(  # type: ignore
       project_example_content=project_examples)
+
+  prompt.save(work_dirs.prompt)
   generated_targets = generate_targets(benchmark, model, prompt, work_dirs,
                                        builder)
   generated_targets = fix_code(work_dirs, generated_targets)
