@@ -72,10 +72,10 @@ def _clone_oss_fuzz_repo():
   #     OSS_FUZZ_DIR
   # ]
   clone_command = [
-        'git', 'clone', 'https://github.com/MarkLee131/oss-fuzz', '--depth', '1',
+      'git', 'clone', 'https://github.com/MarkLee131/oss-fuzz', '--depth', '1',
       OSS_FUZZ_DIR, '--branch', 'libsodium_test'
   ]
-  
+
   proc = sp.Popen(clone_command,
                   stdout=sp.PIPE,
                   stderr=sp.PIPE,
