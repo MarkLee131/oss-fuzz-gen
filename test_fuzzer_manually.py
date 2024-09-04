@@ -137,19 +137,6 @@ def generate_targets(benchmark: Benchmark, model: models.LLM,
   return generated_targets
 
 
-def fix_code(work_dirs: WorkDirs, generated_targets: List[str]) -> List[str]:
-  """Copies the generated target to the fixed target directory for simple
-    code fixes."""
-  fixed_targets = []
-  # Prepare all LLM-generated targets for code fixes.
-  for file in generated_targets:
-    fixed_target = os.path.join(work_dirs.fixed_targets, os.path.basename(file))
-    shutil.copyfile(file, fixed_target)
-    fixed_targets.append(fixed_target)
-
-  return fixed_targets
-
-
 def aggregate_results(target_stats: list[tuple[int, exp_evaluator.Result]],
                       generated_targets: list[str]) -> AggregatedResult:
   """Aggregates experiment status and results of a targets."""
@@ -240,64 +227,6 @@ def prepare(oss_fuzz_dir: str) -> None:
   oss_fuzz_checkout.postprocess_oss_fuzz()
 
 
-def generate_targets_for_analysis(
-    model: models.LLM,
-    benchmark: Benchmark,
-    work_dirs: WorkDirs,
-    template_dir: str,
-    use_context: bool,
-    example_pair: list[list[str]],
-    prompt_builder_to_use: str = 'DEFAULT',
-    cloud_experiment_bucket: str = '') -> List[str]:
-  """Generates a set of harnesses and build scripts ready to be evaluated
-    by `check_targets`. This is where the core first LLM logic is used to
-    generate harnesses.
-
-    Returns a list of folders with the generated artifacts.
-    """
-  logger.info('Generating targets')
-  if benchmark.use_project_examples:
-    project_examples = project_targets.generate_data(
-        benchmark.project,
-        benchmark.language,
-        cloud_experiment_bucket=cloud_experiment_bucket)
-  else:
-    project_examples = []
-
-  if use_context:
-    retriever = ContextRetriever(benchmark)
-    context_info = retriever.get_context_info()
-  else:
-    context_info = {}
-
-  # If this is a test benchmark then we will use a test prompt builder.
-  if benchmark.is_test_benchmark:
-    logger.info('Generating a target for test case: %s',
-                benchmark.test_file_path)
-    builder = prompt_builder.TestToHarnessConverter(model, benchmark,
-                                                    template_dir)
-  elif benchmark.language == 'jvm':
-    # For Java projects
-    builder = prompt_builder.DefaultJvmTemplateBuilder(model, benchmark,
-                                                       template_dir)
-  elif prompt_builder_to_use == 'CSpecific':
-    builder = prompt_builder.CSpecificBuilder(model, benchmark, template_dir)
-  else:
-    # Use default
-    builder = prompt_builder.DefaultTemplateBuilder(model, benchmark,
-                                                    template_dir)
-
-  # prompt = builder.build(example_pair,
-  #                        project_example_content=project_examples,
-  #                        project_context_content=context_info)
-  prompt = builder._build_cot_specification(  # type: ignore
-      project_example_content=project_examples)
-
-  prompt.save(work_dirs.prompt)
-  generated_targets = generate_targets(benchmark, model, prompt, work_dirs,
-                                       builder)
-  generated_targets = fix_code(work_dirs, generated_targets)
-  return generated_targets
 
 
 def initialize_thread(index):
@@ -335,57 +264,31 @@ def _fuzzing_pipelines(benchmark: Benchmark, model: models.LLM,
   return AggregatedResult.from_experiment_result(results)
 
 
-def run(benchmark: Benchmark, model: models.LLM, args: argparse.Namespace,
-        work_dirs: WorkDirs) -> Optional[AggregatedResult]:
-  """Generates code via LLM, and evaluates them."""
-  model.cloud_setup()
-
-  if args.agent:
-    # TODO(dongge): Make this default when it is ready.
-    return _fuzzing_pipelines(benchmark, model, args, work_dirs)
-
-  generated_targets = generate_targets_for_analysis(
-      model=model,
-      benchmark=benchmark,
-      work_dirs=work_dirs,
-      template_dir=args.template_directory,
-      use_context=args.context,
-      example_pair=prompt_builder.EXAMPLES[benchmark.language],
-      prompt_builder_to_use=args.prompt_builder,
-      cloud_experiment_bucket=args.cloud_experiment_bucket)
-
-  logger.info('Generated %d targets', len(generated_targets))
-  if not generated_targets:
-    return None
-
-  return check_targets(model.ai_binary, benchmark, work_dirs, generated_targets,
-                       args.cloud_experiment_name, args.cloud_experiment_bucket,
-                       args.run_timeout, model.name)
 
 if __name__ == '__main__':
  
-model = models.LLM.setup(
+    model = models.LLM.setup(
         ai_binary='',
         name='gpt-4o-azure',
         max_tokens=MAX_TOKENS,
         num_samples=NUM_SAMPLES,
         temperature=TEMPERATURE
     )
- benchmarks = Benchmark.from_yaml('benchmark-sets/spec_test/libphonenumber.yaml')
+    benchmarks = Benchmark.from_yaml('benchmark-sets/spec_test/libphonenumber.yaml')
  
- # backup work_dirs by copying to a new directory
-if os.path.exists(RESULTS_DIR):
-    shutil.copytree(RESULTS_DIR, f'{RESULTS_DIR}_backup')
+    # backup work_dirs by copying to a new directory
+    if os.path.exists(RESULTS_DIR):
+        shutil.copytree(RESULTS_DIR, f'{RESULTS_DIR}_backup')
  
-work_dirs = WorkDirs(RESULTS_DIR)
+    work_dirs = WorkDirs(RESULTS_DIR)
  
-generated_targets = []
-for file in os.listdir('results/output-libphonenumber-_zn6icu_6612regexpattern7matcheserkns_13unicodestringes3_r11uparseerrorr10uerrorcode/fixed_targets'):
-    if file.endswith('.c'):
-        generated_targets.append(file)
+    generated_targets = []
+    for file in os.listdir('results/output-libphonenumber-_zn6icu_6612regexpattern7matcheserkns_13unicodestringes3_r11uparseerrorr10uerrorcode/fixed_targets'):
+        if file.endswith('.c'):
+            generated_targets.append(file)
 
-for benchmark in benchmarks:
-    print(benchmark)
-    print("*"*50)
-    check_targets(ai_binary='', benchmark=benchmark, work_dirs=work_dirs, generated_targets=generated_targets, cloud_experiment_name='', cloud_experiment_bucket='', run_timeout=RUN_TIMEOUT, fixer_model_name='gpt-4o-azure')
-    break
+    for benchmark in benchmarks:
+        print(benchmark)
+        print("*"*50)
+        check_targets(ai_binary='', benchmark=benchmark, work_dirs=work_dirs, generated_targets=generated_targets, cloud_experiment_name='', cloud_experiment_bucket='', run_timeout=RUN_TIMEOUT, fixer_model_name='gpt-4o-azure')
+        break
