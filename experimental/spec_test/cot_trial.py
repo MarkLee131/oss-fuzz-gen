@@ -14,8 +14,8 @@ import openai
 import run_all_experiments
 from data_prep import introspector, project_targets
 from data_prep.project_context.context_introspector import ContextRetriever
-from experiment.benchmark import Benchmark
 from experiment import benchmark as benchmarklib
+from experiment.benchmark import Benchmark
 from experiment.workdir import WorkDirs
 from llm_toolkit import models, output_parser, prompt_builder, prompts
 
@@ -46,30 +46,32 @@ model = models.LLM.setup(ai_binary='',
                          temperature=TEMPERATURE)
 
 
-def retrieve_all_contexts( benchmark: Benchmark,
+def retrieve_all_contexts(benchmark: Benchmark,
                           cloud_experiment_bucket: str = '') -> List[str]:
   """Retrieves all contexts for the given benchmark."""
 
   retriever = ContextRetriever(benchmark)
-  context_info = retriever.get_context_info() # xref, source code...
-  
+  context_info = retriever.get_context_info()  # xref, source code...
+
   project_examples = project_targets.generate_data(
-        benchmark.project,
-        benchmark.language,
-        cloud_experiment_bucket=cloud_experiment_bucket) # existing fuzzers, the type return is a list of str list.
-  
+      benchmark.project,
+      benchmark.language,
+      cloud_experiment_bucket=cloud_experiment_bucket
+  )  # existing fuzzers, the type return is a list of str list.
+
   # print(f'project_examples: {project_examples}')
   # convert the project examples to a list of strings
   project_examples = [f'{example}\n' for example in project_examples]
-  
-  context_info['project_examples'] = project_examples # add the project examples to the context_info, the project examples are the existing fuzzers, format is a list of dict.
+
+  context_info[
+      'project_examples'] = project_examples  # add the project examples to the context_info, the project examples are the existing fuzzers, format is a list of dict.
 
   return context_info
 
 
-
-def query_llm(prompt: str, response_dir: str, response_file_name: str = ''
-              ) -> None:
+def query_llm(prompt: str,
+              response_dir: str,
+              response_file_name: str = '') -> None:
   """Queries OpenAI's API and stores response in |response_dir|."""
 
   # construct the prompt
@@ -89,7 +91,8 @@ def query_llm(prompt: str, response_dir: str, response_file_name: str = ''
 
   for _, choice in enumerate(completion.choices):  # type: ignore
     content = choice.message.content
-    with open(os.path.join(response_dir, f'{response_file_name}.txt'), 'w') as f:
+    with open(os.path.join(response_dir, f'{response_file_name}.txt'),
+              'w') as f:
       f.write(content)  # type: ignore
 
 
@@ -107,7 +110,8 @@ def query_llm(prompt: str, response_dir: str, response_file_name: str = ''
 #   return True
 
 
-def get_benchmarks(benchmarks_directory: str='', benchmark_yaml: str='') -> list[str]:
+def get_benchmarks(benchmarks_directory: str = '',
+                   benchmark_yaml: str = '') -> list[str]:
   """
   get all benchmarks from the benchmark yaml file or directory, by revising the `prepare_experiment_targets` function within
   `run_all_experiments.py`
@@ -117,7 +121,7 @@ def get_benchmarks(benchmarks_directory: str='', benchmark_yaml: str='') -> list
   benchmark_yamls = []
   if benchmark_yaml:
     benchmark_yamls = [benchmark_yaml]
-    
+
   else:
     benchmark_yamls = [
         os.path.join(benchmarks_directory, file)
@@ -137,21 +141,30 @@ def construct_prompt(benchmark: Benchmark, context_info: dict) -> str:
   # read the prompt template
   with open(os.path.join(PROMPTS_DIR, 'cot.txt'), 'r') as f:
     prompt_template = f.read()
-    
+
   # replace the placeholders in the prompt template with the actual values
-  
-  print(f'type of project_examples: {type(context_info["project_examples"])}, {type(context_info["project_examples"][0])}, {len(context_info["project_examples"])}')
-  
-  prompt = prompt_template.replace('{API_name}', benchmark.function_name).replace('{project_name}', benchmark.project).replace('{function_signature}', benchmark.function_signature).replace('{source_code}', context_info['func_source']).replace('{existing_fuzz_drivers}', '\n'.join(context_info['project_examples']))
-  
+
+  print(
+      f'type of project_examples: {type(context_info["project_examples"])}, {type(context_info["project_examples"][0])}, {len(context_info["project_examples"])}'
+  )
+
+  prompt = prompt_template.replace(
+      '{API_name}', benchmark.function_name).replace(
+          '{project_name}', benchmark.project).replace(
+              '{function_signature}', benchmark.function_signature).replace(
+                  '{source_code}', context_info['func_source']).replace(
+                      '{existing_fuzz_drivers}',
+                      '\n'.join(context_info['project_examples']))
+
   return prompt
+
 
 if __name__ == '__main__':
 
   # experiment_targets = get_benchmarks(benchmarks_directory='', benchmark_yaml='../../benchmark-sets/comparison/ada-url.yaml')
-  
-  experiment_targets = get_benchmarks(benchmarks_directory='../../benchmark-sets/spec_test/', benchmark_yaml='')
-  
+
+  experiment_targets = get_benchmarks(
+      benchmarks_directory='../../benchmark-sets/spec_test/', benchmark_yaml='')
 
   for target_benchmark in experiment_targets:
 
@@ -162,5 +175,6 @@ if __name__ == '__main__':
 
     prompt = construct_prompt(benchmark=target_benchmark, context_info=conx)
     # print(f'prompt:\n {prompt}')
-    
-    query_llm(prompt, RESULTS_DIR, target_benchmark.project + '_' + target_benchmark.function_name)
+
+    query_llm(prompt, RESULTS_DIR,
+              target_benchmark.project + '_' + target_benchmark.function_name)
