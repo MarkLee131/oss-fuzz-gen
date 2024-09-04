@@ -112,7 +112,7 @@ def query_llm(prompt: str,
 
 
 def get_benchmarks(benchmarks_directory: str = '',
-                   benchmark_yaml: str = '') -> list[str]:
+                   benchmark_yaml: str = '') -> list:
   """
   get all benchmarks from the benchmark yaml file or directory, by revising the `prepare_experiment_targets` function within
   `run_all_experiments.py`
