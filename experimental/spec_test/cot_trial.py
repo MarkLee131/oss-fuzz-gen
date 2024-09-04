@@ -116,7 +116,7 @@ def get_benchmarks(benchmarks_directory: str = '',
   """
   get all benchmarks from the benchmark yaml file or directory, by revising the `prepare_experiment_targets` function within
   `run_all_experiments.py`
-  
+
   This function will return a list of experiment configurations.
   """
   benchmark_yamls = []
