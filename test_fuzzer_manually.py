@@ -12,7 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Run an experiment with one function-under-test."""
+"""Test a fuzzer manually."""
 
 import argparse
 import dataclasses
@@ -227,8 +227,6 @@ def prepare(oss_fuzz_dir: str) -> None:
   oss_fuzz_checkout.postprocess_oss_fuzz()
 
 
-
-
 def initialize_thread(index):
   """Initialize thread-local storage for each thread."""
   # Thread-local storage object
@@ -264,31 +262,38 @@ def _fuzzing_pipelines(benchmark: Benchmark, model: models.LLM,
   return AggregatedResult.from_experiment_result(results)
 
 
-
 if __name__ == '__main__':
- 
-    model = models.LLM.setup(
-        ai_binary='',
-        name='gpt-4o-azure',
-        max_tokens=MAX_TOKENS,
-        num_samples=NUM_SAMPLES,
-        temperature=TEMPERATURE
-    )
-    benchmarks = Benchmark.from_yaml('benchmark-sets/spec_test/libphonenumber.yaml')
- 
-    # backup work_dirs by copying to a new directory
-    if os.path.exists(RESULTS_DIR):
-        shutil.copytree(RESULTS_DIR, f'{RESULTS_DIR}_backup')
- 
-    work_dirs = WorkDirs(RESULTS_DIR)
- 
-    generated_targets = []
-    for file in os.listdir('results/output-libphonenumber-_zn6icu_6612regexpattern7matcheserkns_13unicodestringes3_r11uparseerrorr10uerrorcode/fixed_targets'):
-        if file.endswith('.c'):
-            generated_targets.append(file)
 
-    for benchmark in benchmarks:
-        print(benchmark)
-        print("*"*50)
-        check_targets(ai_binary='', benchmark=benchmark, work_dirs=work_dirs, generated_targets=generated_targets, cloud_experiment_name='', cloud_experiment_bucket='', run_timeout=RUN_TIMEOUT, fixer_model_name='gpt-4o-azure')
-        break
+  model = models.LLM.setup(ai_binary='',
+                           name='gpt-4o-azure',
+                           max_tokens=MAX_TOKENS,
+                           num_samples=NUM_SAMPLES,
+                           temperature=TEMPERATURE)
+  benchmarks = Benchmark.from_yaml(
+      'benchmark-sets/spec_test/libphonenumber.yaml')
+
+  # backup work_dirs by copying to a new directory
+  if os.path.exists(RESULTS_DIR):
+    shutil.copytree(RESULTS_DIR, f'{RESULTS_DIR}_backup')
+
+  work_dirs = WorkDirs(f'{RESULTS_DIR}_backup', keep=True)
+
+  generated_targets = []
+  for file in os.listdir(
+      'results/output-libphonenumber-_zn6icu_6612regexpattern7matcheserkns_13unicodestringes3_r11uparseerrorr10uerrorcode/fixed_targets'
+  ):
+    if file.endswith('.c'):
+      generated_targets.append(file)
+
+  for benchmark in benchmarks:
+    print(benchmark)
+    print("*" * 50)
+    check_targets(ai_binary='',
+                  benchmark=benchmark,
+                  work_dirs=work_dirs,
+                  generated_targets=generated_targets,
+                  cloud_experiment_name='',
+                  cloud_experiment_bucket='',
+                  run_timeout=RUN_TIMEOUT,
+                  fixer_model_name='gpt-4o-azure')
+    break
