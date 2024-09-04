@@ -189,7 +189,7 @@ def generate_targets(benchmark: Benchmark, model: models.LLM,
                                                  n=1,
                                                  temperature=model.temperature,
                                                  max_tokens=model.max_tokens,
-                                                 stop=None), openai.OpenAIError)
+                                                 stop=None), [openai.OpenAIError])
 
       logger.info('Refined response: %s', refined_complation)
       for _, choice in enumerate(refined_complation.choices):  # type: ignore

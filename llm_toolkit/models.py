@@ -280,7 +280,8 @@ class GPT(LLM):
                                                  n=1,
                                                  temperature=self.temperature,
                                                  max_tokens=self.max_tokens,
-                                                 stop=None), [openai.OpenAIError])
+                                                 stop=None),
+          [openai.OpenAIError])
 
     else:
 
