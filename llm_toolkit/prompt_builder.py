@@ -316,17 +316,17 @@ class DefaultTemplateBuilder(PromptBuilder):
     #                                self.benchmark.needs_extern)
     with open(self.cot_priming_template_file) as f:
       priming = f.read().strip()
-      
+
     # process the demangled function name
     import cxxfilt
     try:
       demangled_name = cxxfilt.demangle(self.benchmark.function_name)
     except cxxfilt.InvalidName:
       demangled_name = self.benchmark.function_name
-    
+
     priming = priming.replace('{API_name}',
-                              demangled_name).replace(
-                                  '{project_name}', self.benchmark.project)
+                              demangled_name).replace('{project_name}',
+                                                      self.benchmark.project)
 
     with open(
         os.path.join(
