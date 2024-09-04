@@ -64,7 +64,9 @@ def retrieve_all_contexts(benchmark: Benchmark,
   project_examples = [f'{example}\n' for example in project_examples]
 
   context_info[
-      'project_examples'] = project_examples  # add the project examples to the context_info, the project examples are the existing fuzzers, format is a list of dict.
+      'project_examples'] = project_examples  
+  # add the project examples to the context_info, 
+  # the project examples are the existing fuzzers, format is a list of dict.
 
   return context_info
 
