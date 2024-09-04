@@ -47,7 +47,7 @@ model = models.LLM.setup(ai_binary='',
 
 
 def retrieve_all_contexts(benchmark: Benchmark,
-                          cloud_experiment_bucket: str = '') -> List[str]:
+                          cloud_experiment_bucket: str = '') -> dict:
   """Retrieves all contexts for the given benchmark."""
 
   retriever = ContextRetriever(benchmark)
@@ -63,9 +63,8 @@ def retrieve_all_contexts(benchmark: Benchmark,
   # convert the project examples to a list of strings
   project_examples = [f'{example}\n' for example in project_examples]
 
-  context_info[
-      'project_examples'] = project_examples  
-  # add the project examples to the context_info, 
+  context_info['project_examples'] = project_examples
+  # add the project examples to the context_info,
   # the project examples are the existing fuzzers, format is a list of dict.
 
   return context_info
