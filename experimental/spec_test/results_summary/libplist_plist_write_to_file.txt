@@ -11,72 +11,71 @@ extern "C" int LLVMFuzzerInitialize(int *argc, char ***argv) {
 extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     /**
      * Goal: The fuzz driver should test `plist_write_to_file` within the `libplist` project.
-     *        - libplist is an open-source library for handling Apple Property List (plist) format files.
-     *        - `plist_write_to_file` is a function that writes a plist structure to a file in a specified format.
+     *       - `libplist` is an open-source library for handling Apple Property List (plist) data.
+     *       - `plist_write_to_file` is a function that writes a plist structure to a file in a specified format.
 
      * Precondition: 1. The function is provided by the library `plist.h` and implemented in `plist.c`.
      *               2. The function `plist_write_to_file` is called with the following parameters:
-     *                 - @plist: a plist_t structure that represents a plist node.
+     *                 - @plist: a plist_t structure that represents a plist node tree.
      *                   - Precondition:
      *                       a. Non-Null Requirement: The `plist` pointer must be non-null before calling `plist_write_to_file`. If `plist` is null, the function returns `PLIST_ERR_INVALID_ARG`.
-     *                       b. Proper Initialization: The `plist_t` structure pointed to by `plist` should be properly initialized.
+     *                       b. Proper Initialization: The `plist_t` structure should be properly initialized before being passed to the function.
      *                   - Postcondition:
      *                       a. Resource Management: The `plist` pointer should be properly released after the function call by using `plist_free` if available.
-     *                       b. Data Integrity: Ensure that the plist structure remains consistent and valid after the write operation.
+     *                   - `plist_t` Structure: The `plist_t` structure contains fields that store information about a plist node tree.
+     *                     * - Precondition:
+     *                        a. Initialization: The `plist_t` structure must be fully initialized, with all pointer fields set to `NULL` and integers to zero or default flags.
+     *                     * - Postcondition:
+     *                          a. Memory Management: Properly manage memory to prevent leaks or double frees, especially for fields with shared pointers.
 
-     *                 - @filename: a pointer to a character string that specifies the file name.
+     *                 - @filename: a pointer to a character buffer that specifies the name of the file to write the plist to.
      *                   - Precondition:
      *                       a. Non-Null Requirement: The `filename` pointer must be non-null before calling `plist_write_to_file`. If `filename` is null, the function returns `PLIST_ERR_INVALID_ARG`.
-     *                       b. Proper Initialization: The `filename` string should be properly initialized and point to a valid file path.
+     *                       b. Proper Initialization: The `filename` should point to a valid null-terminated string.
      *                   - Postcondition:
-     *                       a. File Creation: The specified file should be created or overwritten with the plist data.
-     *                       b. Error Handling: If the file cannot be created or opened, the function should return `PLIST_ERR_IO`.
+     *                       a. File Creation: The function should create a file with the specified name and write the plist data to it.
+     *                       b. Resource Management: The file should be properly closed after writing to it.
 
-     *                 - @format: an integer that specifies the plist format.
+     *                 - @format: an integer that specifies the format in which to write the plist data. This argument allows the user to specify the desired plist format (e.g., binary, XML).
      *                   - Precondition:
-     *                       a. Valid Format: The `format` should be a valid `plist_format_t` value (e.g., PLIST_FORMAT_XML, PLIST_FORMAT_BINARY).
+     *                       a. `format` should be a valid `plist_format_t` value. Valid values include `PLIST_FORMAT_XML` and `PLIST_FORMAT_BINARY`.
      *                   - Postcondition:
-     *                       a. Format Consistency: The written file should adhere to the specified format.
+     *                       a. The value of `format` should not be modified by the function.
+     *                       b. The function should handle the format as specified by the input value.
 
-     *                 - @options: an integer that specifies the write options.
+     *                 - @options: an integer that specifies additional options for writing the plist data. This argument allows the user to specify additional options for writing the plist data.
      *                   - Precondition:
-     *                       a. Valid Options: The `options` should be a valid `plist_write_options_t` value.
+     *                       a. `options` should be a valid `plist_write_options_t` value. Valid values include `PLIST_WRITE_OPTIONS_DEFAULT`.
      *                   - Postcondition:
-     *                       a. Options Handling: The function should handle the write options as specified by the input value.
+     *                       a. The value of `options` should not be modified by the function.
+     *                       b. The function should handle the options as specified by the input value.
 
-     * Postcondition: 1. The function should be called with the mutated data to test the functionality of the function, returning `PLIST_ERR_OK` if successful and an error code if an error occurs.
-     *                   a. File Integrity: Ensure the file is correctly written according to the specified format and options.
-     *                   b. Error Codes: Verify that the function returns appropriate error codes for invalid arguments, I/O errors, and other failure conditions.
-     *                   c. Resource Management: Ensure that all resources (e.g., file handles) are properly released after the function call.
-     */
+     * Postcondition: 1. The function should be called with the mutated data to test the functionality of the function, returning `PLIST_ERR_OK` if successful and an appropriate error code if an error occurs.
+     *                   a. File Validation: Ensure the file is correctly created and contains the expected plist data according to the specified format.
+     *                   b. Error Handling: Verify that the function returns appropriate error codes for invalid arguments, I/O errors, etc.
+     *                   c. Memory Management: Confirm that memory is properly managed and no leaks occur.
+     *                2. Resources should be released properly after the function call. Note that the specified API is preferred to use for resource release if available.
+    **/
 
-    FuzzedDataProvider dataProvider(data, size);
+    FuzzedDataProvider data_provider(data, size);
+    
+    // Generate a random plist node tree
+    plist_t plist = plist_new_dict();
+    plist_dict_insert_item(plist, "key", plist_new_string(data_provider.ConsumeRandomLengthString(100).c_str()));
 
-    // Generate fuzzed input for plist
-    plist_t plist = nullptr;
-    plist_from_xml(dataProvider.ConsumeRemainingBytesAsString().c_str(), dataProvider.remaining_bytes(), &plist);
+    // Generate a random filename
+    std::string filename = data_provider.ConsumeRandomLengthString(100);
 
-    if (!plist) {
-        return 0; // Skip invalid plist data
-    }
+    // Generate random format and options
+    plist_format_t format = static_cast<plist_format_t>(data_provider.ConsumeIntegralInRange<int>(0, 1));
+    plist_write_options_t options = static_cast<plist_write_options_t>(data_provider.ConsumeIntegralInRange<int>(0, 1));
 
-    // Generate fuzzed input for filename
-    std::string filename = dataProvider.ConsumeRandomLengthString(256);
-    if (filename.empty()) {
-        filename = "fuzz_output.plist"; // Default to a valid filename if empty
-    }
-
-    // Generate fuzzed input for format
-    plist_format_t format = static_cast<plist_format_t>(dataProvider.ConsumeIntegralInRange<int>(0, PLIST_FORMAT_BINARY));
-
-    // Generate fuzzed input for options
-    plist_write_options_t options = static_cast<plist_write_options_t>(dataProvider.ConsumeIntegral<int>());
-
-    // Call the function with fuzzed inputs
-    plist_err_t err = plist_write_to_file(plist, filename.c_str(), format, options);
+    // Call the function with the generated inputs
+    plist_write_to_file(plist, filename.c_str(), format, options);
 
     // Clean up
     plist_free(plist);
+    remove(filename.c_str());
 
     return 0;
 }

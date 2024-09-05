@@ -5,13 +5,13 @@ import os
 import sys
 
 sys.path.append(os.path.abspath('../../'))
-import argparse
+import time
 import logging
 from typing import List
 
 import openai
 
-import run_all_experiments
+from tqdm import tqdm
 from data_prep import introspector, project_targets
 from data_prep.project_context.context_introspector import ContextRetriever
 from experiment import benchmark as benchmarklib
@@ -30,7 +30,8 @@ SUMMARY_MAX_TOKENS: int = 100
 RUN_TIMEOUT: int = 30
 TEMPERATURE: float = 0.4
 
-RESULTS_DIR = './results_summary'
+timestamp = time.strftime('%Y%m%d-%H%M%S')
+RESULTS_DIR = f'./results_summary_{timestamp}'
 PROMPTS_DIR = './prompts'
 MODEL = 'gpt-4o-azure'
 os.makedirs(RESULTS_DIR, exist_ok=True)
@@ -167,7 +168,7 @@ if __name__ == '__main__':
   experiment_targets = get_benchmarks(
       benchmarks_directory='../../benchmark-sets/spec_test/', benchmark_yaml='')
 
-  for target_benchmark in experiment_targets:
+  for target_benchmark in tqdm(experiment_targets, len(experiment_targets), desc='Processing benchmarks'):
 
     conx = retrieve_all_contexts(benchmark=target_benchmark)
     # print(f'context_info: {conx}')

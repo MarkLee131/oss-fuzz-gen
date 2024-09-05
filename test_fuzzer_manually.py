@@ -274,9 +274,9 @@ if __name__ == '__main__':
 
   # backup work_dirs by copying to a new directory
   if os.path.exists(RESULTS_DIR):
-    shutil.copytree(RESULTS_DIR, f'{RESULTS_DIR}_backup')
+    shutil.copytree(RESULTS_DIR, f'{RESULTS_DIR}_backup') # backup all results
 
-  work_dirs = WorkDirs(f'{RESULTS_DIR}_backup', keep=True)
+  work_dirs = WorkDirs(f'{RESULTS_DIR}', keep=True) 
 
   generated_targets = []
   for file in os.listdir(

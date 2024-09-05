@@ -1,17 +1,8 @@
 ```cpp
 #include <fuzzer/FuzzedDataProvider.h>
-#include <string>
-#include <cstdint>
-#include <cstdlib>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-
-extern "C" {
-#include "event2/event.h"
-#include "event2/http.h"
-#include "event2/util.h"
-}
+#include <event2/event.h>
+#include <event2/http.h>
+#include <event2/util.h>
 
 extern "C" int LLVMFuzzerInitialize(int *argc, char ***argv) {
     // Initialize the library or any resources needed for the fuzzing process
@@ -21,61 +12,60 @@ extern "C" int LLVMFuzzerInitialize(int *argc, char ***argv) {
 extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     /**
      * Goal: The fuzz driver should test `evhttp_bind_socket_with_handle` within the `libevent` project.
-     *       - `libevent` is an event notification library that provides a mechanism to execute a callback function when a specific event occurs on a file descriptor or after a timeout has been reached.
-     *       - `evhttp_bind_socket_with_handle` is a function that binds an HTTP server to a specified address and port, returning a handle to the bound socket.
+     *        - `libevent` is an event notification library that provides a mechanism to execute a callback function when a specific event occurs on a file descriptor or after a timeout has been reached.
+     *        - `evhttp_bind_socket_with_handle` is a function that binds an HTTP server to a specified address and port, returning a handle to the bound socket.
 
-     * Precondition: 1. The function is provided by the library `evhttp.h` and implemented in `evhttp.c`.
-     *               2. The function `evhttp_bind_socket_with_handle` is called with the following parameters:
-     *                 - @http: a pointer to an `evhttp` structure, which represents an HTTP server.
-     *                   - Precondition:
-     *                       a. Non-Null Requirement: The `http` pointer must be non-null before calling `evhttp_bind_socket_with_handle`. If `http` is null, the function should return `NULL`.
-     *                       b. Proper Initialization: The `evhttp` structure pointed to by `http` should be properly initialized using `evhttp_new` before calling the function.
-     *                   - Postcondition:
-     *                       a. Resource Management: The `http` pointer should be properly released after the function call by using `evhttp_free` if available.
-     *                       b. State Consistency: Ensure that the state of the `evhttp` structure remains consistent after the function call.
+     * Precondition:
+     * 1. The function is provided by the library `event2/http.h` and implemented in `http.c`.
+     * 2. The function `evhttp_bind_socket_with_handle` is called with the following parameters:
+     *    - @http: a pointer to an `evhttp` structure, which represents an HTTP server.
+     *      - Precondition:
+     *        a. Non-Null Requirement: The `http` pointer must be non-null before calling `evhttp_bind_socket_with_handle`. If `http` is null, the function should return `NULL`.
+     *        b. Proper Initialization: The `evhttp` structure pointed to by `http` should be properly initialized using `evhttp_new` before calling `evhttp_bind_socket_with_handle`.
+     *    - @address: a pointer to a null-terminated string representing the address to bind to.
+     *      - Precondition:
+     *        a. Non-Null Requirement: The `address` pointer must be non-null before calling `evhttp_bind_socket_with_handle`. If `address` is null, the function should return `NULL`.
+     *        b. Valid Address: The `address` should be a valid IP address or hostname.
+     *    - @port: a 16-bit unsigned integer representing the port to bind to.
+     *      - Precondition:
+     *        a. Valid Range: The `port` value should be within the valid range of port numbers (0-65535).
+     * 
+     * Postcondition:
+     * 1. The function should return a pointer to an `evhttp_bound_socket` structure if successful, or `NULL` if an error occurs.
+     *    - Successful Binding:
+     *      a. The function should successfully bind the socket to the specified address and port.
+     *      b. The function should set the socket to listen for incoming connections.
+     *      c. The function should return a valid `evhttp_bound_socket` handle if the binding and listening operations are successful.
+     *    - Error Handling:
+     *      a. If binding the socket fails, the function should return `NULL`.
+     *      b. If setting the socket to listen fails, the function should close the socket and return `NULL`.
+     *      c. Proper error messages should be logged using `event_sock_warn` in case of failures.
+     * 2. Resources should be released properly after the function call. Note that the specified API is preferred to use for resource release if available.
+     */
 
-     *                 - @address: a pointer to a `const char` that specifies the address to bind to.
-     *                   - Precondition:
-     *                       a. Valid Address: The `address` pointer must point to a valid null-terminated string representing a valid IP address (IPv4 or IPv6).
-     *                       b. Non-Null Requirement: The `address` pointer must be non-null before calling `evhttp_bind_socket_with_handle`. If `address` is null, the function should return `NULL`.
-     *                   - Postcondition:
-     *                       a. Address Usage: The `address` pointer should be used to bind the socket to the specified address.
-     *                       b. Memory Management: The `address` pointer should not be modified or freed by the function.
-
-     *                 - @port: an unsigned 16-bit integer that specifies the port to bind to.
-     *                   - Precondition:
-     *                       a. Valid Port: The `port` value should be within the valid range for port numbers (0-65535).
-     *                   - Postcondition:
-     *                       a. Port Usage: The `port` value should be used to bind the socket to the specified port.
-     *                       b. Port Consistency: The `port` value should not be modified by the function.
-
-     * Postcondition: 1. The function should be called with the mutated data to test the functionality of the function, returning a valid `evhttp_bound_socket` pointer if successful and `NULL` if an error occurs.
-     *                   a. Socket Binding: Ensure the socket is correctly bound to the specified address and port.
-     *                   b. Error Handling: Verify that appropriate error handling is performed if the socket cannot be bound or if listening on the socket fails.
-     *                   c. Resource Management: Confirm that resources are properly managed, including closing the socket if an error occurs.
-     *                   d. State Consistency: Ensure the state of the `evhttp` structure and the bound socket remains consistent after the function call.
-
-     *                2. Resources should be released properly after the function call. Note that the specified API is preferred to use for resource release if available.
-     **/
-
-    // Step 1: Initialize FuzzedDataProvider with the input data
     FuzzedDataProvider data_provider(data, size);
 
-    // Step 2: Generate fuzzed inputs for the parameters
+    // Generate fuzzed data for the parameters
     std::string address = data_provider.ConsumeRandomLengthString();
     uint16_t port = data_provider.ConsumeIntegral<uint16_t>();
 
-    // Step 3: Initialize the `evhttp` structure
+    // Initialize the evhttp structure
     struct event_base *base = event_base_new();
     struct evhttp *http = evhttp_new(base);
+    if (!http) {
+        event_base_free(base);
+        return 0;
+    }
 
-    // Step 4: Call the target function with the fuzzed inputs
+    // Call the function with fuzzed data
     struct evhttp_bound_socket *result = evhttp_bind_socket_with_handle(http, address.c_str(), port);
 
-    // Step 5: Clean up resources
+    // Check the result and perform any necessary cleanup
     if (result) {
+        // Successfully bound socket, clean up
         evhttp_del_accept_socket(http, result);
     }
+
     evhttp_free(http);
     event_base_free(base);
 

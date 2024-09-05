@@ -1,6 +1,8 @@
 ```cpp
 #include <fuzzer/FuzzedDataProvider.h>
 #include <plist/plist.h>
+#include <stdint.h>
+#include <stddef.h>
 
 extern "C" int LLVMFuzzerInitialize(int *argc, char ***argv) {
     // Initialize the library or any resources needed for the fuzzing process
@@ -10,56 +12,55 @@ extern "C" int LLVMFuzzerInitialize(int *argc, char ***argv) {
 extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     /**
      * Goal: The fuzz driver should test `plist_from_memory` within the `libplist` project.
-     *       - `libplist` is a library for handling Apple Property List (plist) format.
-     *       - `plist_from_memory` is a function that parses a plist from a memory buffer.
+     *        - `libplist` is a library for handling Apple Property List (plist) files.
+     *        - `plist_from_memory` is a function that parses a plist from a memory buffer.
      *
-     * Precondition: The function `plist_from_memory` is called with the following parameters:
-     *               - @plist_data: a pointer to a memory buffer containing the plist data.
-     *                 - Precondition:
-     *                   a. Non-Null Requirement: The `plist_data` pointer must be non-null before calling `plist_from_memory`. If `plist_data` is null, the function returns `PLIST_ERR_INVALID_ARG`.
-     *                   b. Proper Initialization: The memory buffer pointed to by `plist_data` should contain valid plist data.
-     *               - @length: an unsigned integer representing the size of the memory buffer.
-     *                 - Precondition:
-     *                   a. Non-Zero Requirement: The `length` must be greater than zero. If `length` is zero, the function returns `PLIST_ERR_INVALID_ARG`.
-     *               - @plist: a pointer to a `plist_t` structure that will store the parsed plist.
-     *                 - Precondition:
-     *                   a. Non-Null Requirement: The `plist` pointer must be non-null before calling `plist_from_memory`. If `plist` is null, the function returns `PLIST_ERR_INVALID_ARG`.
-     *                   b. Proper Initialization: The `plist_t` structure pointed to by `plist` should be properly initialized.
-     *                 - Postcondition:
-     *                   a. Memory Management: The `plist_t` structure should be properly released after the function call by using `plist_free`.
-     *               - @format: a pointer to a `plist_format_t` that will store the format of the parsed plist.
-     *                 - Precondition:
-     *                   a. Optional Parameter: The `format` pointer can be null. If `format` is non-null, it should be properly initialized.
-     *                 - Postcondition:
-     *                   a. Format Storage: On successful execution, the `format` pointer’s value is updated to reflect the format of the parsed plist.
-     *                   b. Memory Management: The caller must ensure that the `format` pointer is used before any subsequent calls to `plist_from_memory`, as subsequent calls may overwrite the value.
+     * Precondition: 1. The function is provided by the library `plist.h` and implemented in `plist.c`.
+     *               2. The function `plist_from_memory` is called with the following parameters:
+     *                 - @plist_data: a pointer to a character buffer containing the plist data.
+     *                   - Precondition:
+     *                       a. Non-Null Requirement: The `plist_data` pointer must be non-null before calling `plist_from_memory`. If `plist_data` is null, the function returns `PLIST_ERR_INVALID_ARG`.
+     *                       b. Proper Initialization: The buffer should contain valid plist data (binary, XML, JSON, or OpenStep format).
+     *                   - Postcondition:
+     *                       a. Buffer Integrity: The buffer should remain unchanged after the function call.
+     *                 - @length: an unsigned integer specifying the length of the plist data.
+     *                   - Precondition:
+     *                       a. Non-Zero Requirement: The `length` must be greater than 0. If `length` is 0, the function returns `PLIST_ERR_INVALID_ARG`.
+     *                   - Postcondition:
+     *                       a. Length Integrity: The value of `length` should not be modified by the function.
+     *                 - @plist: a pointer to a `plist_t` structure that will store the parsed plist.
+     *                   - Precondition:
+     *                       a. Non-Null Requirement: The `plist` pointer must be non-null before calling `plist_from_memory`. If `plist` is null, the function returns `PLIST_ERR_INVALID_ARG`.
+     *                       b. Proper Initialization: The `plist` pointer should be properly initialized to `NULL` before the function call.
+     *                   - Postcondition:
+     *                       a. Parsed Plist: On successful execution, the `plist` pointer should point to the parsed plist structure.
+     *                       b. Memory Management: Properly manage memory to prevent leaks. The caller is responsible for freeing the plist using `plist_free`.
+     *                 - @format: a pointer to a `plist_format_t` structure that will store the format of the parsed plist.
+     *                   - Precondition:
+     *                       a. Optional Parameter: The `format` pointer can be null. If provided, it should be properly initialized.
+     *                   - Postcondition:
+     *                       a. Format Storage: On successful execution, the `format` pointer should be updated to reflect the format of the parsed plist (binary, XML, JSON, or OpenStep).
      *
-     * Postcondition: The function should be called with the mutated data to test the functionality of the function, returning `PLIST_ERR_SUCCESS` if successful and an appropriate error code if an error occurs.
-     *                - Resource Management: Ensure that the resources are properly released after the function call.
-     *                - Format Validation: Verify that the format of the parsed plist is correctly identified and stored.
-     *                - Data Integrity: Ensure that the parsed plist data is correctly stored in the `plist_t` structure.
+     * Postcondition: 1. The function should be called with the mutated data to test the functionality of the function, returning `PLIST_ERR_SUCCESS` if successful and an error code if an error occurs.
+     *                2. Resources should be released properly after the function call. Note that the specified API is preferred to use for resource release if available.
      **/
 
-    // Create a FuzzedDataProvider to provide fuzzed data
+    // Use FuzzedDataProvider to extract data for the function parameters
     FuzzedDataProvider fuzzed_data(data, size);
 
-    // Extract the plist data and length from the fuzzed data
+    // Extract plist_data and length from the fuzzed input
     const char *plist_data = fuzzed_data.ConsumeRemainingBytes<char>();
     uint32_t length = fuzzed_data.remaining_bytes();
 
-    // Initialize the plist and format variables
+    // Initialize plist and format
     plist_t plist = NULL;
-    plist_format_t format = PLIST_FORMAT_NONE;
+    plist_format_t format;
 
-    // Call the target function with the fuzzed data
+    // Call the function with the fuzzed data
     plist_err_t result = plist_from_memory(plist_data, length, &plist, &format);
 
-    // Verify the result and handle the plist if it was successfully parsed
+    // Free the plist if it was successfully parsed
     if (result == PLIST_ERR_SUCCESS) {
-        // Perform additional checks on the parsed plist if necessary
-        // ...
-
-        // Free the parsed plist
         plist_free(plist);
     }
 
