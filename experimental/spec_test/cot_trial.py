@@ -5,13 +5,13 @@ import os
 import sys
 
 sys.path.append(os.path.abspath('../../'))
-import time
 import logging
+import time
 from typing import List
 
 import openai
-
 from tqdm import tqdm
+
 from data_prep import introspector, project_targets
 from data_prep.project_context.context_introspector import ContextRetriever
 from experiment import benchmark as benchmarklib
@@ -168,7 +168,9 @@ if __name__ == '__main__':
   experiment_targets = get_benchmarks(
       benchmarks_directory='../../benchmark-sets/spec_test/', benchmark_yaml='')
 
-  for target_benchmark in tqdm(experiment_targets, len(experiment_targets), desc='Processing benchmarks'):
+  for target_benchmark in tqdm(experiment_targets,
+                               total=len(experiment_targets),
+                               desc='Processing benchmarks'):
 
     conx = retrieve_all_contexts(benchmark=target_benchmark)
     # print(f'context_info: {conx}')
