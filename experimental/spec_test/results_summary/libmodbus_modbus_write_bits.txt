@@ -1,0 +1,90 @@
+```cpp
+#include <fuzzer/FuzzedDataProvider.h>
+#include <modbus.h>
+#include <errno.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+extern "C" int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    // Initialize the library or any resources needed for the fuzzing process
+    return 0;
+}
+
+extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    /**
+     * Goal: The fuzz driver should test `modbus_write_bits` within the `libmodbus` project.
+     *        - `libmodbus` is a library that provides a fast and simple way to communicate with Modbus devices.
+     *        - `modbus_write_bits` is a function that writes multiple bits to a Modbus device.
+     *
+     * Precondition: 1. The function is provided by the library `modbus.h` and implemented in `modbus.c`.
+     *               2. The function `modbus_write_bits` is called with the following parameters:
+     *                 - @ctx: a pointer to a `modbus_t` structure, which represents a Modbus context.
+     *                   - Precondition:
+     *                       a. Non-Null Requirement: The `ctx` pointer must be non-null before calling `modbus_write_bits`. If `ctx` is null, the function returns `-1`.
+     *                       b. Proper Initialization: The `modbus_t` structure pointed to by `ctx` should be properly initialized using `modbus_new_tcp` or similar functions.
+     *                       c. Connection Requirement: The Modbus context should be connected to a Modbus server using `modbus_connect`.
+     *                   - Postcondition:
+     *                       a. Resource Management: The `ctx` pointer should be properly released after the function call by using `modbus_close` and `modbus_free`.
+     *                       b. Error Handling: If the context is invalid or not connected, the function should handle errors gracefully and set appropriate error codes.
+     *
+     *                 - @addr: an integer that specifies the starting address of the bits to be written.
+     *                   - Precondition:
+     *                       a. Valid Range: The `addr` should be within the valid address range for the Modbus device.
+     *                   - Postcondition:
+     *                       a. Address Handling: The function should correctly handle the address and ensure that the bits are written to the specified address.
+     *
+     *                 - @nb: an integer that specifies the number of bits to be written.
+     *                   - Precondition:
+     *                       a. Valid Range: The `nb` should be greater than 0 and less than or equal to `MODBUS_MAX_WRITE_BITS`.
+     *                       b. Bit Count Check: The number of bits should not exceed the maximum allowed bits for writing.
+     *                   - Postcondition:
+     *                       a. Bit Count Handling: The function should correctly handle the number of bits and ensure that the specified number of bits are written.
+     *
+     *                 - @src: a pointer to a buffer containing the bits to be written.
+     *                   - Precondition:
+     *                       a. Non-Null Requirement: The `src` pointer must be non-null before calling `modbus_write_bits`. If `src` is null, the function returns `-1`.
+     *                       b. Buffer Size: The buffer should contain at least `nb` bits.
+     *                   - Postcondition:
+     *                       a. Buffer Handling: The function should correctly read the bits from the buffer and write them to the Modbus device.
+     *
+     * Postcondition: 1. The function should be called with the mutated data to test the functionality of the function, returning the result of the operation.
+     *                   a. Data Integrity: Ensure the bits are correctly written to the Modbus device according to the input parameters.
+     *                   b. Error Handling: Verify that the function handles errors gracefully and sets appropriate error codes.
+     *                   c. Resource Management: Ensure that resources are properly released after the function call.
+     **/
+
+    FuzzedDataProvider dataProvider(data, size);
+
+    // Create and initialize a Modbus context
+    modbus_t *ctx = modbus_new_tcp("127.0.0.1", 1502);
+    if (ctx == NULL) {
+        return 0;
+    }
+
+    // Connect to the Modbus server
+    if (modbus_connect(ctx) == -1) {
+        modbus_free(ctx);
+        return 0;
+    }
+
+    // Generate random values for addr and nb
+    int addr = dataProvider.ConsumeIntegralInRange<int>(0, 0xFFFF);
+    int nb = dataProvider.ConsumeIntegralInRange<int>(1, MODBUS_MAX_WRITE_BITS);
+
+    // Generate a buffer with random bits
+    std::vector<uint8_t> src(nb);
+    for (int i = 0; i < nb; ++i) {
+        src[i] = dataProvider.ConsumeIntegral<uint8_t>();
+    }
+
+    // Call the function with the generated parameters
+    modbus_write_bits(ctx, addr, nb, src.data());
+
+    // Clean up resources
+    modbus_close(ctx);
+    modbus_free(ctx);
+
+    return 0;
+}
+```

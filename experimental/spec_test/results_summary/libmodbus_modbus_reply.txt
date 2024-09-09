@@ -1,0 +1,97 @@
+```cpp
+#include <fuzzer/FuzzedDataProvider.h>
+#include <modbus.h>
+#include <errno.h>
+#include <stdint.h>
+#include <string.h>
+#include <stdlib.h>
+
+extern "C" int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    // Initialize the library or any resources needed for the fuzzing process
+    return 0;
+}
+
+extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    /**
+     * Goal: The fuzz driver should test `modbus_reply` within the `libmodbus` project.
+     *       - `libmodbus` is a library that provides a fast and portable implementation of the Modbus protocol.
+     *       - `modbus_reply` is a function that processes a Modbus request and prepares a response.
+     *
+     * Precondition: 1. The function is provided by the library `modbus.h` and implemented in `modbus.c`.
+     *               2. The function `modbus_reply` is called with the following parameters:
+     *                 - @ctx: a pointer to a `modbus_t` structure, which represents a Modbus context.
+     *                   - Precondition:
+     *                       a. Non-Null Requirement: The `ctx` pointer must be non-null before calling `modbus_reply`. If `ctx` is null, the function should return `-1`.
+     *                       b. Proper Initialization: The `modbus_t` structure should be properly initialized, particularly ensuring that the backend and its methods are correctly set.
+     *                       c. Backend Setup: The `backend` field should be initialized to a valid backend structure with proper methods for handling Modbus requests and responses.
+     *                   - Postcondition:
+     *                       a. Resource Management: The `ctx` pointer should be properly released after the function call by using `modbus_free` if available.
+     *                       b. State Consistency: The state of the `modbus_t` structure should remain consistent after the function call.
+     *
+     *                 - @req: a pointer to a buffer containing the Modbus request.
+     *                   - Precondition:
+     *                       a. Non-Null Requirement: The `req` pointer must be non-null before calling `modbus_reply`. If `req` is null, the function should return `-1`.
+     *                       b. Buffer Length: The length of the buffer should be at least `req_length`.
+     *                   - Postcondition:
+     *                       a. Buffer Integrity: The content of the `req` buffer should not be modified by the function.
+     *
+     *                 - @req_length: an integer specifying the length of the request buffer.
+     *                   - Precondition:
+     *                       a. Positive Length: The `req_length` should be a positive integer.
+     *                   - Postcondition:
+     *                       a. Length Consistency: The `req_length` should not be modified by the function.
+     *
+     *                 - @mb_mapping: a pointer to a `modbus_mapping_t` structure, which contains the mapping of Modbus data.
+     *                   - Precondition:
+     *                       a. Non-Null Requirement: The `mb_mapping` pointer must be non-null before calling `modbus_reply`. If `mb_mapping` is null, the function should return `-1`.
+     *                       b. Proper Initialization: The `modbus_mapping_t` structure should be properly initialized, particularly ensuring that the data arrays and their lengths are correctly set.
+     *                   - Postcondition:
+     *                       a. Data Integrity: The data in the `modbus_mapping_t` structure should be correctly updated based on the request.
+     *                       b. Memory Management: Properly manage memory to prevent leaks or double frees, especially for fields with shared pointers.
+     *
+     * Postcondition: 1. The function should be called with the mutated data to test the functionality of the function, returning 0 if successful and -1 if an error occurs.
+     *                   a. Response Validation: Ensure the Modbus response is correctly formatted according to the Modbus protocol specifications, regardless of input variations.
+     *                   b. Exception Handling: Verify that the function correctly handles exceptions and returns appropriate error codes for invalid requests.
+     *                   c. Resource Management: Ensure that all resources are properly released after the function call.
+     **/
+
+    if (size < sizeof(modbus_t) + sizeof(modbus_mapping_t)) {
+        return 0;
+    }
+
+    FuzzedDataProvider data_provider(data, size);
+
+    // Create and initialize a Modbus context
+    modbus_t *ctx = modbus_new_tcp("127.0.0.1", 1502);
+    if (ctx == NULL) {
+        return 0;
+    }
+
+    // Create and initialize a Modbus mapping
+    modbus_mapping_t *mb_mapping = modbus_mapping_new(0, 0, 0, 0);
+    if (mb_mapping == NULL) {
+        modbus_free(ctx);
+        return 0;
+    }
+
+    // Create a request buffer
+    int req_length = data_provider.ConsumeIntegralInRange<int>(1, MODBUS_TCP_MAX_ADU_LENGTH);
+    uint8_t *req = (uint8_t *)malloc(req_length);
+    if (req == NULL) {
+        modbus_mapping_free(mb_mapping);
+        modbus_free(ctx);
+        return 0;
+    }
+    data_provider.ConsumeData(req, req_length);
+
+    // Call the function with the fuzzed data
+    modbus_reply(ctx, req, req_length, mb_mapping);
+
+    // Clean up resources
+    free(req);
+    modbus_mapping_free(mb_mapping);
+    modbus_free(ctx);
+
+    return 0;
+}
+```

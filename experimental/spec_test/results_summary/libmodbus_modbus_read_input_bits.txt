@@ -1,0 +1,95 @@
+```cpp
+#include <fuzzer/FuzzedDataProvider.h>
+#include <modbus.h>
+#include <errno.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+extern "C" int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    // Initialize the library or any resources needed for the fuzzing process
+    return 0;
+}
+
+extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    /**
+     * Goal: The fuzz driver should test `modbus_read_input_bits` within the `libmodbus` project.
+     *        - `libmodbus` is a library that provides a fast and simple way to communicate with Modbus devices.
+     *        - `modbus_read_input_bits` is a function that reads the status of discrete inputs from a Modbus device.
+     *
+     * Precondition: 1. The function is provided by the library `modbus.h` and implemented in the source code.
+     *               2. The function `modbus_read_input_bits` is called with the following parameters:
+     *                 - @ctx: a pointer to a `modbus_t` structure, which represents a Modbus context.
+     *                   - Precondition:
+     *                       a. Non-Null Requirement: The `ctx` pointer must be non-null before calling `modbus_read_input_bits`. If `ctx` is null, the function returns `-1`.
+     *                       b. Proper Initialization: The `modbus_t` structure pointed to by `ctx` should be properly initialized using `modbus_new_tcp` or similar functions.
+     *                       c. Connection: The `modbus_t` context should be connected to a Modbus server using `modbus_connect`.
+     *                   - Postcondition:
+     *                       a. Resource Management: The `ctx` pointer should be properly released after the function call by using `modbus_close` and `modbus_free`.
+     *
+     *                 - @addr: an integer that specifies the starting address of the discrete inputs to read.
+     *                   - Precondition:
+     *                       a. Valid Range: The `addr` should be within the valid range of addresses for the Modbus device.
+     *                   - Postcondition:
+     *                       a. The value of `addr` should not be modified by the function.
+     *
+     *                 - @nb: an integer that specifies the number of discrete inputs to read.
+     *                   - Precondition:
+     *                       a. Valid Range: The `nb` should be greater than 0 and less than or equal to `MODBUS_MAX_READ_BITS`.
+     *                   - Postcondition:
+     *                       a. The value of `nb` should not be modified by the function.
+     *
+     *                 - @dest: a pointer to a `uint8_t` buffer that will store the read input bits.
+     *                   - Precondition:
+     *                       a. Non-Null Requirement: The `dest` pointer must be non-null before calling `modbus_read_input_bits`. If `dest` is null, the function returns `-1`.
+     *                       b. Proper Allocation: The buffer pointed to by `dest` should be large enough to hold `nb` bits.
+     *                   - Postcondition:
+     *                       a. Data Storage: On successful execution, the `dest` buffer will contain the read input bits.
+     *                       b. Memory Management: The caller is responsible for managing the memory of the `dest` buffer.
+     *
+     * Postcondition: 1. The function should be called with the mutated data to test the functionality of the function, returning `nb` if successful and `-1` if an error occurs.
+     *                   a. Error Handling: Ensure proper error handling, including setting `errno` appropriately.
+     *                   b. Debug Logging: Verify that debug messages are logged correctly if the `debug` flag in `ctx` is set.
+     *                   c. Data Integrity: Confirm that the `dest` buffer contains the correct input bits as read from the Modbus device.
+     *
+     *                2. Resources should be released properly after the function call. Note that the specified API is preferred to use for resource release if available.
+     **/
+
+    FuzzedDataProvider data_provider(data, size);
+
+    // Create and initialize a Modbus context
+    modbus_t *ctx = modbus_new_tcp("127.0.0.1", 1502);
+    if (ctx == NULL) {
+        return 0;
+    }
+
+    // Connect to the Modbus server
+    if (modbus_connect(ctx) == -1) {
+        modbus_free(ctx);
+        return 0;
+    }
+
+    // Generate fuzzed input values for addr and nb
+    int addr = data_provider.ConsumeIntegralInRange<int>(0, 0xFFFF);
+    int nb = data_provider.ConsumeIntegralInRange<int>(1, MODBUS_MAX_READ_BITS);
+
+    // Allocate a buffer for the destination
+    uint8_t *dest = (uint8_t *)malloc(nb * sizeof(uint8_t));
+    if (dest == NULL) {
+        modbus_close(ctx);
+        modbus_free(ctx);
+        return 0;
+    }
+
+    // Call the target function with fuzzed inputs
+    int result = modbus_read_input_bits(ctx, addr, nb, dest);
+
+    // Clean up resources
+    free(dest);
+    modbus_close(ctx);
+    modbus_free(ctx);
+
+    return 0;
+}
+```

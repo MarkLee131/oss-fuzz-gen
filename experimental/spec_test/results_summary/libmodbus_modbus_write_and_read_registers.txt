@@ -1,0 +1,105 @@
+```cpp
+#include <fuzzer/FuzzedDataProvider.h>
+#include <modbus.h>
+#include <errno.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+extern "C" int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    // Initialize the library or any resources needed for the fuzzing process
+    return 0;
+}
+
+extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    /**
+     * Goal: The fuzz driver should test `modbus_write_and_read_registers` within the `libmodbus` project.
+     *        - `libmodbus` is a library that provides a Modbus implementation.
+     *        - `modbus_write_and_read_registers` is a function that writes to and reads from Modbus registers.
+     *
+     * Precondition: 1. The function is provided by the library `modbus.h`.
+     *               2. The function `modbus_write_and_read_registers` is called with the following parameters:
+     *                 - @ctx: a pointer to a `modbus_t` structure, which represents a Modbus context.
+     *                   - Precondition:
+     *                       a. Non-Null Requirement: The `ctx` pointer must be non-null before calling `modbus_write_and_read_registers`. If `ctx` is null, the function will set `errno` to `EINVAL` and return `-1`.
+     *                       b. Proper Initialization: The `modbus_t` structure should be properly initialized using `modbus_new_tcp` or similar functions.
+     *                       c. Connection: The Modbus context should be connected using `modbus_connect`.
+     *                       d. Debug Mode: If the context's debug mode is enabled, error messages should be printed to `stderr`.
+     *                   - Postcondition:
+     *                       a. Resource Management: The `ctx` pointer should be properly released after the function call using `modbus_close` and `modbus_free`.
+     *
+     *                 - @write_addr: an integer specifying the starting address to write registers.
+     *                   - Precondition:
+     *                       a. Valid Range: The `write_addr` should be within the valid range of Modbus addresses.
+     *
+     *                 - @write_nb: an integer specifying the number of registers to write.
+     *                   - Precondition:
+     *                       a. Valid Range: The `write_nb` should not exceed `MODBUS_MAX_WR_WRITE_REGISTERS`. If it does, the function will set `errno` to `EMBMDATA` and return `-1`.
+     *
+     *                 - @src: a pointer to a `uint16_t` array containing the values to write.
+     *                   - Precondition:
+     *                       a. Non-Null Requirement: The `src` pointer must be non-null before calling `modbus_write_and_read_registers`. If `src` is null, the function will likely crash or behave unpredictably.
+     *                       b. Proper Initialization: The `src` array should be properly initialized with the values to write.
+     *
+     *                 - @read_addr: an integer specifying the starting address to read registers.
+     *                   - Precondition:
+     *                       a. Valid Range: The `read_addr` should be within the valid range of Modbus addresses.
+     *
+     *                 - @read_nb: an integer specifying the number of registers to read.
+     *                   - Precondition:
+     *                       a. Valid Range: The `read_nb` should not exceed `MODBUS_MAX_WR_READ_REGISTERS`. If it does, the function will set `errno` to `EMBMDATA` and return `-1`.
+     *
+     *                 - @dest: a pointer to a `uint16_t` array to store the read values.
+     *                   - Precondition:
+     *                       a. Non-Null Requirement: The `dest` pointer must be non-null before calling `modbus_write_and_read_registers`. If `dest` is null, the function will likely crash or behave unpredictably.
+     *                       b. Proper Initialization: The `dest` array should be properly initialized to store the read values.
+     *
+     * Postcondition: 1. The function should be called with the mutated data to test the functionality of the function, returning the number of registers read if successful and `-1` if an error occurs.
+     *                   a. Error Handling: Ensure proper error handling and setting of `errno` for invalid inputs.
+     *                   b. Data Integrity: Verify that the data written to the `src` array is correctly written to the Modbus registers and the data read into the `dest` array is accurate.
+     *                   c. Resource Management: Ensure that resources are properly released after the function call.
+     **/
+
+    if (size < sizeof(uint16_t) * 2 + sizeof(int) * 4) {
+        return 0;
+    }
+
+    FuzzedDataProvider data_provider(data, size);
+
+    // Create and initialize Modbus context
+    modbus_t *ctx = modbus_new_tcp("127.0.0.1", 1502);
+    if (ctx == NULL) {
+        return 0;
+    }
+
+    if (modbus_connect(ctx) == -1) {
+        modbus_free(ctx);
+        return 0;
+    }
+
+    // Extract parameters from fuzzed data
+    int write_addr = data_provider.ConsumeIntegral<int>();
+    int write_nb = data_provider.ConsumeIntegralInRange<int>(0, MODBUS_MAX_WR_WRITE_REGISTERS);
+    int read_addr = data_provider.ConsumeIntegral<int>();
+    int read_nb = data_provider.ConsumeIntegralInRange<int>(0, MODBUS_MAX_WR_READ_REGISTERS);
+
+    uint16_t *src = new uint16_t[write_nb];
+    for (int i = 0; i < write_nb; i++) {
+        src[i] = data_provider.ConsumeIntegral<uint16_t>();
+    }
+
+    uint16_t *dest = new uint16_t[read_nb];
+
+    // Call the function with fuzzed parameters
+    int rc = modbus_write_and_read_registers(ctx, write_addr, write_nb, src, read_addr, read_nb, dest);
+
+    // Clean up
+    delete[] src;
+    delete[] dest;
+    modbus_close(ctx);
+    modbus_free(ctx);
+
+    return 0;
+}
+```

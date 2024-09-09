@@ -1,0 +1,92 @@
+```cpp
+#include <fuzzer/FuzzedDataProvider.h>
+#include <errno.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <modbus.h>
+
+extern "C" int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    // Initialize the library or any resources needed for the fuzzing process
+    return 0;
+}
+
+extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    /**
+     * Goal: The fuzz driver should test `modbus_read_input_registers` within the `libmodbus` project.
+     *        - libmodbus is a library to communicate with Modbus devices.
+     *        - `modbus_read_input_registers` is a function that reads input registers from a Modbus device.
+     *
+     * Precondition: 1. The function is provided by the library `modbus.h` and implemented in `modbus.c`.
+     *               2. The function `modbus_read_input_registers` is called with the following parameters:
+     *                 - @ctx: a pointer to a `modbus_t` structure, which represents a Modbus context.
+     *                   - Precondition:
+     *                       a. Non-Null Requirement: The `ctx` pointer must be non-null before calling `modbus_read_input_registers`. If `ctx` is null, the function returns `-1`.
+     *                       b. Proper Initialization: The `modbus_t` structure pointed to by `ctx` should be properly initialized using `modbus_new_tcp`, `modbus_new_rtu`, or other appropriate initialization functions.
+     *                       c. Connection: The Modbus context should be connected using `modbus_connect`.
+     *                   - Postcondition:
+     *                       a. Resource Management: The `ctx` pointer should be properly released after the function call by using `modbus_close` and `modbus_free`.
+     *                       b. Error Handling: If an error occurs, `errno` should be set appropriately.
+     *
+     *                 - @addr: an integer specifying the starting address of the input registers to read.
+     *                   - Precondition:
+     *                       a. Valid Range: The `addr` should be within the valid range of the Modbus device's address space.
+     *                   - Postcondition:
+     *                       a. Address Validation: The function should validate the address and return an error if it is out of range.
+     *
+     *                 - @nb: an integer specifying the number of input registers to read.
+     *                   - Precondition:
+     *                       a. Valid Range: The `nb` should be less than or equal to `MODBUS_MAX_READ_REGISTERS`.
+     *                       b. Non-Negative: The `nb` should be a non-negative integer.
+     *                   - Postcondition:
+     *                       a. Register Count Validation: The function should validate the number of registers and return an error if it exceeds `MODBUS_MAX_READ_REGISTERS`.
+     *
+     *                 - @dest: a pointer to a `uint16_t` array where the read input registers will be stored.
+     *                   - Precondition:
+     *                       a. Non-Null Requirement: The `dest` pointer must be non-null before calling `modbus_read_input_registers`. If `dest` is null, the function returns `-1`.
+     *                       b. Sufficient Memory: The `dest` array should have sufficient memory allocated to store `nb` registers.
+     *                   - Postcondition:
+     *                       a. Data Storage: On successful execution, the `dest` array should be populated with the values of the read input registers.
+     *                       b. Memory Management: The caller is responsible for managing the memory allocated for the `dest` array.
+     *
+     * Postcondition: 1. The function should be called with the mutated data to test the functionality of the function, returning 0 if successful and -1 if an error occurs.
+     *                   a. Input Validation: Ensure that the function correctly handles various edge cases and invalid inputs.
+     *                   b. Error Handling: Verify that the function sets `errno` appropriately and returns the correct error codes.
+     *                   c. Resource Management: Confirm that resources are properly managed and released after the function call.
+     *                2. Resources should be released properly after the function call. Note that the specified API is preferred to use for resource release if available.
+     **/
+
+    FuzzedDataProvider data_provider(data, size);
+
+    // Create and initialize a Modbus context
+    modbus_t *ctx = modbus_new_tcp("127.0.0.1", 1502);
+    if (ctx == NULL) {
+        return 0;
+    }
+
+    if (modbus_connect(ctx) == -1) {
+        modbus_free(ctx);
+        return 0;
+    }
+
+    // Generate inputs for the API
+    int addr = data_provider.ConsumeIntegral<int>();
+    int nb = data_provider.ConsumeIntegralInRange<int>(1, MODBUS_MAX_READ_REGISTERS);
+    uint16_t *dest = (uint16_t *)malloc(nb * sizeof(uint16_t));
+    if (dest == NULL) {
+        modbus_close(ctx);
+        modbus_free(ctx);
+        return 0;
+    }
+
+    // Call the API
+    int status = modbus_read_input_registers(ctx, addr, nb, dest);
+
+    // Clean up
+    free(dest);
+    modbus_close(ctx);
+    modbus_free(ctx);
+
+    return 0;
+}
+```
