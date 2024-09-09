@@ -27,7 +27,7 @@ from experiment import oss_fuzz_checkout, textcov
 from experiment.benchmark import Benchmark
 from experiment.workdir import WorkDirs
 from llm_toolkit import models, output_parser, prompt_builder, prompts
-from results import BuildResult, ExperimentResult, Result
+from results import BuildResult, ExperimentResult
 
 thread_local = threading.local()
 
@@ -53,6 +53,16 @@ RUN_TIMEOUT: int = 30
 TEMPERATURE: float = 0.4
 
 RESULTS_DIR = './results'
+
+import run_one_experiment
+from experiment import benchmark as benchmarklib
+class Result:
+  benchmark: benchmarklib.Benchmark
+  result: run_one_experiment.AggregatedResult | str
+
+  def __init__(self, benchmark, result):
+    self.benchmark = benchmark
+    self.result = result
 
 
 # TODO(dongge): Move this to results.py
@@ -361,7 +371,7 @@ if __name__ == '__main__':
                            run_timeout=RUN_TIMEOUT,
                            fixer_model_name='gpt-4o-azure')
     # break
-    res = Result(benchmark, result, work_dirs)
+    res = Result(benchmark, result)
     import run_all_experiments
     _print_and_dump_experiment_result(res, report_dir)
     # Process total gain from all generated harnesses for each projects
