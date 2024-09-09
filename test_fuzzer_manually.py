@@ -14,13 +14,12 @@
 # limitations under the License.
 """Test a fuzzer manually."""
 
-from typing import Any
 import dataclasses
 import logging
 import os
 import threading
 from multiprocessing import pool
-from typing import List, Optional
+from typing import Any, List, Optional
 
 from experiment import builder_runner as builder_runner_lib
 from experiment import evaluator as exp_evaluator
@@ -245,8 +244,11 @@ def _print_and_dump_experiment_result(result: Result, save_dir):
   coverage_gain_dict = _process_total_coverage_gain(EXPERIMENT_RESULTS)
   add_to_json_report(save_dir, 'project_summary', coverage_gain_dict)
 
+
 JSON_REPORT = 'report.json'
 import json
+
+
 def add_to_json_report(outdir: str, key: str, value: Any) -> None:
   """Adds a key/value pair to JSON report."""
   os.makedirs(outdir, exist_ok=True)
@@ -262,6 +264,7 @@ def add_to_json_report(outdir: str, key: str, value: Any) -> None:
   # Overwrite the new json file
   with open(json_report_path, 'w') as f:
     f.write(json.dumps(json_report))
+
 
 def _process_total_coverage_gain(
     results: list[Result]) -> dict[str, dict[str, Any]]:
@@ -287,7 +290,8 @@ def _process_total_coverage_gain(
     for cov in cov_list:
       total_cov.merge(cov)
 
-    coverage_summary = run_all_experiments.evaluator.load_existing_coverage_summary(project)
+    coverage_summary = run_all_experiments.evaluator.load_existing_coverage_summary(
+        project)
 
     try:
       coverage_summary_files = coverage_summary['data'][0]['files']
@@ -312,7 +316,6 @@ def _process_total_coverage_gain(
 
 if __name__ == '__main__':
 
-  
   prepare('')
 
   model = models.LLM.setup(ai_binary='',
@@ -324,7 +327,7 @@ if __name__ == '__main__':
       'benchmark-sets/spec_test/libmodbus.yaml')
 
   report_dir = 'results/output-libmodbus-modbus_write_bits/fixed_targets'
-  
+
   benchmarks = []
   # print all benchmark names
   for benchmark in benchmarks_all:
@@ -341,29 +344,29 @@ if __name__ == '__main__':
   for file in os.listdir(
       report_dir):  # copy all generated targets to fixed_targets directory
     if file.endswith('.c'):
-      generated_targets.append(os.path.join(
-          report_dir, file))
-  
+      generated_targets.append(os.path.join(report_dir, file))
+
   global EXPERIMENT_RESULTS
   EXPERIMENT_RESULTS = []
-  
+
   for benchmark in benchmarks:
     print(benchmark)
     print("*" * 50)
     result = check_targets(ai_binary='',
-                  benchmark=benchmark,
-                  work_dirs=work_dirs,
-                  generated_targets=generated_targets,
-                  cloud_experiment_name='',
-                  cloud_experiment_bucket='',
-                  run_timeout=RUN_TIMEOUT,
-                  fixer_model_name='gpt-4o-azure')
+                           benchmark=benchmark,
+                           work_dirs=work_dirs,
+                           generated_targets=generated_targets,
+                           cloud_experiment_name='',
+                           cloud_experiment_bucket='',
+                           run_timeout=RUN_TIMEOUT,
+                           fixer_model_name='gpt-4o-azure')
     # break
-    res = Result(benchmark, result)
+    res = Result(benchmark, result, work_dirs)
     import run_all_experiments
     _print_and_dump_experiment_result(res, report_dir)
-      # Process total gain from all generated harnesses for each projects
+    # Process total gain from all generated harnesses for each projects
     coverage_gain_dict = _process_total_coverage_gain(EXPERIMENT_RESULTS)
     add_to_json_report(report_dir, 'project_summary', coverage_gain_dict)
 
-    run_all_experiments._print_experiment_results(EXPERIMENT_RESULTS, coverage_gain_dict)
+    run_all_experiments._print_experiment_results(EXPERIMENT_RESULTS,
+                                                  coverage_gain_dict)

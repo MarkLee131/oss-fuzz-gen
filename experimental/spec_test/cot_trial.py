@@ -56,15 +56,17 @@ def retrieve_all_contexts(benchmark: Benchmark,
 
   # check context_info['header']
   import json
-  header_info_path = os.path.join(PROMPTS_DIR, 'headerfiles.json'), 'r'
-  with open(header_info_path) as f:
+  header_info_path = os.path.join(PROMPTS_DIR, 'headerfiles.json')
+  with open(header_info_path, 'r') as f:
     header_info = json.load(f)
   try:
     context_info['header'] = header_info[benchmark.project]
   except KeyError:
     pass
-    logger.warning(f'No customed header information found for {benchmark.project}, using default header information.')
-  
+    logger.warning(
+        f'No customed header information found for {benchmark.project}, using default header information.'
+    )
+
   project_examples = project_targets.generate_data(
       benchmark.project,
       benchmark.language,
@@ -180,7 +182,8 @@ if __name__ == '__main__':
   #     benchmarks_directory='../../benchmark-sets/spec_test/', benchmark_yaml='')
 
   experiment_targets = get_benchmarks(
-      benchmarks_directory='', benchmark_yaml='../../benchmark-sets/spec_test/libmodbus.yaml')
+      benchmarks_directory='',
+      benchmark_yaml='../../benchmark-sets/spec_test/libmodbus.yaml')
 
   for target_benchmark in tqdm(experiment_targets,
                                total=len(experiment_targets),
