@@ -76,6 +76,7 @@ INTROSPECTOR_SAMPLE_XREFS = ''
 INTROSPECTOR_ALL_JVM_SOURCE_PATH = ''
 INTROSPECTOR_FUNCTION_WITH_MATCHING_RETURN_TYPE = ''
 INTROSPECTOR_JVM_PROPERTIES = ''
+INTROSPECTOR_JVM_PUBLIC_CLASSES = ''
 
 
 def get_oracle_dict() -> Dict[str, Any]:
@@ -105,7 +106,8 @@ def set_introspector_endpoints(endpoint):
       INTROSPECTOR_HEADERS_FOR_FUNC, \
       INTROSPECTOR_FUNCTION_WITH_MATCHING_RETURN_TYPE, \
       INTROSPECTOR_ORACLE_ALL_TESTS, INTROSPECTOR_JVM_PROPERTIES, \
-      INTROSPECTOR_TEST_SOURCE, INTROSPECTOR_HARNESS_SOURCE_AND_EXEC
+      INTROSPECTOR_TEST_SOURCE, INTROSPECTOR_HARNESS_SOURCE_AND_EXEC, \
+      INTROSPECTOR_JVM_PUBLIC_CLASSES
 
   INTROSPECTOR_ENDPOINT = endpoint
 
@@ -141,6 +143,8 @@ def set_introspector_endpoints(endpoint):
   INTROSPECTOR_JVM_PROPERTIES = f'{INTROSPECTOR_ENDPOINT}/jvm-method-properties'
   INTROSPECTOR_HARNESS_SOURCE_AND_EXEC = (
       f'{INTROSPECTOR_ENDPOINT}/harness-source-and-executable')
+  INTROSPECTOR_JVM_PUBLIC_CLASSES = (
+      f'{INTROSPECTOR_ENDPOINT}/all-public-classes')
 
 
 def _construct_url(api: str, params: dict) -> str:
@@ -325,6 +329,13 @@ def query_introspector_function_props(project: str, func_sig: str) -> dict:
       'is-jvm-static': _get_data(resp, 'is-jvm-static', False),
       'need-close': _get_data(resp, 'need-close', False)
   }
+
+
+def query_introspector_public_classes(project: str) -> list[str]:
+  """Queries FuzzIntrospector API for all public classes of |project|."""
+  resp = _query_introspector(INTROSPECTOR_JVM_PUBLIC_CLASSES,
+                             {'project': project})
+  return _get_data(resp, 'classes', [])
 
 
 def query_introspector_source_code(project: str, filepath: str, begin_line: int,
@@ -613,7 +624,7 @@ def _select_top_functions_from_oracle(project: str, limit: int,
                                       target_oracle: str,
                                       target_oracles: list[str]) -> OrderedDict:
   """Selects the top |limit| functions from |target_oracle|."""
-  if target_oracle not in target_oracles:
+  if target_oracle not in target_oracles or target_oracle == 'test-migration':
     return OrderedDict()
 
   logger.info('Extracting functions using oracle %s.', target_oracle)
@@ -774,11 +785,6 @@ def populate_benchmarks_using_introspector(project: str, language: str,
                                            target_oracles: List[str]):
   """Populates benchmark YAML files from the data from FuzzIntrospector."""
 
-  # If there is any oracle with test-migration then only do this oracle
-  # selection, because the benchmarks will have different .yaml structure.
-  # TODO(David): clean up benchmark code to make it more flexible for varying
-  # forms of target selectors, and potential mixing both types of target
-  # selectors.
   potential_benchmarks = []
   for target_oracle in target_oracles:
     if 'test-migration' in target_oracle:
