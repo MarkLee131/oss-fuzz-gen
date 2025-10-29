@@ -37,11 +37,12 @@ def add_agent_messages(
             # New agent, just use the messages from right
             combined = messages
         
-        # Trim this agent's messages to 50k tokens
+        # Trim this agent's messages to 100k tokens
         result[agent_name] = trim_messages_by_tokens(
             combined,
-            max_tokens=50000,  # Each agent gets 50k tokens
-            keep_system=True
+            max_tokens=100000,  # Increase to 100k tokens per agent
+            keep_system=True,
+            system_max_tokens=10000  # Limit system message to 10k
         )
     
     return result
@@ -126,12 +127,18 @@ class FuzzingWorkflowState(TypedDict):
     additional_files_path: NotRequired[str]  # Path to additional files
     run_timeout: NotRequired[int]  # Execution timeout
     current_iteration: NotRequired[int]  # Current workflow iteration
+    max_iterations: NotRequired[int]  # Maximum workflow iterations
     workflow_status: NotRequired[str]  # Workflow status
-    build_errors: NotRequired[List[str]]  # Build error list
     active_containers: NotRequired[List[str]]  # Active container list
+    crash_results: NotRequired[List[Dict[str, Any]]]  # Crash results list
     
     # === Token Usage Statistics ===
     token_usage: NotRequired[Dict[str, Any]]  # Token consumption statistics
+    
+    # === Session Memory (Consensus Constraints) ===
+    # Current consensus constraints established by agents during this task
+    # Supervisor should always inject this consensus to downstream agents instead of full message history
+    session_memory: NotRequired[Dict[str, Any]]
 
 class WorkerState(TypedDict):
     """State for worker nodes in parallel execution."""
@@ -201,6 +208,14 @@ def create_initial_state(
             "total_completion_tokens": 0,
             "total_tokens": 0,
             "by_agent": {}
+        },
+        # Initialize session memory (consensus constraints storage)
+        session_memory={
+            "api_constraints": [],      # API usage constraints list
+            "archetype": None,           # Identified architecture pattern
+            "known_fixes": [],           # Known error fixes
+            "decisions": [],             # Key decision records
+            "coverage_strategies": []    # Coverage optimization strategies
         }
     )
 
@@ -327,3 +342,337 @@ def get_state_summary(state: FuzzingWorkflowState) -> str:
         summary += f"\n  Errors: {errors} recorded"
     
     return summary
+
+
+# ==================== Session Memory Management ====================
+
+def add_api_constraint(
+    state: FuzzingWorkflowState,
+    constraint: str,
+    source: str,
+    confidence: str = "medium",
+    iteration: int = None
+) -> None:
+    """
+    Add API constraint to session_memory.
+    
+    Args:
+        state: Workflow state
+        constraint: Constraint description
+        source: Source agent name
+        confidence: Confidence level (high/medium/low)
+        iteration: Iteration where this constraint was found
+    """
+    if "session_memory" not in state:
+        state["session_memory"] = {
+            "api_constraints": [],
+            "archetype": None,
+            "known_fixes": [],
+            "decisions": [],
+            "coverage_strategies": []
+        }
+    
+    api_constraints = state["session_memory"].get("api_constraints", [])
+    
+    # Deduplication: Check if the same constraint already exists
+    for existing in api_constraints:
+        if existing["constraint"] == constraint:
+            # Update if new constraint has higher confidence
+            if confidence == "high" and existing["confidence"] != "high":
+                existing["confidence"] = "high"
+                existing["source"] = source
+            return
+    
+    # Add new constraint
+    api_constraints.append({
+        "constraint": constraint,
+        "source": source,
+        "confidence": confidence,
+        "iteration": iteration if iteration is not None else state.get("current_iteration", 0)
+    })
+    
+    state["session_memory"]["api_constraints"] = api_constraints
+
+
+def add_known_fix(
+    state: FuzzingWorkflowState,
+    error_pattern: str,
+    solution: str,
+    source: str,
+    iteration: int = None
+) -> None:
+    """
+    Add known error fix to session_memory.
+    
+    Args:
+        state: Workflow state
+        error_pattern: Error pattern description
+        solution: Solution description
+        source: Source agent name
+        iteration: Iteration where this fix was discovered
+    """
+    if "session_memory" not in state:
+        state["session_memory"] = {
+            "api_constraints": [],
+            "archetype": None,
+            "known_fixes": [],
+            "decisions": [],
+            "coverage_strategies": []
+        }
+    
+    known_fixes = state["session_memory"].get("known_fixes", [])
+    
+    # Deduplication
+    for existing in known_fixes:
+        if existing["error_pattern"] == error_pattern:
+            # Update solution if different
+            if existing["solution"] != solution:
+                existing["solution"] = solution
+                existing["source"] = source
+            return
+    
+    # Add new fix
+    known_fixes.append({
+        "error_pattern": error_pattern,
+        "solution": solution,
+        "source": source,
+        "iteration": iteration if iteration is not None else state.get("current_iteration", 0)
+    })
+    
+    state["session_memory"]["known_fixes"] = known_fixes
+
+
+def add_decision(
+    state: FuzzingWorkflowState,
+    decision: str,
+    reason: str,
+    source: str,
+    iteration: int = None
+) -> None:
+    """
+    Add key decision to session_memory.
+    
+    Args:
+        state: Workflow state
+        decision: Decision content
+        reason: Decision reason
+        source: Source agent name
+        iteration: Iteration where this decision was made
+    """
+    if "session_memory" not in state:
+        state["session_memory"] = {
+            "api_constraints": [],
+            "archetype": None,
+            "known_fixes": [],
+            "decisions": [],
+            "coverage_strategies": []
+        }
+    
+    decisions = state["session_memory"].get("decisions", [])
+    
+    decisions.append({
+        "decision": decision,
+        "reason": reason,
+        "source": source,
+        "iteration": iteration if iteration is not None else state.get("current_iteration", 0)
+    })
+    
+    # Limit decisions to keep only the most recent 10
+    state["session_memory"]["decisions"] = decisions[-10:]
+
+
+def set_archetype(
+    state: FuzzingWorkflowState,
+    archetype_type: str,
+    lifecycle_phases: List[str],
+    source: str,
+    iteration: int = None
+) -> None:
+    """
+    Set the identified API archetype pattern.
+    
+    Args:
+        state: Workflow state
+        archetype_type: Archetype type (e.g., "stateful_decoder", "simple_parser")
+        lifecycle_phases: List of lifecycle phases
+        source: Source agent name
+        iteration: Iteration where this archetype was identified
+    """
+    if "session_memory" not in state:
+        state["session_memory"] = {
+            "api_constraints": [],
+            "archetype": None,
+            "known_fixes": [],
+            "decisions": [],
+            "coverage_strategies": []
+        }
+    
+    state["session_memory"]["archetype"] = {
+        "type": archetype_type,
+        "lifecycle_phases": lifecycle_phases,
+        "source": source,
+        "iteration": iteration if iteration is not None else state.get("current_iteration", 0)
+    }
+
+
+def add_coverage_strategy(
+    state: FuzzingWorkflowState,
+    strategy: str,
+    target: str,
+    source: str,
+    iteration: int = None
+) -> None:
+    """
+    Add coverage optimization strategy to session_memory.
+    
+    Args:
+        state: Workflow state
+        strategy: Strategy description
+        target: Target/expected effect
+        source: Source agent name
+        iteration: Iteration where this strategy was proposed
+    """
+    if "session_memory" not in state:
+        state["session_memory"] = {
+            "api_constraints": [],
+            "archetype": None,
+            "known_fixes": [],
+            "decisions": [],
+            "coverage_strategies": []
+        }
+    
+    strategies = state["session_memory"].get("coverage_strategies", [])
+    
+    # Deduplication
+    for existing in strategies:
+        if existing["strategy"] == strategy:
+            return
+    
+    strategies.append({
+        "strategy": strategy,
+        "target": target,
+        "source": source,
+        "iteration": iteration if iteration is not None else state.get("current_iteration", 0)
+    })
+    
+    # Limit strategies to keep only the most recent 10
+    state["session_memory"]["coverage_strategies"] = strategies[-10:]
+
+
+def format_session_memory_for_prompt(state: FuzzingWorkflowState) -> str:
+    """
+    Format session_memory as readable text for injection into agent prompts.
+    
+    Args:
+        state: Workflow state
+    
+    Returns:
+        Formatted session_memory text
+    """
+    session_memory = state.get("session_memory", {})
+    
+    if not session_memory:
+        return "*No consensus constraints for this task yet*"
+    
+    parts = []
+    
+    # 1. Format API constraints
+    if api_constraints := session_memory.get("api_constraints", []):
+        parts.append("## API Usage Constraints")
+        for c in api_constraints:
+            confidence_level = c.get("confidence", "medium").upper()
+            parts.append(f"- [{confidence_level}] {c['constraint']}")
+            parts.append(f"  *source: {c['source']}, iteration: {c.get('iteration', 0)}*")
+    
+    # 2. Format archetype pattern
+    if archetype := session_memory.get("archetype"):
+        parts.append("\n## Identified Architecture Pattern")
+        parts.append(f"- **Type**: {archetype['type']}")
+        parts.append(f"- **Lifecycle**: {' → '.join(archetype['lifecycle_phases'])}")
+        parts.append(f"- *source: {archetype['source']}, iteration: {archetype.get('iteration', 0)}*")
+    
+    # 3. Format known fixes
+    if known_fixes := session_memory.get("known_fixes", []):
+        parts.append("\n## Known Error Fixes")
+        for fix in known_fixes[-5:]:  # Show only the most recent 5
+            parts.append(f"- **Error**: {fix['error_pattern']}")
+            parts.append(f"  **Solution**: {fix['solution']}")
+            parts.append(f"  *source: {fix['source']}, iteration: {fix.get('iteration', 0)}*")
+    
+    # 4. Format decision records
+    if decisions := session_memory.get("decisions", []):
+        parts.append("\n## Key Decisions")
+        for d in decisions[-3:]:  # Show only the most recent 3
+            parts.append(f"- **Decision**: {d['decision']}")
+            parts.append(f"  **Reason**: {d['reason']}")
+            parts.append(f"  *source: {d['source']}, iteration: {d.get('iteration', 0)}*")
+    
+    # 5. Format coverage strategies
+    if strategies := session_memory.get("coverage_strategies", []):
+        parts.append("\n## Coverage Optimization Strategies")
+        for s in strategies[-5:]:  # Show only the most recent 5
+            parts.append(f"- {s['strategy']}")
+            parts.append(f"  *target: {s['target']}, source: {s['source']}*")
+    
+    if not parts:
+        return "*No consensus constraints for this task yet*"
+    
+    return "\n".join(parts)
+
+
+def consolidate_session_memory(state: FuzzingWorkflowState) -> Dict[str, Any]:
+    """
+    Consolidate and clean session_memory with deduplication and length limits.
+    
+    This function should be called in the Supervisor node to keep session_memory tidy.
+    
+    Args:
+        state: Workflow state
+    
+    Returns:
+        Cleaned session_memory
+    """
+    session_memory = state.get("session_memory", {}).copy()
+    
+    if not session_memory:
+        return {
+            "api_constraints": [],
+            "archetype": None,
+            "known_fixes": [],
+            "decisions": [],
+            "coverage_strategies": []
+        }
+    
+    # 1. Deduplicate API constraints
+    if api_constraints := session_memory.get("api_constraints", []):
+        # Deduplicate by constraint content, keep the one with highest confidence
+        unique_constraints = {}
+        for c in api_constraints:
+            key = c["constraint"]
+            if key not in unique_constraints:
+                unique_constraints[key] = c
+            elif c["confidence"] == "high" and unique_constraints[key]["confidence"] != "high":
+                unique_constraints[key] = c
+        session_memory["api_constraints"] = list(unique_constraints.values())
+    
+    # 2. Deduplicate known_fixes
+    if known_fixes := session_memory.get("known_fixes", []):
+        unique_fixes = {}
+        for fix in known_fixes:
+            key = fix["error_pattern"]
+            unique_fixes[key] = fix  # Later ones override earlier ones
+        session_memory["known_fixes"] = list(unique_fixes.values())[-10:]  # Keep only the most recent 10
+    
+    # 3. Limit decisions length
+    if decisions := session_memory.get("decisions", []):
+        session_memory["decisions"] = decisions[-10:]
+    
+    # 4. Deduplicate coverage_strategies
+    if strategies := session_memory.get("coverage_strategies", []):
+        unique_strategies = {}
+        for s in strategies:
+            key = s["strategy"]
+            unique_strategies[key] = s
+        session_memory["coverage_strategies"] = list(unique_strategies.values())[-10:]
+    
+    return session_memory
