@@ -271,8 +271,10 @@ def is_image_cached(project_name: str, sanitizer: str) -> bool:
   building."""
   cached_image_name = _get_project_cache_image_name(project_name, sanitizer)
   try:
+    # Use 'docker inspect' to check local image cache instead of 'docker manifest inspect'
+    # which checks remote registry. This allows us to use local cached images.
     sp.run(
-        ['docker', 'manifest', 'inspect', cached_image_name],
+        ['docker', 'inspect', '--type=image', cached_image_name],
         check=True,
         stdin=sp.DEVNULL,
         stdout=sp.DEVNULL,
