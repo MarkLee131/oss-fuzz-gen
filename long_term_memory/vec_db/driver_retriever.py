@@ -8,7 +8,7 @@ from the indexed vector database.
 
 from pathlib import Path
 from typing import List, Dict, Optional
-from driver_indexer import DriverCodeIndexer
+from long_term_memory.vec_db.driver_indexer import DriverCodeIndexer
 import chromadb
 
 
