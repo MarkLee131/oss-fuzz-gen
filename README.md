@@ -363,7 +363,6 @@ logicfuzz/
 │   │   ├── coverage_analyzer.py    # Coverage analysis
 │   │   ├── crash_feasibility_analyzer.py  # Crash validation
 │   │   └── utils.py                # Agent utilities
-│   ├── api_dependency_analyzer.py  # API call graph extraction
 │   ├── api_context_extractor.py    # API usage context from FI
 │   ├── api_heuristics.py           # API pattern heuristics
 │   ├── api_validator.py            # API usage validation

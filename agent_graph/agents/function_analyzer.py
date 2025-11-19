@@ -70,12 +70,14 @@ class LangGraphFunctionAnalyzer(LangGraphAgent):
             logger.error(error_msg, trial=self.trial)
             raise RuntimeError(error_msg)
         
-        logger.info(f'✅ Using fuzzing context (prepared in {context.get("preparation_time", 0):.2f}s)', trial=self.trial)
+        logger.info(f'Using fuzzing context (prepared in {context.get("preparation_time", 0):.2f}s)', trial=self.trial)
         
         # Extract data from context - all guaranteed to exist
         func_source = context.get('source_code', '')
-        # 2025-11: API 组合信息分析已在数据准备阶段移除，这里仅使用轻量级 api_context。
-        api_context = context.get('api_context', {}) or context.get('api_dependencies', {}).get('api_context', {})
+        # 2025-11: API 组合信息分析已在数据准备阶段移除，仅使用数据准备阶段构造的轻量级 api_dependencies。
+        api_dependencies = context["api_dependencies"]
+        # 对分析逻辑本身，仅使用轻量级 api_context。
+        api_context = api_dependencies.get('api_context', {})
         header_info = context.get('header_info', {})
         existing_fuzzer_headers = context.get('existing_fuzzer_headers', {})
         
@@ -379,10 +381,12 @@ Generate complete SRS incorporating all knowledge above.
         final_srs = parse_srs_json_from_response(final_response)
         if final_srs:
             archetype_data = final_srs.get('archetype', {})
-            if archetype_data.get('primary_pattern') != 'unknown':
+            primary_pattern = archetype_data.get('primary_pattern')
+            # 不再使用 'unknown' 等回退值；只有明确识别的 archetype 才会写入 session_memory。
+            if primary_pattern:
                 set_archetype(
                     state,
-                    archetype_type=archetype_data.get('primary_pattern', 'unknown'),
+                    archetype_type=primary_pattern,
                     lifecycle_phases=archetype_data.get('lifecycle_phases', []),
                     source=self.name,
                     iteration=state.get('current_iteration', 0)
@@ -397,12 +401,7 @@ Generate complete SRS incorporating all knowledge above.
                         source=self.name,
                         confidence="high" if pre.get('priority') == 'MANDATORY' else "medium",
                         iteration=state.get('current_iteration', 0)
-                    )
-        
-        # OPTIMIZATION: No longer store in state
-        # add_agent_message(state, self.name, "user", f"Generate SRS for {function_signature}")
-        # add_agent_message(state, self.name, "assistant", final_response)
-        
+                    )     
         logger.info(f'📊 Stateless analysis complete: {examples_analyzed} examples processed', trial=self.trial)
         return final_response
     
@@ -491,8 +490,7 @@ Generate complete SRS incorporating all knowledge above.
         lines = caller_source.splitlines()
         
         # Extract callee function name from function_signature
-        # e.g., "CURLMcode curl_multi_socket_action(CURLM *, curl_socket_t, int, int *)"
-        # -> "curl_multi_socket_action"
+
         callee_name = self._extract_function_name_from_signature(function_signature)
         logger.debug(
             f'Searching for callee function: {callee_name} (from signature: {function_signature[:80]}...)',
