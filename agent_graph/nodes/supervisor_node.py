@@ -259,8 +259,41 @@ def _determine_next_action(state: FuzzingWorkflowState) -> str:
                     logger.info('Crash is not feasible, enhancing target', trial=trial)
                     return "enhancer"
             
-            # Execution failed but not a crash, enhance the target
-            logger.debug('Execution failed (not a crash), enhancing target', trial=trial)
+            # === Non-crash failures (e.g., timeouts, infra errors) ===
+            # These are expensive to keep retrying because each enhancer round can
+            # trigger a full build + run + coverage cycle.
+            run_error_str = str(run_error or "").lower()
+            timeout_keywords = ("timed out", "timeout", "time-out")
+            
+            # Special-case: pure timeout → don't even try enhancer; just stop.
+            if any(kw in run_error_str for kw in timeout_keywords):
+                logger.warning(
+                    f'Execution failed due to timeout (run_error={run_error_str[:200]}...), '
+                    f'skipping enhancer and ending workflow',
+                    trial=trial
+                )
+                return "END"
+            
+            # For other non-crash failures, allow only a very small number of
+            # enhancer attempts in OPTIMIZATION phase before giving up.
+            optimization_enhancer_count = state.get("optimization_enhancer_count", 0)
+            MAX_OPTIMIZATION_ENHANCER_RETRIES = 1
+            
+            if optimization_enhancer_count >= MAX_OPTIMIZATION_ENHANCER_RETRIES:
+                logger.info(
+                    f'Execution failed (not a crash) and enhancer already used '
+                    f'{optimization_enhancer_count} time(s) in optimization phase, '
+                    f'ending workflow instead of looping.',
+                    trial=trial
+                )
+                return "END"
+            
+            logger.debug(
+                f'Execution failed (not a crash), enhancing target '
+                f'(optimization_enhancer_count={optimization_enhancer_count + 1}/'
+                f'{MAX_OPTIMIZATION_ENHANCER_RETRIES})',
+                trial=trial
+            )
             return "enhancer"
         
         # Execution succeeded, check coverage results

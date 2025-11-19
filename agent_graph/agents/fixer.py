@@ -165,9 +165,14 @@ class LangGraphEnhancer(LangGraphAgent):
             state_update["compilation_retry_count"] = compilation_retry_count + 1
             logger.info(f'Compilation retry count: {compilation_retry_count + 1}', trial=self.trial)
         else:
-            # In optimization phase, update regular retry_count
+            # In optimization phase, update regular retry_count and a dedicated
+            # optimization_enhancer_count so Supervisor can cap enhancer usage
+            # much more aggressively than the global retry_count.
             retry_count = state.get("retry_count", 0)
             state_update["retry_count"] = retry_count + 1
+            
+            optimization_enhancer_count = state.get("optimization_enhancer_count", 0)
+            state_update["optimization_enhancer_count"] = optimization_enhancer_count + 1
         
         # Flush logs for this agent after completing execution
         self._langgraph_logger.flush_agent_logs(self.name)

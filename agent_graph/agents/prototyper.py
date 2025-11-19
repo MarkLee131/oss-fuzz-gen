@@ -290,18 +290,6 @@ class LangGraphPrototyper(LangGraphAgent):
             output.append(f"- **Purpose**: {metadata.get('purpose', 'N/A')}")
             output.append("")
         
-        # Add API Composition Information
-        api_dependencies = function_analysis.get('api_dependencies')
-        if api_dependencies and api_dependencies.get('call_sequence'):
-            from agent_graph.api_composition_analyzer import format_api_combinations_for_prompt
-            
-            func_sig = function_analysis.get('function_signature', '')
-            api_dep_text = format_api_combinations_for_prompt(api_dependencies, func_sig)
-            
-            if api_dep_text:
-                output.append(api_dep_text)
-                output.append("")
-        
         return "\n".join(output)
     
     def _retrieve_skeleton(self, function_analysis: dict) -> str:
@@ -354,12 +342,12 @@ class LangGraphPrototyper(LangGraphAgent):
             return f"""
 # Reference Skeleton
 
-**⚠️ CRITICAL: This is a TEMPLATE showing the PATTERN, NOT code to copy literally!**
+**CRITICAL: This is a TEMPLATE showing the PATTERN, NOT code to copy literally!**
 
 **How to use:**
-1. 🥇 **COPY patterns from EXISTING FUZZERS** (highest priority - proven to compile)
-2. 🥈 **Replace PLACEHOLDERS** with actual function calls from the public API
-3. 🥉 **Keep the STRUCTURE** (error handling, cleanup order) but adapt the content
+1.**COPY patterns from EXISTING FUZZERS** (highest priority - proven to compile)
+2.**Replace PLACEHOLDERS** with actual function calls from the public API
+3.**Keep the STRUCTURE** (error handling, cleanup order) but adapt the content
 
 **Placeholders** like `PARSE_FUNCTION()`, `RESULT_TYPE`, `MIN_SIZE` are NOT real identifiers - replace them with actual API calls!
 

@@ -86,7 +86,6 @@ class FuzzingContext:
         import time
         from data_prep import introspector
         from agent_graph.api_context_extractor import APIContextExtractor
-        from agent_graph.api_composition_analyzer import APICompositionAnalyzer
         from agent_graph.header_extractor import get_function_definition_headers
         
         log = logger_instance or logger
@@ -123,7 +122,7 @@ class FuzzingContext:
             source_code = None
         
         # === Step 3: Extract API context ===
-        log.debug('  3/5 Extracting API context...')
+        log.debug('  3/6 Extracting API context...')
         try:
             extractor = APIContextExtractor(project_name)
             api_context = extractor.extract(function_signature)
@@ -139,41 +138,18 @@ class FuzzingContext:
                 f"This function might have unusual signature that APIContextExtractor cannot parse."
             )
         
-        # === Step 4: Find API combinations ===
-        log.debug('  4/5 Finding API combinations...')
-        try:
-            analyzer = APICompositionAnalyzer(
-                project_name,
-                llm=None,
-                use_llm=False  # Use heuristic mode for data preparation
-            )
-            # Pass api_context to avoid redundant FI query
-            api_dependencies = analyzer.find_api_combinations(
-                function_signature, 
-                api_context=api_context
-            )
-        except Exception as e:
-            raise RuntimeError(
-                f"Failed to find API combinations: {e}\n"
-                f"This is an internal error in APICompositionAnalyzer."
-            ) from e
-        
-        if not api_dependencies:
-            # 好品味原则：关键数据不能用"空结构"糊弄过去
-            # 如果依赖图为空，要么是：
-            #  1）函数真的没有依赖（极少），要么
-            #  2）FuzzIntrospector / 分析器的数据有问题
-            # 这两种情况都应该让上游明确感知，而不是静默继续。
-            raise ValueError(
-                f"API dependency analysis returned empty result for "
-                f"'{function_signature}' in project '{project_name}'.\n"
-                f"Either this function truly has no dependencies or the "
-                f"FuzzIntrospector data is incomplete. Inspect FI data or "
-                f"APICompositionAnalyzer before retrying."
-            )
+        # === Step 4: Build lightweight API dependency wrapper (no composition analysis) ===
+        # 性能原因：不再运行昂贵的 API 组合分析器，只保留基础的 API context。
+        # 这里构造一个轻量级的 api_dependencies 结构，以保持下游兼容。
+        api_dependencies = {
+            "api_context": api_context,
+            "prerequisites": [],
+            "data_dependencies": [],
+            "call_sequence": [],
+        }
         
         # === Step 5: Extract header information ===
-        log.debug('  5/5 Extracting headers...')
+        log.debug('  5/6 Extracting headers...')
         try:
             header_info = get_function_definition_headers(project_name, function_signature)
         except Exception as e:
@@ -213,9 +189,6 @@ class FuzzingContext:
             f'Deps: {len(api_dependencies.get("call_sequence", []))}, '
             f'Headers: {len(header_info.get("standard_headers", [])) + len(header_info.get("project_headers", []))}'
         )
-        
-        # Store api_context inside api_dependencies for backward compatibility
-        api_dependencies['api_context'] = api_context
         
         return cls(
             project_name=project_name,

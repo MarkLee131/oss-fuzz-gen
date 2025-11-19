@@ -138,6 +138,10 @@ class FuzzingWorkflowState(TypedDict):
     compilation_retry_count: NotRequired[int]  # Separate counter for compilation retries
     prototyper_regenerate_count: NotRequired[int]  # Counter for prototyper regenerations
     previous_fuzz_target_source: NotRequired[str]  # Store previous version for diff generation
+    # Track how many times enhancer has been used specifically in OPTIMIZATION phase.
+    # This lets us enforce a much stricter cap there than the global retry_count,
+    # so we don't keep running expensive build/run/coverage cycles for low-value tweaks.
+    optimization_enhancer_count: NotRequired[int]
     
     # === Error Handling ===
     errors: NotRequired[List[Dict[str, Any]]]
@@ -216,6 +220,8 @@ def create_initial_state(
         compilation_retry_count=0,  # Track compilation retries separately
         prototyper_regenerate_count=0,  # Track prototyper regenerations
         previous_fuzz_target_source="",  # For diff generation
+        # Optimization-phase enhancer usage counter
+        optimization_enhancer_count=0,
         # Store additional configuration
         pipeline=pipeline or [],
         use_context=use_context,

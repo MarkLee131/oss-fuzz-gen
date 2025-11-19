@@ -32,7 +32,10 @@ class LangGraphFunctionAnalyzer(LangGraphAgent):
         )
         
         # Configuration for iterative analysis
-        self.max_examples = getattr(args, 'max_function_examples', 5)
+        # Limit the number of refined call-site examples we analyze.
+        # 3 examples captures most useful usage patterns while keeping latency
+        # and token cost reasonable. Can be overridden via CLI.
+        self.max_examples = getattr(args, 'max_function_examples', 3)
         self.convergence_threshold = getattr(args, 'convergence_threshold', 3)
     
     def execute(self, state: FuzzingWorkflowState) -> Dict[str, Any]:
@@ -71,8 +74,8 @@ class LangGraphFunctionAnalyzer(LangGraphAgent):
         
         # Extract data from context - all guaranteed to exist
         func_source = context.get('source_code', '')
-        api_dependencies = context.get('api_dependencies', {})
-        api_context = api_dependencies.get('api_context', {})  # Nested inside dependencies
+        # 2025-11: API 组合信息分析已在数据准备阶段移除，这里仅使用轻量级 api_context。
+        api_context = context.get('api_context', {}) or context.get('api_dependencies', {}).get('api_context', {})
         header_info = context.get('header_info', {})
         existing_fuzzer_headers = context.get('existing_fuzzer_headers', {})
         
@@ -120,32 +123,6 @@ class LangGraphFunctionAnalyzer(LangGraphAgent):
             )
         else:
             logger.warning(f'⚠️ No API context available for {function_signature}', trial=self.trial)
-        
-        if api_dependencies and api_dependencies.get('call_sequence'):
-            prereq_count = len(api_dependencies.get('prerequisites', []))
-            data_dep_count = len(api_dependencies.get('data_dependencies', []))
-            call_seq_len = len(api_dependencies.get('call_sequence', []))
-            
-            logger.info(
-                f'🔗 API dependency graph available: {prereq_count} prerequisites, '
-                f'{data_dep_count} data deps, call sequence length: {call_seq_len}',
-                trial=self.trial
-            )
-            
-            # Log detailed dependency information
-            logger.info(
-                f'🔗 Detailed API Dependency Information:\n'
-                f'  ├─ Call Sequence ({call_seq_len}):\n' +
-                '\n'.join([f'  │   {i+1}. {func}{"" if func != function_signature else " ← TARGET"}' 
-                          for i, func in enumerate(api_dependencies.get('call_sequence', []))]) +
-                f'\n  ├─ Prerequisites ({prereq_count}):\n' +
-                '\n'.join([f'  │   • {prereq}()' 
-                          for prereq in api_dependencies.get('prerequisites', [])]) +
-                f'\n  └─ Data Dependencies ({data_dep_count}):\n' +
-                '\n'.join([f'  │   • {src} → {dst}' 
-                          for src, dst in api_dependencies.get('data_dependencies', [])]),
-                trial=self.trial
-            )
         
         # Log header information
         if header_info:

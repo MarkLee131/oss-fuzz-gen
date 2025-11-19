@@ -887,7 +887,7 @@ def format_api_combinations_for_prompt(api_combinations: Dict, target_function: 
         return ""
     
     sections = []
-    sections.append("## 🔗 API Composition Analysis\n")
+    sections.append("## 🔗API Composition Analysis\n")
     
     # Check if this is LLM-enhanced analysis
     llm_metadata = api_combinations.get('llm_metadata', {})
