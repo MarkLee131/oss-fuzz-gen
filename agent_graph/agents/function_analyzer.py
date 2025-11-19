@@ -798,8 +798,7 @@ Generate complete SRS incorporating all knowledge above.
         """
         Retrieve relevant archetype knowledge from long-term memory.
         
-        Attempts to infer archetype from conversation history, or returns all archetypes
-        for reference.
+        仅在明确识别出 archetype 的情况下注入知识；否则返回空字符串，不做任何回退。
         """
         try:
             from long_term_memory.retrieval import KnowledgeRetriever
@@ -828,17 +827,9 @@ Generate complete SRS incorporating all knowledge above.
                 
                 return knowledge
             else:
-                # Return list of archetypes for reference
-                archetypes_list = retriever.list_archetypes()
-                logger.info(f'No archetype inferred, providing archetype list', trial=self.trial)
-                return f"""
-# Available Archetype Patterns
-
-Consider which pattern best matches this API:
-{', '.join(archetypes_list)}
-
-Use this knowledge to structure your analysis.
-"""
+                # 不再提供“所有 archetype 列表”的回退，只在识别出明确 archetype 时注入知识。
+                logger.info('No clear archetype inferred; skipping archetype knowledge injection', trial=self.trial)
+                return ""
         except Exception as e:
             logger.warning(f'Failed to retrieve archetype knowledge: {e}', trial=self.trial)
             return ""
