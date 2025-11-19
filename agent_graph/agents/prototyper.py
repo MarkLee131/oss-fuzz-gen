@@ -699,56 +699,34 @@ class LangGraphPrototyper(LangGraphAgent):
         # Look for explicit archetype declaration
         import re
         
+        # Valid archetype names (standardized)
+        valid_archetypes = {
+            "object_lifecycle",
+            "event_driven_state_machine", 
+            "iterative_processing",
+            "round_trip_testing",
+            "temporary_file",
+            "one_time_initialization",
+            "stateful_context"
+        }
+        
         # Pattern 1: "Primary pattern: {archetype}"
-        # FIX: Use non-greedy match and stop at line end to avoid capturing next line
-        pattern1 = r"Primary pattern:\s*([A-Za-z\-\s]+?)(?:\n|$)"
+        pattern1 = r"Primary pattern:\s*([A-Za-z_\-\s]+?)(?:\n|$)"
         match = re.search(pattern1, analysis_text, re.IGNORECASE)
         if match:
-            archetype_name = match.group(1).strip().lower()
-            # Normalize to our archetype names
-            mapping = {
-                "stateless parser": "object_lifecycle",
-                "object lifecycle": "object_lifecycle",
-                "state machine": "event_driven_state_machine",
-                "stream processor": "iterative_processing",
-                "round-trip": "round_trip_testing",
-                "round trip": "round_trip_testing",
-                "file-based": "temporary_file",
-                "file based": "temporary_file",
-                "global initialization": "one_time_initialization",
-                "global init": "one_time_initialization",
-                "stateful fuzzing": "stateful_context",
-                "stateful": "stateful_context"
-            }
-            result = mapping.get(archetype_name)
-            if result:
-                logger.debug(f"Extracted archetype via Pattern 1: '{archetype_name}' -> '{result}'", trial=self.trial)
-                return result
+            archetype_name = match.group(1).strip().lower().replace("-", "_").replace(" ", "_")
+            if archetype_name in valid_archetypes:
+                logger.debug(f"Extracted archetype via Pattern 1: '{archetype_name}'", trial=self.trial)
+                return archetype_name
         
         # Pattern 2: "Archetype: {archetype}"
-        # FIX: Use non-greedy match and stop at line end
-        pattern2 = r"Archetype:\s*([A-Za-z\-\s]+?)(?:\n|$)"
+        pattern2 = r"Archetype:\s*([A-Za-z_\-\s]+?)(?:\n|$)"
         match = re.search(pattern2, analysis_text, re.IGNORECASE)
         if match:
-            archetype_name = match.group(1).strip().lower()
-            mapping = {
-                "stateless parser": "object_lifecycle",
-                "object lifecycle": "object_lifecycle",
-                "state machine": "event_driven_state_machine",
-                "stream processor": "iterative_processing",
-                "round-trip": "round_trip_testing",
-                "round trip": "round_trip_testing",
-                "file-based": "temporary_file",
-                "file based": "temporary_file",
-                "global initialization": "one_time_initialization",
-                "global init": "one_time_initialization",
-                "stateful fuzzing": "stateful_context",
-                "stateful": "stateful_context"
-            }
-            result = mapping.get(archetype_name)
-            if result:
-                logger.debug(f"Extracted archetype via Pattern 2: '{archetype_name}' -> '{result}'", trial=self.trial)
-                return result
+            archetype_name = match.group(1).strip().lower().replace("-", "_").replace(" ", "_")
+            if archetype_name in valid_archetypes:
+                logger.debug(f"Extracted archetype via Pattern 2: '{archetype_name}'", trial=self.trial)
+                return archetype_name
         
         logger.debug(f"No archetype pattern matched in analysis text (length: {len(analysis_text)})", trial=self.trial)
         return None
