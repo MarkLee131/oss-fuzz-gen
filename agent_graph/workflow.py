@@ -10,7 +10,7 @@ from agent_graph.adapters import ConfigAdapter
 from agent_graph.nodes import (
     function_analyzer_node,
     prototyper_node,
-    enhancer_node,
+    fixer_node,
     crash_analyzer_node,
     execution_node,
     build_node,
@@ -182,10 +182,9 @@ class FuzzingWorkflow:
         return final_state
     
     def _create_full_workflow(self) -> StateGraph:
-        """Create the full supervisor-based workflow."""
+        """Create the full supervisor-based workflow (supervisor + analysis/optimization nodes)."""
         from agent_graph.nodes.coverage_analyzer_node import coverage_analyzer_node
         from agent_graph.nodes.crash_feasibility_analyzer_node import crash_feasibility_analyzer_node
-        from agent_graph.nodes.improver_node import improver_node
         
         workflow = StateGraph(FuzzingWorkflowState)
         
@@ -193,8 +192,7 @@ class FuzzingWorkflow:
         workflow.add_node("supervisor", supervisor_node)
         workflow.add_node("function_analyzer", function_analyzer_node)
         workflow.add_node("prototyper", prototyper_node)
-        workflow.add_node("enhancer", enhancer_node)
-        workflow.add_node("improver", improver_node)
+        workflow.add_node("fixer", fixer_node)
         workflow.add_node("build", build_node)
         workflow.add_node("execution", execution_node)
         workflow.add_node("crash_analyzer", crash_analyzer_node)
@@ -211,8 +209,7 @@ class FuzzingWorkflow:
             {
                 "function_analyzer": "function_analyzer",
                 "prototyper": "prototyper",
-                "enhancer": "enhancer",
-                "improver": "improver",
+                "fixer": "fixer",
                 "build": "build",
                 "execution": "execution",
                 "crash_analyzer": "crash_analyzer",
@@ -225,8 +222,7 @@ class FuzzingWorkflow:
         # Add edges back to supervisor from all nodes
         workflow.add_edge("function_analyzer", "supervisor")
         workflow.add_edge("prototyper", "supervisor")
-        workflow.add_edge("enhancer", "supervisor")
-        workflow.add_edge("improver", "supervisor")
+        workflow.add_edge("fixer", "supervisor")
         workflow.add_edge("build", "supervisor")
         workflow.add_edge("execution", "supervisor")
         workflow.add_edge("crash_analyzer", "supervisor")
@@ -282,7 +278,7 @@ def create_fuzzing_workflow() -> StateGraph:
     workflow.add_node("supervisor", supervisor_node)
     workflow.add_node("function_analyzer", function_analyzer_node)
     workflow.add_node("prototyper", prototyper_node)
-    workflow.add_node("enhancer", enhancer_node)
+    workflow.add_node("fixer", fixer_node)
     workflow.add_node("build", build_node)
     workflow.add_node("execution", execution_node)
     workflow.add_node("crash_analyzer", crash_analyzer_node)
@@ -297,7 +293,7 @@ def create_fuzzing_workflow() -> StateGraph:
         {
             "function_analyzer": "function_analyzer",
             "prototyper": "prototyper",
-            "enhancer": "enhancer",
+            "fixer": "fixer",
             "build": "build",
             "execution": "execution", 
             "crash_analyzer": "crash_analyzer",
@@ -308,7 +304,7 @@ def create_fuzzing_workflow() -> StateGraph:
     # Add edges back to supervisor from all nodes
     workflow.add_edge("function_analyzer", "supervisor")
     workflow.add_edge("prototyper", "supervisor")
-    workflow.add_edge("enhancer", "supervisor")
+    workflow.add_edge("fixer", "supervisor")
     workflow.add_edge("build", "supervisor")
     workflow.add_edge("execution", "supervisor")
     workflow.add_edge("crash_analyzer", "supervisor")

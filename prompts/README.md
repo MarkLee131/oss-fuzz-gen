@@ -23,9 +23,9 @@ For each agent (e.g., `function_analyzer`), there are two files:
 - **Purpose**: Generate initial LibFuzzer fuzz target code based on function analysis
 - **Key Features**: Handles complex type initialization, follows LibFuzzer best practices, ensures deterministic behavior
 
-### 3. Enhancer
-- **System**: `enhancer_system.txt`
-- **Prompt**: `enhancer_prompt.txt`
+### 3. Fixer
+- **System**: `fixer_system.txt`
+- **Prompt**: `fixer_prompt.txt`
 - **Purpose**: Fix compilation and runtime errors in fuzz targets
 - **Key Features**: Minimal changes to preserve fuzzing logic, handles header/type/linker errors, respects function requirements
 
@@ -170,7 +170,7 @@ The prompts in this directory have been carefully designed to unify and improve 
 **Content Sources:**
 - `function_analyzer`: Unified from `function-analyzer-{description,instruction,priming}.txt`
 - `prototyper`: Enhanced from `prototyper-priming.txt` with OSS-Fuzz best practices
-- `enhancer`: Combined from `enhancer-{priming,crash-priming,coverage-priming}.txt`
+- `fixer`: Combined from `enhancer-{priming,crash-priming,coverage-priming}.txt`
 - `crash_analyzer`: Improved from `crash_analyzer-priming.txt` with severity assessment
 - `context_analyzer`: Adapted from `context-analyzer-{description,instruction,priming}.txt`
 - `coverage_analyzer`: Enhanced from `coverage-analyzer-priming.txt` with detailed strategies

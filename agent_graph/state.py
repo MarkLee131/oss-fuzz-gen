@@ -138,10 +138,10 @@ class FuzzingWorkflowState(TypedDict):
     compilation_retry_count: NotRequired[int]  # Separate counter for compilation retries
     prototyper_regenerate_count: NotRequired[int]  # Counter for prototyper regenerations
     previous_fuzz_target_source: NotRequired[str]  # Store previous version for diff generation
-    # Track how many times enhancer has been used specifically in OPTIMIZATION phase.
+    # Track how many times the fixer has been used specifically in OPTIMIZATION phase.
     # This lets us enforce a much stricter cap there than the global retry_count,
     # so we don't keep running expensive build/run/coverage cycles for low-value tweaks.
-    optimization_enhancer_count: NotRequired[int]
+    optimization_fixer_count: NotRequired[int]
     
     # === Error Handling ===
     errors: NotRequired[List[Dict[str, Any]]]
@@ -220,8 +220,8 @@ def create_initial_state(
         compilation_retry_count=0,  # Track compilation retries separately
         prototyper_regenerate_count=0,  # Track prototyper regenerations
         previous_fuzz_target_source="",  # For diff generation
-        # Optimization-phase enhancer usage counter
-        optimization_enhancer_count=0,
+        # Optimization-phase fixer usage counter
+        optimization_fixer_count=0,
         # Store additional configuration
         pipeline=pipeline or [],
         use_context=use_context,
@@ -611,13 +611,13 @@ def add_coverage_attempt(
     """
     Add a coverage improvement attempt record to session_memory.
     
-    This is used to let downstream agents (coverage_analyzer, improver, etc.)
+    This is used to let downstream agents (e.g., coverage_analyzer)
     see how many times we've already tried to improve coverage and with what
     results, so they can decide when to stop.
     
     Args:
         state: Workflow state
-        attempt_type: Type of attempt (e.g., "coverage_analysis", "improver")
+        attempt_type: Type of attempt (e.g., "coverage_analysis")
         outcome: Short outcome label (e.g., "improve_required", "no_improvement_needed")
         coverage_percent: Current PC coverage percent (0.0-1.0)
         line_coverage_diff: Current real project line coverage diff (0.0-1.0)

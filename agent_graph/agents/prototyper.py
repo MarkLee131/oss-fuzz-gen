@@ -124,7 +124,7 @@ class LangGraphPrototyper(LangGraphAgent):
         if is_regeneration:
             prototyper_regenerate_count = state.get("prototyper_regenerate_count", 0)
             state_update["prototyper_regenerate_count"] = prototyper_regenerate_count + 1
-            state_update["compilation_retry_count"] = 0  # Reset enhancer retry count
+            state_update["compilation_retry_count"] = 0  # Reset fixer retry count
             logger.info(f'Prototyper regeneration #{prototyper_regenerate_count + 1}, '
                        f'resetting compilation_retry_count', trial=self.trial)
         

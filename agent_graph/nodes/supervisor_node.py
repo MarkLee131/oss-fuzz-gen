@@ -117,12 +117,12 @@ def _determine_next_action(state: FuzzingWorkflowState) -> str:
     4. Still failing after 3 retries -> Regenerate with Prototyper (once)
     5. Compilation succeeds -> Switch to OPTIMIZATION phase
     
-    PHASE 2: OPTIMIZATION (focus on coverage improvement)
+    PHASE 2: OPTIMIZATION (focus on runtime validation & bug finding)
     1. Execution -> Analyze results
-    2. Crashes -> CrashAnalyzer -> ContextAnalyzer
-    3. Low coverage -> CoverageAnalyzer
-    4. Based on analysis -> Enhancer for improvement
-    5. Multiple cycles until good coverage or max iterations
+    2. Crashes -> CrashAnalyzer -> CrashFeasibilityAnalyzer
+    3. Feasible crash (true bug) -> END
+    4. Non‑crash failures -> at most one Enhancer round, then END
+    5. Successful execution without bug -> log coverage once, then END
     
     Args:
         state: Current workflow state
@@ -162,18 +162,17 @@ def _determine_next_action(state: FuzzingWorkflowState) -> str:
             compilation_retry_count = state.get("compilation_retry_count", 0)
             
             logger.debug(f'Build failed, compilation_retry_count={compilation_retry_count}', trial=trial)
-            
-            # Strategy: Try enhancer up to 3 times, then end
+            # Strategy: Try fixer up to 3 times, then end
             MAX_COMPILATION_RETRIES = 3
             
             if compilation_retry_count < MAX_COMPILATION_RETRIES:
-                # Try to fix with enhancer
+                # Try to fix with fixer
                 logger.info(f'Compilation failed (attempt {compilation_retry_count + 1}/{MAX_COMPILATION_RETRIES}), '
-                           f'routing to enhancer', trial=trial)
-                return "enhancer"
+                           f'routing to fixer', trial=trial)
+                return "fixer"
             else:
-                # Enhancer retries exhausted - give up
-                logger.error(f'Compilation failed after {MAX_COMPILATION_RETRIES} enhancer retries. Ending workflow.', 
+                # Fixer retries exhausted - give up
+                logger.error(f'Compilation failed after {MAX_COMPILATION_RETRIES} fixer retries. Ending workflow.', 
                             trial=trial)
                 return "END"
         
@@ -201,11 +200,11 @@ def _determine_next_action(state: FuzzingWorkflowState) -> str:
                 
                 if validation_failure_count < MAX_VALIDATION_RETRIES:
                     logger.info(
-                        f"Routing to enhancer to fix validation error (attempt {validation_failure_count}/{MAX_VALIDATION_RETRIES})",
+                        f"Routing to fixer to fix validation error (attempt {validation_failure_count}/{MAX_VALIDATION_RETRIES})",
                         trial=trial
                     )
-                    # Return enhancer, let enhancer node handle the validation error
-                    return "enhancer"
+                    # Return fixer, let fixer node handle the validation error
+                    return "fixer"
                 else:
                     logger.error(
                         f"Validation failed after {MAX_VALIDATION_RETRIES} retries. "
@@ -215,7 +214,7 @@ def _determine_next_action(state: FuzzingWorkflowState) -> str:
                     return "END"
             
             # Validation passed - switch to optimization phase
-            logger.info(f'✓ Compilation and validation successful! Switching to OPTIMIZATION phase', trial=trial)
+            logger.info(f'Compilation and validation successful! Switching to OPTIMIZATION phase', trial=trial)
             # Note: The phase switch will be handled by build_node when it updates state
             return "execution"
     
@@ -255,112 +254,58 @@ def _determine_next_action(state: FuzzingWorkflowState) -> str:
                     logger.info('Found a feasible crash (true bug)!', trial=trial)
                     return "END"
                 else:
-                    # False positive, try to enhance the target based on recommendations
-                    logger.info('Crash is not feasible, enhancing target', trial=trial)
-                    return "enhancer"
+                    # False positive, try to fix the target based on recommendations
+                    logger.info('Crash is not feasible, fixing target', trial=trial)
+                    return "fixer"
             
             # === Non-crash failures (e.g., timeouts, infra errors) ===
-            # These are expensive to keep retrying because each enhancer round can
+            # These are expensive to keep retrying because each fixer round can
             # trigger a full build + run + coverage cycle.
             run_error_str = str(run_error or "").lower()
             timeout_keywords = ("timed out", "timeout", "time-out")
             
-            # Special-case: pure timeout → don't even try enhancer; just stop.
+            # Special-case: pure timeout → don't even try fixer; just stop.
             if any(kw in run_error_str for kw in timeout_keywords):
                 logger.warning(
                     f'Execution failed due to timeout (run_error={run_error_str[:200]}...), '
-                    f'skipping enhancer and ending workflow',
+                    f'skipping fixer and ending workflow',
                     trial=trial
                 )
                 return "END"
             
             # For other non-crash failures, allow only a very small number of
-            # enhancer attempts in OPTIMIZATION phase before giving up.
-            optimization_enhancer_count = state.get("optimization_enhancer_count", 0)
+            # fixer attempts in OPTIMIZATION phase before giving up.
+            optimization_fixer_count = state.get("optimization_fixer_count", 0)
             MAX_OPTIMIZATION_ENHANCER_RETRIES = 1
             
-            if optimization_enhancer_count >= MAX_OPTIMIZATION_ENHANCER_RETRIES:
+            if optimization_fixer_count >= MAX_OPTIMIZATION_ENHANCER_RETRIES:
                 logger.info(
-                    f'Execution failed (not a crash) and enhancer already used '
-                    f'{optimization_enhancer_count} time(s) in optimization phase, '
+                    f'Execution failed (not a crash) and fixer already used '
+                    f'{optimization_fixer_count} time(s) in optimization phase, '
                     f'ending workflow instead of looping.',
                     trial=trial
                 )
                 return "END"
             
             logger.debug(
-                f'Execution failed (not a crash), enhancing target '
-                f'(optimization_enhancer_count={optimization_enhancer_count + 1}/'
+                f'Execution failed (not a crash), fixing target '
+                f'(optimization_fixer_count={optimization_fixer_count + 1}/'
                 f'{MAX_OPTIMIZATION_ENHANCER_RETRIES})',
                 trial=trial
             )
-            return "enhancer"
+            return "fixer"
         
-        # Execution succeeded, check coverage results
-        # 🔧 FIXED: Use line_coverage_diff as primary quality metric, not PC coverage_percent
-        # PC coverage_percent (cov_pcs/total_pcs) represents internal fuzzer coverage
-        # line_coverage_diff represents real project code coverage increase - the true goal
-        coverage_percent = state.get("coverage_percent", 0.0)  # Keep for logging
-        coverage_diff = state.get("line_coverage_diff", 0.0)  # PRIMARY METRIC
+        # We only log the final coverage numbers once for observability and then end.
+        coverage_percent = state.get("coverage_percent", 0.0)
+        coverage_diff = state.get("line_coverage_diff", 0.0)
         total_pcs = state.get("total_pcs", 0)
         
-        logger.debug(f'Execution succeeded: PC_coverage={coverage_percent:.2%} (internal), '
-                    f'line_diff={coverage_diff:.2%} (real project coverage), total_pcs={total_pcs}', 
-                    trial=trial)
-        
-        # Check iteration count to avoid infinite loops
-        current_iteration = state.get("current_iteration", 0)
-        max_iterations = state.get("max_iterations", 5)
-        
-        # Track consecutive iterations without coverage improvement
-        no_improvement_count = state.get("no_coverage_improvement_count", 0)
-        NO_IMPROVEMENT_THRESHOLD = 3  # If coverage doesn't improve for 3 consecutive checks, consider it done
-        
-        # Check if coverage improved significantly (using REAL project coverage diff)
-        IMPROVEMENT_THRESHOLD = 0.01  # At least 1% improvement in real project code
-        if coverage_diff > IMPROVEMENT_THRESHOLD:
-            # Coverage improved, reset the no-improvement counter
-            logger.debug(f'Real project coverage improved by {coverage_diff:.2%}, resetting no-improvement counter', 
-                        trial=trial)
-            # Note: The counter will be reset in execution_node when it updates the state
-        
-        # Check if coverage has been stagnant for too long
-        if no_improvement_count >= NO_IMPROVEMENT_THRESHOLD:
-            logger.info(f'Real project coverage stagnant for {no_improvement_count} iterations '
-                       f'(line_diff={coverage_diff:.2%}, PC_coverage={coverage_percent:.2%}), '
-                       f'considering workflow complete and ready for delivery', 
-                       trial=trial)
-            return "END"
-        
-        # 🔧 FIXED: Use line_coverage_diff instead of PC coverage_percent for quality decisions
-        # PC coverage can be misleading (e.g., 100% of stub code = useless)
-        # Real project coverage diff is what matters
-        LINE_COVERAGE_THRESHOLD = 0.05  # At least 5% real project coverage increase
-        SIGNIFICANT_IMPROVEMENT = 0.05  # 5% is considered significant improvement
-        
-        # Only analyze if real coverage is low AND there's no significant improvement
-        # If there's significant improvement, continue the current strategy even if absolute coverage is low
-        if coverage_diff < LINE_COVERAGE_THRESHOLD and coverage_diff <= SIGNIFICANT_IMPROVEMENT:
-            coverage_analysis = state.get("coverage_analysis")
-            if not coverage_analysis and current_iteration < max_iterations:
-                logger.debug(f'Low real project coverage (line_diff={coverage_diff:.2%}) and '
-                            f'no significant improvement (no_improvement_count={no_improvement_count}), '
-                            f'routing to coverage_analyzer', 
-                            trial=trial)
-                return "coverage_analyzer"
-            
-            # We have coverage analysis or reached max iterations
-            if coverage_analysis and coverage_analysis.get("improve_required", False):
-                # Coverage analyzer suggests improvement is possible
-                if current_iteration < max_iterations and no_improvement_count < NO_IMPROVEMENT_THRESHOLD:
-                    logger.info('Real project coverage can be improved, routing to improver', trial=trial)
-                    return "improver"
-        
-        # Good coverage or max iterations reached - we're done
-        logger.info(f'Workflow complete: line_coverage_diff={coverage_diff:.2%}, '
-                   f'PC_coverage={coverage_percent:.2%}, iterations={current_iteration}, '
-                   f'no_improvement_count={no_improvement_count}', 
-                   trial=trial)
+        logger.info(
+            f'Execution succeeded; ending workflow '
+            f'(PC_coverage={coverage_percent:.2%}, '
+            f'line_diff={coverage_diff:.2%}, total_pcs={total_pcs})',
+            trial=trial
+        )
         return "END"
     
     # Unknown phase - shouldn't happen
@@ -370,9 +315,6 @@ def _determine_next_action(state: FuzzingWorkflowState) -> str:
 def route_condition(state: FuzzingWorkflowState) -> str:
     """
     LangGraph conditional routing function.
-    
-    This function is used by LangGraph's conditional edges to determine
-    which node to execute next.
     
     Args:
         state: Current workflow state
@@ -390,8 +332,7 @@ def route_condition(state: FuzzingWorkflowState) -> str:
     action_to_node = {
         "function_analyzer": "function_analyzer",
         "prototyper": "prototyper", 
-        "enhancer": "enhancer",
-        "improver": "improver",
+        "fixer": "fixer",
         "build": "build",
         "execution": "execution",
         "crash_analyzer": "crash_analyzer",

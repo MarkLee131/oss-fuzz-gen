@@ -272,7 +272,7 @@ LogicFuzz uses a **Supervisor-Agent Pattern** with **LangGraph-based multi-agent
 - **Crash Path**: Crash Analyzer (classify type) → Crash Feasibility Analyzer (validation)
   - If **real bug** (feasible crash) → END (success! 🎉)
   - If **false positive** → Enhancer (fix harness)
-- **Coverage Path**: Coverage Analyzer → Enhancer/Improver (add boundary tests, explore paths)
+- **Coverage Path**: Coverage Analyzer → Enhancer (add boundary tests, explore paths)
 - **Termination**: 
   - Coverage stable (3 no-improvement iterations) OR 
   - Max iterations reached OR
@@ -287,7 +287,6 @@ LogicFuzz uses a **Supervisor-Agent Pattern** with **LangGraph-based multi-agent
 - **Function Analyzer** - Semantic analysis: API constraints, archetype identification, calling conventions
 - **Prototyper** - Code generation: Fuzz target + build script (archetype-driven)
 - **Enhancer** - Multi-mode enhancement: Compilation fixing, Validation fixing, False positive fixing, Coverage improvement
-- **Improver** - Advanced code optimization and refactoring
 
 #### 🔴 Analysis Layer (LLM-Driven)
 - **Crash Analyzer** - Crash type classification (buffer overflow, UAF, timeout, OOM)
@@ -308,7 +307,7 @@ Cross-agent knowledge sharing system (prevents repeated mistakes):
 | **Archetype** | Function Analyzer | Prototyper | "stateful_decoder", "simple_parser" |
 | **Known Fixes** | Enhancer | Enhancer | "undefined reference to `compress` → Add `-lz`" |
 | **Build Context** | Build Node | Enhancer | Error line ±10 context for targeted fixing |
-| **Coverage Insights** | Coverage Analyzer | Enhancer | "Add empty array test case `[]`" |
+| **Coverage Insights** | Coverage Analyzer | Fixer | "Add empty array test case `[]`" |
 | **Crash Context** | Crash Analyzer | Crash Feasibility Analyzer | Stack trace + ASAN report for validation |
 
 **Injection Strategy**: Supervisor injects top-3 relevant memories (prioritized by confidence + recency) into each agent's prompt.
@@ -318,15 +317,15 @@ Cross-agent knowledge sharing system (prevents repeated mistakes):
 **Loop Prevention**:
 - Per-node visit counter (max: 10 visits)
 - Phase-specific retry counters:
-  - **Compilation errors**: 3 enhancer retries
-  - **Validation errors**: 2 enhancer retries (target function not called)
+  - **Compilation errors**: 3 fixer retries
+  - **Validation errors**: 2 fixer retries (target function not called)
 - No-improvement counter (max: 3 consecutive iterations in optimization phase)
 
 **Phase Transition**:
 ```
-compilation_retry_count < 3? → Enhancer (fix build errors)
+compilation_retry_count < 3? → Fixer (fix build errors)
 compilation_retry_count >= 3? → END (compilation failed)
-validation_failure_count < 2? → Enhancer (fix validation)
+validation_failure_count < 2? → Fixer (fix validation)
 compile_success + validation_passed? → Switch to OPTIMIZATION phase
 ```
 
@@ -347,8 +346,7 @@ logicfuzz/
 │   │   ├── supervisor_node.py      # Central routing logic (phase-aware)
 │   │   ├── function_analyzer_node.py
 │   │   ├── prototyper_node.py
-│   │   ├── fixer_node.py           # Enhancer node (multi-mode fixing)
-│   │   ├── improver_node.py
+│   │   ├── fixer_node.py           # Fixer node (multi-mode fixing)
 │   │   ├── crash_analyzer_node.py
 │   │   ├── coverage_analyzer_node.py
 │   │   ├── crash_feasibility_analyzer_node.py
@@ -358,7 +356,6 @@ logicfuzz/
 │   │   ├── function_analyzer.py    # API semantic analysis
 │   │   ├── prototyper.py           # Code generation
 │   │   ├── fixer.py                # Enhancer agent (LangGraphEnhancer)
-│   │   ├── improver.py             # Code optimization agent
 │   │   ├── crash_analyzer.py       # Crash classification
 │   │   ├── coverage_analyzer.py    # Coverage analysis
 │   │   ├── crash_feasibility_analyzer.py  # Crash validation
@@ -376,11 +373,10 @@ logicfuzz/
 ├── prompts/                        # 📝 LLM System Prompts (80% token optimized)
 │   ├── function_analyzer_system.txt / *_prompt.txt / *_iteration_prompt.txt
 │   ├── prototyper_system.txt / prototyper_prompt.txt
-│   ├── enhancer_system.txt / enhancer_prompt.txt
+│   ├── fixer_system.txt / fixer_prompt.txt
 │   ├── crash_analyzer_system.txt / crash_analyzer_prompt.txt
 │   ├── crash_feasibility_analyzer_system.txt / crash_feasibility_analyzer_prompt.txt
 │   ├── coverage_analyzer_system.txt / coverage_analyzer_prompt.txt
-│   ├── improver_system.txt / improver_prompt.txt
 │   └── session_memory_header.txt / session_memory_footer.txt
 │
 ├── experiment/                     # 🧪 Build & Evaluation Infrastructure

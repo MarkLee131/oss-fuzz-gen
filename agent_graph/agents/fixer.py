@@ -1,5 +1,5 @@
 """
-LangGraphEnhancer agent for LangGraph workflow.
+LangGraphFixer agent for LangGraph workflow.
 """
 from typing import Any, Dict, List, Optional, Tuple
 import argparse
@@ -15,16 +15,16 @@ from agent_graph.agents.utils import parse_tag
 from agent_graph.prompt_loader import get_prompt_manager
 
 
-class LangGraphEnhancer(LangGraphAgent):
-    """Enhancer agent for LangGraph."""
+class LangGraphFixer(LangGraphAgent):
+    """Fixer agent for LangGraph."""
     
     def __init__(self, llm: LLM, trial: int, args: argparse.Namespace):
         # Load system prompt from file
         prompt_manager = get_prompt_manager()
-        system_message = prompt_manager.get_system_prompt("enhancer")
+        system_message = prompt_manager.get_system_prompt("fixer")
         
         super().__init__(
-            name="enhancer",
+            name="fixer",
             llm=llm,
             trial=trial,
             args=args,
@@ -74,7 +74,7 @@ class LangGraphEnhancer(LangGraphAgent):
         # Build base prompt from template file
         prompt_manager = get_prompt_manager()
         base_prompt = prompt_manager.build_user_prompt(
-            "enhancer",
+            "fixer",
             language=language,
             function_name=benchmark.get('function_name', 'unknown'),
             current_code=code_context,  # Use context instead of full code
@@ -82,14 +82,14 @@ class LangGraphEnhancer(LangGraphAgent):
             additional_context=additional_context
         )
         
-        # 注入session_memory，让Enhancer能看到所有共识约束
+        # 注入session_memory，让Fixer能看到所有共识约束
         prompt = build_prompt_with_session_memory(
             state,
             base_prompt,
             agent_name=self.name
         )
         
-        # Chat with LLM (using enhancer's own message history)
+        # Chat with LLM (using fixer's own message history)
         response = self.chat_llm(state, prompt)
         
         # 从响应中提取session_memory更新
@@ -166,13 +166,13 @@ class LangGraphEnhancer(LangGraphAgent):
             logger.info(f'Compilation retry count: {compilation_retry_count + 1}', trial=self.trial)
         else:
             # In optimization phase, update regular retry_count and a dedicated
-            # optimization_enhancer_count so Supervisor can cap enhancer usage
+            # optimization_fixer_count so Supervisor can cap fixer usage
             # much more aggressively than the global retry_count.
             retry_count = state.get("retry_count", 0)
             state_update["retry_count"] = retry_count + 1
             
-            optimization_enhancer_count = state.get("optimization_enhancer_count", 0)
-            state_update["optimization_enhancer_count"] = optimization_enhancer_count + 1
+            optimization_fixer_count = state.get("optimization_fixer_count", 0)
+            state_update["optimization_fixer_count"] = optimization_fixer_count + 1
         
         # Flush logs for this agent after completing execution
         self._langgraph_logger.flush_agent_logs(self.name)
@@ -181,7 +181,7 @@ class LangGraphEnhancer(LangGraphAgent):
     
     def _generate_code_context(self, current_code: str, previous_code: str, build_errors: list) -> str:
         """
-        Generate code context for enhancer based on diff strategy.
+        Generate code context for fixer based on diff strategy.
         
         Strategy: Extract only the error-relevant parts of code to reduce token usage.
         
