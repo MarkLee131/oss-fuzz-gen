@@ -24,7 +24,8 @@ class KnowledgeRetriever:
         "exception_handling_api",
         "global_initialization",
         "round_trip",
-        "stateful_fuzzing"
+        "stateful_fuzzing",
+        "state_machine"
     ]
     
     def __init__(self, base_path: Optional[Path] = None):

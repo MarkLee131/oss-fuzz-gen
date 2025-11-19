@@ -1,0 +1,39 @@
+{
+    "archetype_name": "state_machine",
+    "api_pattern": "Event-driven or state-machine style APIs that must be called repeatedly to drive internal state transitions until completion.",
+    "when_to_use": [
+        "The API represents a state machine entry point that advances internal state based on inputs/events.",
+        "Callers are expected to invoke the function multiple times (e.g., per socket/event) until a completion condition is reached.",
+        "The function often reports both a status code and an updated \"running\" or \"in-progress\" counter.",
+        "Examples: multi-handle network event loops, dispatcher-style interfaces that react to readiness/timeout events."
+    ],
+    "core_template": {
+        "c": "int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {\n  if (size < MIN_SIZE) return 0;\n\n  // 1) Initialize state machine handle/context\n  STATE_HANDLE *handle = STATE_INIT();\n  if (!handle) return 0;\n\n  // 2) Build a small sequence of \"events\" from fuzz data\n  EventSequence seq;\n  if (!EVENTSEQ_INIT(&seq, data, size)) {\n    STATE_CLEANUP(handle);\n    return 0;\n  }\n\n  int running = 0;\n  size_t max_steps = MAX_STEPS;  // MUST cap the number of iterations\n\n  // 3) Drive the state machine by repeatedly calling the API\n  for (size_t i = 0; i < seq.count && i < max_steps; ++i) {\n    Event e = seq.events[i];\n\n    // Typical signature: STATUS STATE_STEP(handle, e.resource, e.mask, &running);\n    STATUS rc = STATE_STEP(handle, e.resource, e.mask, &running);\n    if (rc != STATUS_OK) {\n      // Treat non-OK as error; optionally log and break\n      break;\n    }\n\n    if (running <= 0) {\n      // All work finished; state machine reports completion\n      break;\n    }\n  }\n\n  // 4) Cleanup resources\n  EVENTSEQ_DESTROY(&seq);\n  STATE_CLEANUP(handle);\n  return 0;\n}",
+        "cpp": "extern \"C\" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {\n  if (size < MIN_SIZE) return 0;\n\n  // 1) Initialize state machine handle/context\n  STATE_HANDLE *handle = STATE_INIT();\n  if (!handle) return 0;\n\n  // 2) Build a small sequence of \"events\" from fuzz data\n  EventSequence seq;\n  if (!EVENTSEQ_INIT(&seq, data, size)) {\n    STATE_CLEANUP(handle);\n    return 0;\n  }\n\n  int running = 0;\n  size_t max_steps = MAX_STEPS;  // MUST cap the number of iterations\n\n  // 3) Drive the state machine by repeatedly calling the API\n  for (size_t i = 0; i < seq.count && i < max_steps; ++i) {\n    Event &e = seq.events[i];\n\n    // Typical signature: STATUS STATE_STEP(handle, e.resource, e.mask, &running);\n    STATUS rc = STATE_STEP(handle, e.resource, e.mask, &running);\n    if (rc != STATUS_OK) {\n      // Treat non-OK as error; optionally log and break\n      break;\n    }\n\n    if (running <= 0) {\n      // All work finished; state machine reports completion\n      break;\n    }\n  }\n\n  // 4) Cleanup resources\n  EVENTSEQ_DESTROY(&seq);\n  STATE_CLEANUP(handle);\n  return 0;\n}"
+    },
+    "critical_mistakes": [
+        {
+            "mistake": "Not bounding the number of state-machine steps (infinite or very long loops).",
+            "wrong": "while (running > 0) {\n  STATUS rc = STATE_STEP(handle, resource, mask, &running);\n  if (rc != STATUS_OK) break;\n}\n",
+            "right": "size_t max_steps = MAX_STEPS;  // e.g., 1000\nwhile (running > 0 && max_steps-- > 0) {\n  STATUS rc = STATE_STEP(handle, resource, mask, &running);\n  if (rc != STATUS_OK) break;\n}\n",
+            "why": "Fuzzed inputs may cause the state machine to never converge. Without an explicit iteration cap, the fuzzer may time out instead of finding bugs."
+        },
+        {
+            "mistake": "Ignoring the updated running/active counter returned by the API.",
+            "wrong": "int running = 0;\nSTATUS rc = STATE_STEP(handle, resource, mask, &running);\n// Ignore `running` and keep looping forever based only on external condition\n",
+            "right": "int running = 0;\nSTATUS rc = STATE_STEP(handle, resource, mask, &running);\nif (rc != STATUS_OK) {/* handle error */}\nif (running <= 0) {\n  // Stop loop – state machine reports completion\n}\n",
+            "why": "Many state-machine APIs rely on the caller to honor the updated running/active count. Ignoring it can create artificial infinite loops and unrealistic usage."
+        },
+        {
+            "mistake": "Calling the step function before proper initialization or after cleanup.",
+            "wrong": "STATE_HANDLE *handle = NULL;\nint running = 0;\nSTATE_STEP(handle, resource, mask, &running);  // handle not initialized\n",
+            "right": "STATE_HANDLE *handle = STATE_INIT();\nif (!handle) return 0;\nint running = 0;\nSTATUS rc = STATE_STEP(handle, resource, mask, &running);\n// ... later ...\nSTATE_CLEANUP(handle);\n",
+            "why": "State-machine functions usually assume a fully initialized handle and undefined behavior if called on NULL or freed objects."
+        }
+    ],
+    "real_examples": [
+        "curl: CURLMcode curl_multi_socket_action(CURLM *m, curl_socket_t s, int ev_bitmask, int *running_handles) – drive multi interface based on socket/timeout events.",
+        "event-loop style libraries where each call processes a single event and updates an internal \"running\"/\"pending\" count.",
+        "dispatcher APIs that consume a stream of events to transition through states until completion."
+    ]
+}

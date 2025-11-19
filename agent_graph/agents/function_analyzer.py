@@ -237,7 +237,7 @@ class LangGraphFunctionAnalyzer(LangGraphAgent):
         from agent_graph.prompt_loader import get_prompt_manager
         from data_prep import introspector
         from agent_graph.srs_knowledge import (
-            SRSKnowledge, 
+            SRSKnowledge,
             parse_srs_json_from_response,
             parse_incremental_updates_from_response
         )
@@ -270,12 +270,43 @@ class LangGraphFunctionAnalyzer(LangGraphAgent):
         # Parse SRS knowledge
         initial_srs_json = parse_srs_json_from_response(initial_response)
         if initial_srs_json:
+            # ✅ Preferred path: INITIAL response already returned SRS JSON
             knowledge = SRSKnowledge.from_json(initial_srs_json)
             knowledge.target_function = function_name
             logger.info('✅ Parsed initial SRS knowledge', trial=self.trial)
         else:
+            # Fallback: start from empty SRSKnowledge and try to at least recover archetype
             knowledge = SRSKnowledge()
             knowledge.target_function = function_name
+
+            # Try to infer archetype directly from INITIAL response (JSON or text)
+            try:
+                inferred_arch = self._infer_archetype_from_initial_response(initial_response)
+            except Exception as e:
+                inferred_arch = None
+                logger.warning(f'Failed to infer archetype from INITIAL response: {e}', trial=self.trial)
+
+            if inferred_arch:
+                # Seed archetype in knowledge state
+                knowledge.archetype["primary_pattern"] = inferred_arch
+                knowledge.archetype["confidence"] = "MEDIUM"
+                knowledge.archetype["evidence_count"] = 1
+                logger.info(f'Inferred archetype from INITIAL analysis: {inferred_arch}', trial=self.trial)
+
+                # Also write into session_memory so downstream components (including
+                # archetype knowledge injection in Phase 4) can immediately use it.
+                try:
+                    set_archetype(
+                        state,
+                        archetype_type=inferred_arch,
+                        lifecycle_phases=[],
+                        source=self.name,
+                        iteration=state.get('current_iteration', 0)
+                    )
+                    logger.info(f'Session memory archetype set to: {inferred_arch}', trial=self.trial)
+                except Exception as e:
+                    logger.warning(f'Failed to set archetype in session_memory: {e}', trial=self.trial)
+
             logger.warning('⚠️ Using minimal SRS structure', trial=self.trial)
         
         stats = knowledge.get_stats()
@@ -885,6 +916,81 @@ Generate complete SRS incorporating all knowledge above.
         if scores:
             max_arch = max(scores, key=scores.get)
             return max_arch if scores[max_arch] > 0 else None
+        
+        return None
+
+    def _infer_archetype_from_initial_response(self, response: str) -> Optional[str]:
+        """
+        Infer archetype directly from the INITIAL analysis response.
+        
+        This is a robustness fallback for cases where the INITIAL prompt
+        returns a lightweight JSON summary (behavior/function_type/archetype)
+        instead of a full SRS JSON in <srs_json> tags.
+        """
+        if not response:
+            return None
+        
+        import json
+        import re
+        
+        # Normalization map shared with Prototyper-style archetype extraction
+        mapping = {
+            "stateless parser": "stateless_parser",
+            "object lifecycle": "object_lifecycle",
+            "state machine": "state_machine",
+            "stream processor": "stream_processor",
+            "round-trip": "round_trip",
+            "round trip": "round_trip",
+            "file-based": "file_based",
+            "file based": "file_based",
+            "global initialization": "global_initialization",
+            "global init": "global_initialization",
+            "stateful fuzzing": "stateful_fuzzing",
+            "stateful": "stateful_fuzzing",
+        }
+        
+        text = response.strip()
+        
+        # 1) Try to parse response as pure JSON (common for INITIAL)
+        try:
+            data = json.loads(text)
+            cand = None
+            
+            arch_field = data.get("archetype")
+            if isinstance(arch_field, str):
+                cand = arch_field
+            elif isinstance(arch_field, dict):
+                cand = arch_field.get("primary_pattern") or arch_field.get("type")
+            
+            if isinstance(cand, str):
+                norm = cand.strip().lower()
+                if norm in mapping:
+                    return mapping[norm]
+        except Exception:
+            # Not pure JSON – fall back to regex extraction below
+            pass
+        
+        # 2) Look for JSON-like `"archetype": "State Machine"` inside text
+        m = re.search(r'"archetype"\s*:\s*"([^"]+)"', text, re.IGNORECASE)
+        if m:
+            norm = m.group(1).strip().lower()
+            if norm in mapping:
+                return mapping[norm]
+        
+        # 3) Reuse textual patterns used by Prototyper (_extract_archetype_from_analysis)
+        # Pattern A: "Primary pattern: State Machine"
+        m = re.search(r"Primary pattern:\s*([A-Za-z\-\s]+?)(?:\n|$)", text, re.IGNORECASE)
+        if m:
+            norm = m.group(1).strip().lower()
+            if norm in mapping:
+                return mapping[norm]
+        
+        # Pattern B: "Archetype: State Machine"
+        m = re.search(r"Archetype:\s*([A-Za-z\-\s]+?)(?:\n|$)", text, re.IGNORECASE)
+        if m:
+            norm = m.group(1).strip().lower()
+            if norm in mapping:
+                return mapping[norm]
         
         return None
     
