@@ -883,14 +883,13 @@ Generate complete SRS incorporating all knowledge above.
         decisions = session_memory.get("decisions", [])
         
         archetype_keywords = {
-            "stateless_parser": ["stateless", "parse", "single call", "no state"],
-            "object_lifecycle": ["create", "destroy", "lifecycle", "init", "free"],
-            "state_machine": ["state machine", "multi-step", "sequence", "configure"],
-            "stream_processor": ["stream", "chunk", "incremental", "loop"],
-            "round_trip": ["round-trip", "encode", "decode", "compress"],
-            "file_based": ["file path", "filename", "temp file"],
-            "global_initialization": ["LLVMFuzzerInitialize", "global init", "one-time setup", "initialize once"],
-            "stateful_fuzzing": ["static context", "reuse context", "static variable", "context reset", "stateful"]
+            "object_lifecycle": ["create", "destroy", "lifecycle", "init", "free", "stateless", "parse", "single call", "no state"],
+            "event_driven_state_machine": ["state machine", "multi-step", "sequence", "configure"],
+            "iterative_processing": ["stream", "chunk", "incremental", "loop"],
+            "round_trip_testing": ["round-trip", "encode", "decode", "compress"],
+            "temporary_file": ["file path", "filename", "temp file"],
+            "one_time_initialization": ["LLVMFuzzerInitialize", "global init", "one-time setup", "initialize once"],
+            "stateful_context": ["static context", "reuse context", "static variable", "context reset", "stateful"]
         }
         
         # Count keyword matches in session_memory
@@ -935,18 +934,18 @@ Generate complete SRS incorporating all knowledge above.
         
         # Normalization map shared with Prototyper-style archetype extraction
         mapping = {
-            "stateless parser": "stateless_parser",
+            "stateless parser": "object_lifecycle",
             "object lifecycle": "object_lifecycle",
-            "state machine": "state_machine",
-            "stream processor": "stream_processor",
-            "round-trip": "round_trip",
-            "round trip": "round_trip",
-            "file-based": "file_based",
-            "file based": "file_based",
-            "global initialization": "global_initialization",
-            "global init": "global_initialization",
-            "stateful fuzzing": "stateful_fuzzing",
-            "stateful": "stateful_fuzzing",
+            "state machine": "event_driven_state_machine",
+            "stream processor": "iterative_processing",
+            "round-trip": "round_trip_testing",
+            "round trip": "round_trip_testing",
+            "file-based": "temporary_file",
+            "file based": "temporary_file",
+            "global initialization": "one_time_initialization",
+            "global init": "one_time_initialization",
+            "stateful fuzzing": "stateful_context",
+            "stateful": "stateful_context",
         }
         
         text = response.strip()

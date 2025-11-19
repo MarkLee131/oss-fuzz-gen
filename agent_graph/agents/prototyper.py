@@ -523,7 +523,7 @@ class LangGraphPrototyper(LangGraphAgent):
                 "#include <string.h>",
                 "#include <assert.h>"
             ])
-        elif archetype == "file_based":
+        elif archetype == "temporary_file":
             header_lines.extend([
                 "#include <stdio.h>",
                 "#include <unistd.h>"
@@ -533,8 +533,7 @@ class LangGraphPrototyper(LangGraphAgent):
         
         # ===== HEADER PRIORITY: EXISTING FUZZERS FIRST =====
         # RATIONALE: Existing fuzzer headers are PROVEN to compile in OSS-Fuzz
-        # They are the ONLY source that guarantees correct paths and availability
-        
+  
         func_header = header_info.get('function_header')
         related_headers = header_info.get('related_headers', [])
         definition_headers = header_info.get('definition_file_headers')
@@ -708,18 +707,18 @@ class LangGraphPrototyper(LangGraphAgent):
             archetype_name = match.group(1).strip().lower()
             # Normalize to our archetype names
             mapping = {
-                "stateless parser": "stateless_parser",
+                "stateless parser": "object_lifecycle",
                 "object lifecycle": "object_lifecycle",
-                "state machine": "state_machine",
-                "stream processor": "stream_processor",
-                "round-trip": "round_trip",
-                "round trip": "round_trip",
-                "file-based": "file_based",
-                "file based": "file_based",
-                "global initialization": "global_initialization",
-                "global init": "global_initialization",
-                "stateful fuzzing": "stateful_fuzzing",
-                "stateful": "stateful_fuzzing"
+                "state machine": "event_driven_state_machine",
+                "stream processor": "iterative_processing",
+                "round-trip": "round_trip_testing",
+                "round trip": "round_trip_testing",
+                "file-based": "temporary_file",
+                "file based": "temporary_file",
+                "global initialization": "one_time_initialization",
+                "global init": "one_time_initialization",
+                "stateful fuzzing": "stateful_context",
+                "stateful": "stateful_context"
             }
             result = mapping.get(archetype_name)
             if result:
@@ -733,18 +732,18 @@ class LangGraphPrototyper(LangGraphAgent):
         if match:
             archetype_name = match.group(1).strip().lower()
             mapping = {
-                "stateless parser": "stateless_parser",
+                "stateless parser": "object_lifecycle",
                 "object lifecycle": "object_lifecycle",
-                "state machine": "state_machine",
-                "stream processor": "stream_processor",
-                "round-trip": "round_trip",
-                "round trip": "round_trip",
-                "file-based": "file_based",
-                "file based": "file_based",
-                "global initialization": "global_initialization",
-                "global init": "global_initialization",
-                "stateful fuzzing": "stateful_fuzzing",
-                "stateful": "stateful_fuzzing"
+                "state machine": "event_driven_state_machine",
+                "stream processor": "iterative_processing",
+                "round-trip": "round_trip_testing",
+                "round trip": "round_trip_testing",
+                "file-based": "temporary_file",
+                "file based": "temporary_file",
+                "global initialization": "one_time_initialization",
+                "global init": "one_time_initialization",
+                "stateful fuzzing": "stateful_context",
+                "stateful": "stateful_context"
             }
             result = mapping.get(archetype_name)
             if result:

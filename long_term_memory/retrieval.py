@@ -56,7 +56,8 @@ class KnowledgeRetriever:
             Parsed SRS JSON as dict
         """
         if archetype_name not in self.ARCHETYPES:
-            raise ValueError(f"Unknown archetype: {archetype_name}")
+            available = ", ".join(self.ARCHETYPES)
+            raise ValueError(f"Unknown archetype: {archetype_name}. Available: {available}")
         
         path = self.base_path / "archetypes" / f"{archetype_name}.srs.json"
         if not path.exists():
