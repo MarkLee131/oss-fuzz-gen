@@ -14,18 +14,29 @@ from typing import Dict, List, Optional, Any
 class KnowledgeRetriever:
     """Retrieves knowledge from unified SRS JSON files."""
     
+    # Organized by pattern category for better understanding
     ARCHETYPES = [
-        "simple_function_call",
-        "object_lifecycle",
-        "file_path_api",
-        "callback_api",
-        "streaming_api",
-        "multi_parameter_api",
-        "exception_handling_api",
-        "global_initialization",
-        "round_trip",
-        "stateful_fuzzing",
-        "state_machine"
+        # Resource Management
+        "object_lifecycle",            # Most common: create → use → destroy
+        "stateful_context",            # Reuse expensive contexts across inputs
+        "temporary_file",              # APIs requiring file paths instead of memory
+        
+        # Control Flow
+        "iterative_processing",        # Loops that MUST be bounded
+        "event_driven_state_machine",  # Event-driven state transitions
+        
+        # API Sequencing
+        "callback_registration",       # Callbacks set before use
+        "one_time_initialization",     # LLVMFuzzerInitialize for global setup
+        
+        # Error Handling
+        "exception_handling",          # C++ exceptions must be caught
+        
+        # Input Construction
+        "structured_input",            # Multi-parameter APIs using FuzzedDataProvider
+        
+        # Verification
+        "round_trip_testing"           # Parse → serialize → verify
     ]
     
     def __init__(self, base_path: Optional[Path] = None):

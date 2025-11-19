@@ -380,24 +380,43 @@ class LangGraphPrototyper(LangGraphAgent):
             logger.info(f'Vector DB retriever unavailable: {e}', trial=self.trial)
             return ""
 
-        project = benchmark.get('project') if isinstance(benchmark, dict) else None
         function_name = benchmark.get('function_name') if isinstance(benchmark, dict) else None
         function_signature = benchmark.get('function_signature') if isinstance(benchmark, dict) else None
-
-        if not project:
-            return ""
 
         # Prefer archetype from structured SRS data if available
         srs_data = (function_analysis or {}).get('srs_data', {})
         archetype_info = srs_data.get('archetype', {}) if isinstance(srs_data, dict) else {}
         api_type = archetype_info.get('primary_pattern') or None
 
-        # Build natural language description for retrieval
-        description_parts = [f"fuzz driver for project {project}"]
+        # Build natural language description for retrieval, focusing on API semantics
+        description_parts = ["fuzz driver for a semantically similar API"]
         if function_name:
-            description_parts.append(f"API {function_name}")
+            description_parts.append(f"API name: {function_name}")
         if function_signature:
             description_parts.append(f"signature: {function_signature}")
+
+        # Enrich the description with SRS-level semantics when available
+        if isinstance(srs_data, dict):
+            metadata = srs_data.get('metadata', {}) or {}
+            category = metadata.get('category')
+            state_model = metadata.get('state_model')
+            recommended = metadata.get('recommended_approach')
+            if api_type:
+                description_parts.append(f"archetype pattern: {api_type}")
+            if category:
+                description_parts.append(f"category: {category}")
+            if state_model:
+                description_parts.append(f"state model: {state_model}")
+            if recommended:
+                description_parts.append(f"recommended approach: {recommended}")
+
+            # Add a few top functional requirements as plain-text hints
+            frs = srs_data.get('functional_requirements', []) or []
+            for fr in frs[:3]:
+                req = fr.get('requirement')
+                if req:
+                    description_parts.append(f"functional requirement: {req}")
+
         description = " | ".join(description_parts)
 
         # Database directory can be overridden via env; default to ./chroma_db
@@ -412,7 +431,9 @@ class LangGraphPrototyper(LangGraphAgent):
             results = retriever.search_by_description(
                 description=description,
                 n=3,
-                project=project,
+                # 不按项目做硬分区，让跨项目的“语义相似 API”也能互相借鉴
+                project=None,
+                # 只在 API archetype 维度上进行温和过滤，保持语义一致性
                 api_type=api_type,
                 threshold=0.6,
             )
