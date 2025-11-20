@@ -2,40 +2,36 @@
 
 **Multi-Agent Automated Fuzz Target Generation using LLM Agents**
 
-LogicFuzz is an intelligent fuzzing framework that leverages **multi-agent LLM collaboration** to automatically generate high-quality fuzz targets. It uses a **Supervisor-Agent pattern with two-phase workflow** to achieve high compilation success rates, maximize code coverage, and discover real bugs.
+LogicFuzz is an intelligent fuzzing framework that leverages **multi-agent LLM collaboration** to automatically generate high-quality fuzz targets. It uses a **Supervisor-Agent pattern with streamlined two-phase workflow** to achieve high compilation success rates and discover real bugs efficiently.
 
 ---
 
 ## 🎯 Key Features
 
 ### 🏗️ **Multi-Agent Architecture**
-- **Supervisor-Agent Pattern**: Central supervisor orchestrates 9+ specialized agents
-- **Session Memory**: Shared knowledge base for API constraints, error fixes, and coverage strategies
+- **Supervisor-Agent Pattern**: Central supervisor orchestrates 8 specialized agents
+- **Session Memory**: Shared knowledge base for API constraints, error fixes
 - **Phase-Aware Routing**: Intelligent decision-making based on compilation/optimization phases
 
-### 🔄 **Two-Phase Workflow**
-- **Phase 1 - COMPILATION**: Function Analysis → Code Generation → Build → Error Fixing (3 retries + regeneration)
-- **Phase 2 - OPTIMIZATION**: Execution → Coverage/Crash Analysis → Iterative Enhancement
+### 🔄 **Streamlined Two-Phase Workflow**
+- **Phase 1 - COMPILATION**: Function Analysis → Code Generation → Build → Error Fixing (max 3 retries)
+- **Phase 2 - OPTIMIZATION**: Execution → Crash Analysis → False Positive Filtering (single-pass, no coverage iteration)
 
 ### 🧠 **Intelligent Error Handling**
 - **Context-Aware Fixing**: Extracts error context (±10 lines) for targeted fixes
-- **Progressive Retry**: 3 compilation retries with Enhancer + 1 prototyper regeneration
+- **Progressive Retry**: Max 3 compilation retries with Enhancer
 - **Known Fixes Memory**: Stores successful fixes in Session Memory for reuse
 
-### 🎯 **Coverage-Driven Optimization**
-- **Coverage Analyzer**: Identifies uncovered paths and suggests specific improvements
-- **Boundary Exploration**: Adds edge cases (empty input, min/max sizes, NULL pointers)
-- **Stagnation Detection**: Terminates after 3 consecutive no-improvement iterations
-
-### 🐛 **Crash Analysis Pipeline**
-- **Two-Stage Analysis**: Crash Analyzer (type classification) + Context Analyzer (feasibility validation)
+### 🐛 **Efficient Crash Analysis**
+- **Two-Stage Validation**: Crash Analyzer (classification) + Crash Feasibility Analyzer (deep validation)
 - **False Positive Filter**: Distinguishes real bugs from fuzzer harness issues
 - **Severity Assessment**: Prioritizes security-relevant crashes (buffer overflow, UAF)
+- **One-Shot Fix**: Single enhancer retry for false positives, then terminate
 
 ### ⚡ **Token Efficiency**
-- **Per-Agent Memory**: Each agent maintains independent 100k token conversation history
-- **Smart Trimming**: Automatic message pruning while preserving system prompts
-- **Optimized Prompts**: 80% token reduction through structured output and focused context
+- **Session Memory Only**: No per-agent conversation history (100% memory savings)
+- **Smart Context Injection**: Only top-3 relevant memories by confidence + recency
+- **Optimized Prompts**: 80% token reduction through structured output
 
 ### 🔍 **FuzzingContext Data Preparation**
 - **Single Source of Truth**: All data prepared once at workflow start
@@ -64,40 +60,52 @@ context.header_info        # Include dependencies
 context.source_code        # Optional source
 ```
 
-### 2. **Intelligent Code Context Extraction**
+### 2. **Streamlined Error Recovery**
 ```python
-# Instead of sending entire file (wasteful):
-send_entire_file(fuzz_target_source)  # ❌ 500+ lines
+# PHASE 1: COMPILATION (max 3 retries)
+Compilation Failed → Enhancer (retry 1)
+                  → Enhancer (retry 2)
+                  → Enhancer (retry 3)
+                  → END (give up)
 
+# PHASE 2: OPTIMIZATION (no iteration loops)
+Execution → Crash? → YES: Crash Analyzer → Crash Feasibility Analyzer
+                     - Feasible (true bug)? → END (success! 🎉)
+                     - False positive? → Enhancer (1 fix) → END
+         → NO: Log coverage → END
+```
+
+**Key Improvements:**
+- ✅ No coverage iteration loops (removed stagnation detection complexity)
+- ✅ Single-pass optimization (1 enhancer fix max for false positives)
+- ✅ Fast termination (no redundant build/run cycles)
+
+### 3. **Intelligent Code Context Extraction**
+```python
 # Extract ±10 lines around error (targeted):
-extract_error_context(error_line=142, context_lines=10)  # ✅ 20 lines
+extract_error_context(error_line=142, context_lines=10)  # 20 lines
 #  >>> 142 | result_t *r = target_function(data, size);
 #      143 | if (r) { process_result(r); }
 ```
 
 **Impact**: 95% token reduction on compilation fixes
 
-### 3. **Session Memory Prioritization**
+### 4. **Session Memory (No Conversation History)**
 ```python
-# Supervisor injects top-3 memories by:
-# 1. Confidence level (HIGH > MEDIUM > LOW)
-# 2. Recency (newer iteration > older)
+# OLD: Store full conversation history per agent (100k+ tokens)
+agent_messages["prototyper"] = [msg1, msg2, msg3, ...]  # ❌ Expensive
 
-format_session_memory_for_prompt(state, max_items_per_category=3)
+# NEW: Session memory only (3-5 key insights)
+session_memory = {
+    "api_constraints": ["Must call init() before decode()"],
+    "known_fixes": ["undefined reference to `compress` → Add `-lz`"],
+    "archetype": "stateful_decoder"
+}
 ```
 
-**Example Output**:
-```
-## API Usage Constraints
-- [HIGH] Must call init() before decode()
-- [MEDIUM] Returns NULL on error, check before use
+**Impact**: 90% memory reduction, faster execution
 
-## Known Error Fixes  
-- **Error**: undefined reference to `compress`
-  **Solution**: Add `-lz` to LDFLAGS in build.sh
-```
-
-### 4. **Two-Stage Crash Validation**
+### 5. **Two-Stage Crash Validation**
 ```
 Crash Detected
     ↓
@@ -109,15 +117,13 @@ Crash Feasibility Analyzer:
   - Security-relevant? → Yes (write beyond buffer) ✓
   - Reproducible? → Yes (stable reproducer) ✓
     ↓
-✅ Real Bug Found! (feasible=True)
-```
+✅ Real Bug Found! (feasible=True) → END
 
-**False Positive Example**:
-```
-Crash: timeout in fuzz harness
-Crash Feasibility Analyzer: "Infinite loop in harness setup, not in target code" (feasible=False)
+OR:
+
+Crash Feasibility Analyzer: "Timeout in harness setup" (feasible=False)
     ↓
-Enhancer: Add timeout protection in harness
+Enhancer: Fix harness (1 attempt) → END
 ```
 
 ---
@@ -252,44 +258,89 @@ python run_logicfuzz.py --agent \
 
 LogicFuzz uses a **Supervisor-Agent Pattern** with **LangGraph-based multi-agent collaboration**:
 
-### 🧠 Two-Phase Workflow
+### 🧠 Streamlined Two-Phase Workflow
 
-**Phase 1: COMPILATION** → Get code to compile successfully
-- **Entry**: Function Analyzer → Prototyper → Build
-- **Error Recovery**: Build Errors → Enhancer (3 retries with intelligent error context)
-- **Validation**: Target function call validation (2 retries)
-- **Failure Handling**: If 3 compilation retries fail → END (compilation failed)
-- **Exit**: Successful build + validation → Switch to Phase 2
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    PHASE 1: COMPILATION                     │
+│        Goal: Get fuzz target to compile successfully        │
+└─────────────────────────────────────────────────────────────┘
+                             ↓
+              Function Analyzer (API analysis)
+                             ↓
+              Prototyper (Generate fuzz target)
+                             ↓
+                 Build Node (OSS-Fuzz build)
+                             ↓
+                    ┌────────────────┐
+                    │ Build Success? │
+                    └────────────────┘
+                      ↙            ↘
+                 YES                  NO
+                  ↓                    ↓
+        Target function called?    Enhancer (fix errors)
+              ↙        ↘               ↓
+          YES           NO          Retry (max 3)
+           ↓             ↓               ↓
+      Switch to     Enhancer (fix)   Still failing?
+    Optimization    (max 2 retries)      ↓
+                         ↓           END (fail)
+                    Switch to 
+                   Optimization
 
-**Phase 2: OPTIMIZATION** → Maximize coverage and find bugs
-- **Execution**: Run fuzzer with timeout, collect coverage + crashes
-- **Crash Path**: Crash Analyzer (classify type) → Crash Feasibility Analyzer (validation)
-  - If **real bug** (feasible crash) → END (success! 🎉)
-  - If **false positive** → Enhancer (fix harness)
-- **Coverage Path**: Coverage Analyzer → Enhancer (add boundary tests, explore paths)
-- **Termination**: 
-  - Coverage stable (3 no-improvement iterations) OR 
-  - Max iterations reached OR
-  - Real bug found
+┌─────────────────────────────────────────────────────────────┐
+│                  PHASE 2: OPTIMIZATION                       │
+│         Goal: Execute fuzzer and validate crashes            │
+└─────────────────────────────────────────────────────────────┘
+                             ↓
+              Execution Node (Run fuzzer)
+                             ↓
+                    ┌────────────────┐
+                    │  Crash Found?  │
+                    └────────────────┘
+                      ↙            ↘
+                 YES                  NO
+                  ↓                    ↓
+          Crash Analyzer         Log coverage
+        (Classify crash type)        ↓
+                  ↓                 END ✓
+    Crash Feasibility Analyzer
+      (Validate true bug)
+                  ↓
+          ┌──────────────┐
+          │  Feasible?   │
+          └──────────────┘
+            ↙          ↘
+        YES              NO
+         ↓                ↓
+     END 🎉         Enhancer (1 fix)
+   (True bug!)            ↓
+                        END ✓
 
-### 🤖 Agent Ecosystem (9 Specialized Agents + 2 Execution Nodes)
+Key Differences from Previous Version:
+✅ No coverage iteration loops (removed Coverage Analyzer from main flow)
+✅ Single-pass optimization (1 execution → done or fix → done)
+✅ Crash-focused (only analyze if crash found)
+✅ Fast termination (no redundant cycles)
+```
+
+### 🤖 Agent Ecosystem (6 LLM Agents + 2 Execution Nodes)
 
 #### 🔵 Control Layer
-- **Supervisor** - Central router with phase-aware decision logic, loop prevention, session memory injection
+- **Supervisor** - Phase-aware router with retry limits and session memory injection
 
 #### 🟡 Generation Layer (LLM-Driven)
-- **Function Analyzer** - Semantic analysis: API constraints, archetype identification, calling conventions
-- **Prototyper** - Code generation: Fuzz target + build script (archetype-driven)
-- **Enhancer** - Multi-mode enhancement: Compilation fixing, Validation fixing, False positive fixing, Coverage improvement
+- **Function Analyzer** - API semantic analysis, archetype identification
+- **Prototyper** - Initial fuzz target + build script generation
+- **Enhancer** - Multi-mode fixing: compilation errors, validation errors, false positives
 
 #### 🔴 Analysis Layer (LLM-Driven)
-- **Crash Analyzer** - Crash type classification (buffer overflow, UAF, timeout, OOM)
-- **Crash Feasibility Analyzer** - Deep crash validation with security assessment (replaces Context Analyzer)
-- **Coverage Analyzer** - Uncovered path identification + improvement suggestions
+- **Crash Analyzer** - Crash type classification (buffer overflow, UAF, timeout)
+- **Crash Feasibility Analyzer** - Deep crash validation with security assessment
 
 #### 🟣 Execution Layer (Non-LLM)
-- **Build Node** - OSS-Fuzz container compilation with error parsing + target function call validation
-- **Execution Node** - Fuzzer execution with LLVM source-based coverage collection
+- **Build Node** - OSS-Fuzz compilation + target function call validation
+- **Execution Node** - Fuzzer execution with LLVM source-based coverage
 
 ### 🧠 Session Memory Mechanism
 
@@ -301,29 +352,35 @@ Cross-agent knowledge sharing system (prevents repeated mistakes):
 | **Archetype** | Function Analyzer | Prototyper | "stateful_decoder", "simple_parser" |
 | **Known Fixes** | Enhancer | Enhancer | "undefined reference to `compress` → Add `-lz`" |
 | **Build Context** | Build Node | Enhancer | Error line ±10 context for targeted fixing |
-| **Coverage Insights** | Coverage Analyzer | Fixer | "Add empty array test case `[]`" |
 | **Crash Context** | Crash Analyzer | Crash Feasibility Analyzer | Stack trace + ASAN report for validation |
 
 **Injection Strategy**: Supervisor injects top-3 relevant memories (prioritized by confidence + recency) into each agent's prompt.
 
 ### 📊 Workflow Control
 
-**Loop Prevention**:
-- Per-node visit counter (max: 10 visits)
-- Phase-specific retry counters:
-  - **Compilation errors**: 3 fixer retries
-  - **Validation errors**: 2 fixer retries (target function not called)
-- No-improvement counter (max: 3 consecutive iterations in optimization phase)
+**Strict Retry Limits**:
+- **Compilation Phase**: Max 3 enhancer retries → END
+- **Validation Phase**: Max 2 enhancer retries → END
+- **Optimization Phase**: Max 1 enhancer retry for false positives → END
+- **Per-Node Limit**: Max 10 visits (loop prevention)
 
-**Phase Transition**:
-```
-compilation_retry_count < 3? → Fixer (fix build errors)
-compilation_retry_count >= 3? → END (compilation failed)
-validation_failure_count < 2? → Fixer (fix validation)
-compile_success + validation_passed? → Switch to OPTIMIZATION phase
+**Phase Transition Logic**:
+```python
+# COMPILATION → OPTIMIZATION
+if compile_success and target_function_called:
+    workflow_phase = "optimization"
+    return "execution"
+
+# OPTIMIZATION termination
+if feasible_crash:
+    return "END"  # Success!
+elif not feasible_crash:
+    return "fixer" (1 attempt) → "END"
+elif run_success:
+    return "END"  # No crash, log coverage
 ```
 
-📖 **For detailed workflow diagrams and implementation, see [agent_graph/README.md](agent_graph/README.md)**
+📖 **For detailed workflow implementation, see [agent_graph/README.md](agent_graph/README.md)**
 
 ---
 
@@ -510,16 +567,17 @@ LogicFuzz is built on these core principles:
 - Immutable data prevents state pollution
 
 ### 3. **Token Efficiency First** 💰
-- 100k token limit per agent (independent histories)
+- **No conversation history** (session memory only)
 - Intelligent context extraction (±10 lines around errors)
 - Session Memory prioritization (top-3 by confidence + recency)
-- 80% reduction vs naive full-context approaches
+- 90% reduction vs naive full-history approaches
 
-### 4. **Progressive Error Recovery** 🔄
-- 3 compilation error retries with accumulating knowledge
-- 2 validation error retries (target function not called)
-- Enhancer modes: Compilation → Validation → False Positive → Coverage
-- Fail fast: No regeneration, terminate after max retries
+### 4. **Aggressive Termination** 🔄
+- **Compilation**: 3 retries → END (no regeneration)
+- **Validation**: 2 retries → END
+- **Optimization**: Single-pass (no iteration loops)
+- **False Positives**: 1 fix → END
+- Result: Faster execution, lower token cost
 
 ### 5. **Agent Specialization** 🎯
 - Each agent has ONE clear responsibility
@@ -527,19 +585,26 @@ LogicFuzz is built on these core principles:
 - Analyzers suggest, Enhancer implements
 
 ### 6. **Phase-Aware Workflow** 🚦
-- **COMPILATION**: Focus on build success (retry counters)
-- **OPTIMIZATION**: Focus on coverage/crashes (iteration limit)
-- Different termination criteria per phase
+- **COMPILATION**: Focus on build success (max 3 retries)
+- **OPTIMIZATION**: Single execution → crash analysis OR log coverage → END
+- No iteration loops in optimization phase
 
 ### 7. **Real Bugs Matter** 🐛
-- Two-stage validation (Crash + Context Analyzer)
-- False positive filtering
+- Two-stage validation (Crash Analyzer + Crash Feasibility Analyzer)
+- False positive filtering with single fix attempt
 - Security-relevant crash prioritization
 
 ---
 
-## 🔮 Future Directions
+## 🔮 Recent Improvements & Future Directions
 
+### ✅ Recently Completed
+- **Removed Conversation History**: Session memory only (90% memory reduction)
+- **Streamlined Optimization**: Single-pass execution (no coverage iteration)
+- **Aggressive Termination**: Strict retry limits (faster execution)
+- **Qwen Model Support**: Added qwen-turbo, qwen-plus, qwen-max, qwen3
+
+### 🚧 Future Directions
 - **Parallel Agent Execution**: Run Function Analyzer + Prototyper simultaneously
 - **Long-Term Memory**: Cross-project API pattern learning
 - **Fine-Grained Parameter Modeling**: Symbolic constraints for input generation
