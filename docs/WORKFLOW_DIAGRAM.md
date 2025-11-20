@@ -94,13 +94,13 @@ START
   │                                    ▼
   ▼                            ┌──────────────────────┐
 ┏━━━━━━━━━━━━━━━━━━━━┓         │ Target Function      │
-┃     Enhancer       ┃         │ Called in Driver?    │
+┃     Fixer       ┃         │ Called in Driver?    │
 ┃   (LLM Agent)      ┃         └──────────────────────┘
 ┗━━━━━━━━━━━━━━━━━━━━┛           │              │
   │                             │ NO           │ YES
   │ Receives:                   ▼              ▼
   │ • Error context (±10 lines)┏━━━━━━━━━━━━━━━━━━━━┓
-  │ • Session memory (known fixes)┃    Enhancer       ┃
+  │ • Session memory (known fixes)┃    Fixer       ┃
   │                             ┃  (Validation Fix) ┃
   │ Generates:                  ┗━━━━━━━━━━━━━━━━━━━━┛
   │ • Fixed fuzz_driver.cc        │
@@ -205,7 +205,7 @@ START
            │             │
            ▼             ▼
     ┌────────────┐  ┏━━━━━━━━━━━━━━━━━━━━┓
-    │    END     │  ┃     Enhancer       ┃
+    │    END     │  ┃     Fixer       ┃
     │    🎉      │  ┃  (False Positive   ┃
     │ (True Bug!)│  ┃      Fix)          ┃
     └────────────┘  ┗━━━━━━━━━━━━━━━━━━━━┛
@@ -278,7 +278,7 @@ START
              │                               └─────────────────────┘
              ▼
     ┌─────────────────────┐
-    │     Enhancer        │
+    │     Fixer        │
     │    (LLM Agent)      │
     │  • Compilation fix  │
     │  • Validation fix   │
@@ -330,7 +330,7 @@ Initial State                     Updated by Nodes
                                            │
                                            ▼
                                  ┌────────────────────────┐
-                                 │ Enhancer:              │
+                                 │ Fixer:              │
                                  │ • fuzz_target_source   │
                                  │   (fixed)              │
                                  │ • session_memory       │
@@ -421,7 +421,7 @@ Final State
                           │ YES      │ NO │                ▼
                           ▼          ▼    │     ┌────────────────────┐
                      ┌────────┐  ┌────┐  │     │crash_feasibility_  │
-                     │enhancer│  │END │  │     │analyzer            │
+                     │fixer│  │END │  │     │analyzer            │
                      └────────┘  └────┘  │     └────────────────────┘
                                          │                │
                                          │                ▼
@@ -432,7 +432,7 @@ Final State
                                          │        │ YES        │ NO
                                          │        ▼            ▼
                                          │     ┌────┐    ┌────────┐
-                                         │     │END │    │enhancer│
+                                         │     │END │    │fixer│
                                          │     │🎉  │    │(1 fix) │
                                          │     └────┘    └────────┘
                                          │                   │
@@ -459,7 +459,7 @@ Final State
                                            │ YES      │ NO
                                            ▼          ▼
                                       ┌────────┐  ┌────┐
-                                      │enhancer│  │END │
+                                      │fixer│  │END │
                                       └────────┘  └────┘
 ```
 
@@ -478,7 +478,7 @@ Phase 1: COMPILATION
 ├──────────────────────┼──────────┼────────────────────────┤
 │ Function Analyzer    │ 5-10k    │ Initial analysis       │
 │ Prototyper           │ 8-15k    │ Code generation        │
-│ Enhancer (per retry) │ 3-5k     │ Error fixing           │
+│ Fixer (per retry) │ 3-5k     │ Error fixing           │
 │   × 2-3 retries      │ 6-15k    │ Typical: 2 retries     │
 │ Session Memory       │ 0.5-1k   │ Injected into prompts  │
 ├──────────────────────┼──────────┼────────────────────────┤
@@ -491,7 +491,7 @@ Phase 2: OPTIMIZATION
 ├──────────────────────┼──────────┼────────────────────────┤
 │ Crash Analyzer       │ 2-4k     │ If crash detected      │
 │ Crash Feasibility    │ 3-6k     │ Deep validation        │
-│ Enhancer (false pos) │ 3-5k     │ 1 fix attempt          │
+│ Fixer (false pos) │ 3-5k     │ 1 fix attempt          │
 ├──────────────────────┼──────────┼────────────────────────┤
 │ TOTAL (Phase 2)      │ 0-15k    │ 0 if no crash          │
 │                      │          │ 5-10k if feasible crash│
@@ -523,17 +523,17 @@ Comparison with Previous Version (with conversation history):
 └────────────────────────────────────────────────────────────┘
 
 Compilation Errors
-├─ Syntax errors           → Enhancer (±10 lines context)
-├─ Undefined references    → Enhancer + session memory (known fixes)
-├─ Type mismatches         → Enhancer (error context)
-├─ Missing headers         → Enhancer (check FuzzingContext.header_info)
-└─ Linker errors           → Enhancer (update build.sh)
+├─ Syntax errors           → Fixer (±10 lines context)
+├─ Undefined references    → Fixer + session memory (known fixes)
+├─ Type mismatches         → Fixer (error context)
+├─ Missing headers         → Fixer (check FuzzingContext.header_info)
+└─ Linker errors           → Fixer (update build.sh)
    │
    └─ Max 3 retries → END (fail fast)
 
 Validation Errors
-├─ Target function not called  → Enhancer (fix driver logic)
-└─ Incorrect function signature → Enhancer (fix function call)
+├─ Target function not called  → Fixer (fix driver logic)
+└─ Incorrect function signature → Fixer (fix function call)
    │
    └─ Max 2 retries → END (fail fast)
 
@@ -544,13 +544,13 @@ Runtime Errors (Optimization Phase)
 │  └─ stack-buffer-overflow  → Crash Analyzer → Feasibility → END (🎉 bug!)
 │
 ├─ Crashes (in harness)
-│  ├─ Timeout                → Feasibility (not feasible) → Enhancer (1 fix)
-│  ├─ Initialization error   → Feasibility (not feasible) → Enhancer (1 fix)
-│  └─ Cleanup error          → Feasibility (not feasible) → Enhancer (1 fix)
+│  ├─ Timeout                → Feasibility (not feasible) → Fixer (1 fix)
+│  ├─ Initialization error   → Feasibility (not feasible) → Fixer (1 fix)
+│  └─ Cleanup error          → Feasibility (not feasible) → Fixer (1 fix)
 │
 └─ Execution failures
    ├─ Timeout (pure)         → END (no fix attempt)
-   └─ Other infra errors     → Enhancer (1 fix) → END
+   └─ Other infra errors     → Fixer (1 fix) → END
 ```
 
 ---
@@ -561,7 +561,7 @@ Runtime Errors (Optimization Phase)
 
 **Old approach:**
 ```
-Execute → Coverage Analyzer → Enhancer → Build → Execute → ...
+Execute → Coverage Analyzer → Fixer → Build → Execute → ...
 (Repeat until coverage stable)
 
 Cost: ~50k tokens + 5 min per iteration

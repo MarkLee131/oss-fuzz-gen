@@ -113,7 +113,7 @@ def _determine_next_action(state: FuzzingWorkflowState) -> str:
     PHASE 1: COMPILATION (focus on getting code to compile)
     1. Function analysis -> Prototyper
     2. Prototyper -> Build
-    3. Build failed -> Enhancer (max 3 retries)
+    3. Build failed -> Fixer (max 3 retries)
     4. Still failing after 3 retries -> Regenerate with Prototyper (once)
     5. Compilation succeeds -> Switch to OPTIMIZATION phase
     
@@ -121,7 +121,7 @@ def _determine_next_action(state: FuzzingWorkflowState) -> str:
     1. Execution -> Analyze results
     2. Crashes -> CrashAnalyzer -> CrashFeasibilityAnalyzer
     3. Feasible crash (true bug) -> END
-    4. Non‑crash failures -> at most one Enhancer round, then END
+    4. Non‑crash failures -> at most one Fixer round, then END
     5. Successful execution without bug -> log coverage once, then END
     
     Args:
@@ -160,10 +160,15 @@ def _determine_next_action(state: FuzzingWorkflowState) -> str:
         elif not compile_success:
             # Build failed - handle compilation retry logic
             compilation_retry_count = state.get("compilation_retry_count", 0)
+            prototyper_regenerate_count = state.get("prototyper_regenerate_count", 0)
             
-            logger.debug(f'Build failed, compilation_retry_count={compilation_retry_count}', trial=trial)
-            # Strategy: Try fixer up to 3 times, then end
-            MAX_COMPILATION_RETRIES = 3
+            logger.debug(f'Build failed, compilation_retry_count={compilation_retry_count}, '
+                         f'regeneration_count={prototyper_regenerate_count}', trial=trial)
+            
+            if prototyper_regenerate_count > 0:
+                MAX_COMPILATION_RETRIES = 1  # Reduced retries for regenerated target
+            else:
+                MAX_COMPILATION_RETRIES = 3  # Standard retries for initial target
             
             if compilation_retry_count < MAX_COMPILATION_RETRIES:
                 # Try to fix with fixer
@@ -171,9 +176,23 @@ def _determine_next_action(state: FuzzingWorkflowState) -> str:
                            f'routing to fixer', trial=trial)
                 return "fixer"
             else:
-                # Fixer retries exhausted - give up
-                logger.error(f'Compilation failed after {MAX_COMPILATION_RETRIES} fixer retries. Ending workflow.', 
-                            trial=trial)
+                # Fixer retries exhausted
+                if prototyper_regenerate_count == 0:
+                    logger.warning(
+                        f'Compilation failed after {MAX_COMPILATION_RETRIES} fixer retries. '
+                        f'Attempting ONE regeneration with Prototyper.', 
+                        trial=trial
+                    )
+                    # Route back to prototyper to generate a fresh approach
+                    # Prototyper will see this is a regeneration and reset compilation_retry_count
+                    return "prototyper"
+                
+                # Both initial and regeneration attempts failed - give up
+                logger.error(
+                    f'Compilation failed after regeneration and {MAX_COMPILATION_RETRIES} fixer retries. '
+                    f'Ending workflow.', 
+                    trial=trial
+                )
                 return "END"
         
         else:
@@ -276,9 +295,9 @@ def _determine_next_action(state: FuzzingWorkflowState) -> str:
             # For other non-crash failures, allow only a very small number of
             # fixer attempts in OPTIMIZATION phase before giving up.
             optimization_fixer_count = state.get("optimization_fixer_count", 0)
-            MAX_OPTIMIZATION_ENHANCER_RETRIES = 1
+            MAX_OPTIMIZATION_FIXER_RETRIES = 1
             
-            if optimization_fixer_count >= MAX_OPTIMIZATION_ENHANCER_RETRIES:
+            if optimization_fixer_count >= MAX_OPTIMIZATION_FIXER_RETRIES:
                 logger.info(
                     f'Execution failed (not a crash) and fixer already used '
                     f'{optimization_fixer_count} time(s) in optimization phase, '
@@ -290,7 +309,7 @@ def _determine_next_action(state: FuzzingWorkflowState) -> str:
             logger.debug(
                 f'Execution failed (not a crash), fixing target '
                 f'(optimization_fixer_count={optimization_fixer_count + 1}/'
-                f'{MAX_OPTIMIZATION_ENHANCER_RETRIES})',
+                f'{MAX_OPTIMIZATION_FIXER_RETRIES})',
                 trial=trial
             )
             return "fixer"

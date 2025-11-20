@@ -299,7 +299,7 @@ class HeaderExtractor:
         # Using >=3 for LOOSE filtering - allows some cross-directory includes
         # that might be valid (e.g., ../../include/api.h), while filtering
         # obviously deep internal paths (e.g., ../../../internal/impl.h)
-        # If these cause build errors, Enhancer can fix them later
+        # If these cause build errors, Fixer can fix them later
         relative_depth = header_path.count('../')
         if relative_depth >= 3:
             return True, f"excessive relative path depth (>={relative_depth})"

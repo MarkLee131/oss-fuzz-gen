@@ -170,7 +170,7 @@ The prompts in this directory have been carefully designed to unify and improve 
 **Content Sources:**
 - `function_analyzer`: Unified from `function-analyzer-{description,instruction,priming}.txt`
 - `prototyper`: Enhanced from `prototyper-priming.txt` with OSS-Fuzz best practices
-- `fixer`: Combined from `enhancer-{priming,crash-priming,coverage-priming}.txt`
+- `fixer`: Combined from `fixer-{priming,crash-priming,coverage-priming}.txt`
 - `crash_analyzer`: Improved from `crash_analyzer-priming.txt` with severity assessment
 - `context_analyzer`: Adapted from `context-analyzer-{description,instruction,priming}.txt`
 - `coverage_analyzer`: Enhanced from `coverage-analyzer-priming.txt` with detailed strategies

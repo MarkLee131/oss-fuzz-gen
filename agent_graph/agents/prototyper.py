@@ -123,8 +123,8 @@ class LangGraphPrototyper(LangGraphAgent):
             "compile_success": None,  # Reset to trigger build
             "build_errors": [],  # Clear previous errors
             "retry_count": 0,  # Reset retry count for new target
-            "session_memory": updated_session_memory,  # ✅ 返回更新
-            "api_validation_warnings": validation_warnings  # Store for Enhancer to see
+            "session_memory": updated_session_memory,
+            "api_validation_warnings": validation_warnings  # Store for Fixer to see
         }
         
         # If this is a regeneration, update regeneration counter and reset compilation retry count

@@ -25,7 +25,7 @@ The workflow is divided into two distinct phases to optimize for different goals
 #### 🟡 Generation Layer (LLM-Driven)
 *   **Function Analyzer**: API semantic analysis, archetype identification.
 *   **Prototyper**: Initial fuzz target + build script generation.
-*   **Enhancer**: Multi-mode fixing (compilation, validation, false positives).
+*   **Fixer**: Multi-mode fixing (compilation, validation, false positives).
 
 #### 🔴 Analysis Layer (LLM-Driven)
 *   **Crash Analyzer**: Crash type classification (buffer overflow, UAF, timeout).

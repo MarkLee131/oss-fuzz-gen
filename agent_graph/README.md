@@ -12,17 +12,15 @@ LogicFuzz uses **LangGraph** to implement a stateful, multi-agent workflow with 
 
 ### Key Components
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    LangGraph StateGraph                      │
-│  ┌────────────┐  ┌──────────────┐  ┌────────────────────┐  │
-│  │   State    │  │  Supervisor  │  │  Agent Nodes (8)   │  │
-│  │  (TypedDict)│→│  (Router)    │→│  LLM + Non-LLM     │  │
-│  └────────────┘  └──────────────┘  └────────────────────┘  │
-│         ↑                                       │             │
-│         └───────────────────────────────────────┘             │
-│                  State updates flow back                      │
-└─────────────────────────────────────────────────────────────┘
+```mermaid
+graph LR
+    State[State<br/>TypedDict] --> Supervisor[Supervisor<br/>Router]
+    Supervisor --> Agents[Agent Nodes 8<br/>LLM + Non-LLM]
+    Agents -->|State updates flow back| State
+    
+    style State fill:#f9f,stroke:#333,stroke-width:2px
+    style Supervisor fill:#bbf,stroke:#333,stroke-width:2px
+    style Agents fill:#bfb,stroke:#333,stroke-width:2px
 ```
 
 ---
@@ -33,85 +31,36 @@ LogicFuzz uses **LangGraph** to implement a stateful, multi-agent workflow with 
 
 **Objective**: Generate a fuzz target that compiles successfully and calls the target function.
 
-```
-START
-  ↓
-┌──────────────────┐
-│ Function Analyzer│  ← Analyze target function API
-└──────────────────┘
-  ↓
-  - Identify API constraints
-  - Determine archetype (stateful_decoder, simple_parser, etc.)
-  - Extract calling conventions
-  - Store in session_memory["api_constraints"]
-  ↓
-┌──────────────────┐
-│   Prototyper     │  ← Generate initial fuzz target
-└──────────────────┘
-  ↓
-  - Use archetype template
-  - Apply API constraints from session memory
-  - Generate fuzz_driver.cc + build.sh
-  ↓
-┌──────────────────┐
-│   Build Node     │  ← Compile with OSS-Fuzz
-└──────────────────┘
-  ↓
-  ┌─────────────────────┐
-  │  Compile Success?   │
-  └─────────────────────┘
-    ↙                 ↘
-  YES                  NO
-   ↓                    ↓
-┌─────────────────────────────────┐
-│ Target Function Called?         │ ← Validation check
-└─────────────────────────────────┘
-  ↙                           ↘
-YES                            NO
- ↓                              ↓
-Switch to                ┌───────────────┐
-Optimization            │   Enhancer     │
-                         └───────────────┘
-                               ↓
-                         Fix validation error
-                         (max 2 retries)
-                               ↓
-                         ┌──────────────┐
-                         │  Still NO?   │
-                         └──────────────┘
-                          ↙          ↘
-                       YES            NO
-                        ↓              ↓
-                       END        Switch to
-                      (fail)     Optimization
-
-┌──────────────────┐
-│    Enhancer      │  ← Fix compilation errors
-└──────────────────┘
-  ↓
-  - Extract error context (±10 lines)
-  - Check session_memory["known_fixes"]
-  - Generate fix
-  - Store new fix in session memory
-  ↓
-  Back to Build Node
-  ↓
-  Retry (max 3 times)
-  ↓
-  ┌────────────────┐
-  │ Still failing? │
-  └────────────────┘
-    ↙          ↘
-  YES           NO
-   ↓             ↓
-  END      Continue to
- (fail)     Optimization
+```mermaid
+graph TD
+    Start[START] --> FuncAnalyzer[Function Analyzer]
+    FuncAnalyzer -->|"Analyze target function API<br/>(Identify constraints, Archetype)"| Prototyper[Prototyper]
+    
+    Prototyper -->|"Generate initial fuzz target"| BuildNode[Build Node]
+    
+    BuildNode --> CheckCompile{Compile Success?}
+    
+    %% Compilation Failure Loop
+    CheckCompile -- NO --> FixerBuild[Fixer]
+    FixerBuild -- "Generate fix" --> BuildNode
+    
+    %% Validation Failure Loop
+    CheckCompile -- YES --> CheckValidation{Target Function Called?}
+    CheckValidation -- NO --> FixerVal[Fixer]
+    FixerVal -- "Fix validation error" --> BuildNode
+    
+    %% Success
+    CheckValidation -- YES --> Optimize[Switch to Optimization]
+    
+    %% Failures (simplified, max retries lead to END)
+    FixerBuild -.->|"Max 3 retries"| EndFail[END (fail)]
+    FixerVal -.->|"Max 2 retries"| EndFail
 ```
 
 **Key Mechanisms:**
 
 1. **Compilation Retry Logic**
-   - Max 3 enhancer retries for build errors
+   - Max 3 fixer retries for build errors
    - Each retry has access to previous fix attempts via session memory
    - After 3 retries → END (compilation failed)
 
@@ -121,7 +70,7 @@ Optimization            │   Enhancer     │
    - If validation fails → separate retry counter (max 2)
 
 3. **Error Context Extraction**
-   - Only send ±10 lines around error location to Enhancer
+   - Only send ±10 lines around error location to Fixer
    - Reduces token usage by 95% compared to full file
    - Preserves context for accurate fixing
 
@@ -129,59 +78,21 @@ Optimization            │   Enhancer     │
 
 **Objective**: Execute the fuzzer once and validate any crashes found. No iteration loops.
 
-```
-┌──────────────────┐
-│ Execution Node   │  ← Run fuzzer (single pass)
-└──────────────────┘
-  ↓
-  - Execute with timeout (default 60s)
-  - Collect coverage data (LLVM source-based)
-  - Detect crashes (ASAN/UBSAN reports)
-  - Store results in state
-  ↓
-  ┌────────────────┐
-  │ Crash Found?   │
-  └────────────────┘
-    ↙           ↘
-  YES            NO
-   ↓              ↓
-┌──────────────────┐     Log coverage
-│ Crash Analyzer   │     metrics
-└──────────────────┘          ↓
-   ↓                        END ✓
-   - Classify crash type
-     • heap-buffer-overflow
-     • stack-buffer-overflow
-     • use-after-free
-     • timeout
-     • out-of-memory
-   - Extract stack trace
-   - Store in state["crash_analysis"]
-   ↓
-┌──────────────────────────────┐
-│ Crash Feasibility Analyzer   │  ← Deep validation
-└──────────────────────────────┘
-   ↓
-   - Is crash in target code (not harness)?
-   - Is crash reachable in real-world usage?
-   - Is crash security-relevant?
-   - Is crash reproducible?
-   - Assess severity (CVSS-like)
-   ↓
-   ┌────────────────┐
-   │  Feasible?     │
-   └────────────────┘
-     ↙          ↘
-   YES           NO
-    ↓             ↓
-  END 🎉    ┌──────────────────┐
-(True bug!)  │    Enhancer      │
-             └──────────────────┘
-                     ↓
-               Fix false positive
-               (1 attempt only)
-                     ↓
-                   END ✓
+```mermaid
+graph TD
+    Execution[Execution Node] -->|"Run fuzzer (single pass)"| CheckCrash{Crash Found?}
+    
+    CheckCrash -- NO --> EndSuccess[END Success<br/>(Log coverage)]
+    CheckCrash -- YES --> CrashAnalyzer[Crash Analyzer]
+    
+    CrashAnalyzer -->|"Classify crash type"| Feasibility[Crash Feasibility Analyzer]
+    
+    Feasibility --> CheckFeasible{Feasible?}
+    
+    CheckFeasible -- YES --> EndBug[END True Bug]
+    CheckFeasible -- NO --> Fixer[Fixer]
+    
+    Fixer -->|"Fix false positive<br/>(1 attempt only)"| EndFixed[END Success]
 ```
 
 **Key Mechanisms:**
@@ -198,7 +109,7 @@ Optimization            │   Enhancer     │
 
 3. **False Positive Handling**
    - If crash is not feasible (harness issue, timeout, etc.)
-   - **One** enhancer attempt to fix the harness
+   - **One** fixer attempt to fix the harness
    - Then END (no retry loop)
 
 4. **No Coverage Iteration**
@@ -316,7 +227,7 @@ def _determine_next_action(state: FuzzingWorkflowState) -> str:
 - Applies API constraints from session memory
 - Generates both driver code and build script
 
-### 4. Enhancer (Fixer)
+### 4. Fixer
 
 **Type**: LLM Agent  
 **File**: `agent_graph/agents/fixer.py`
@@ -406,7 +317,7 @@ def _determine_next_action(state: FuzzingWorkflowState) -> str:
 **Key Features:**
 - Uses `experiment.builder_runner.BuilderRunner`
 - Validates that target function is referenced in generated code
-- Stores detailed build errors for Enhancer
+- Stores detailed build errors for Fixer
 
 ### 8. Execution Node
 
@@ -633,7 +544,7 @@ agent_graph/
 
 **Rationale**: High cost, low return.
 
-- Each iteration requires: build → run → coverage analysis → enhancer → repeat
+- Each iteration requires: build → run → coverage analysis → fixer → repeat
 - Token cost: ~50k per iteration
 - Time cost: ~5 minutes per iteration
 - Empirical observation: Most bugs found in first execution
@@ -666,7 +577,7 @@ agent_graph/
 |-----------|--------|-------|
 | Function Analyzer | 5-10k | API analysis |
 | Prototyper | 8-15k | Initial generation |
-| Enhancer (per retry) | 3-5k | Error fixing |
+| Fixer (per retry) | 3-5k | Error fixing |
 | Crash Analyzer | 2-4k | Crash classification |
 | Crash Feasibility | 3-6k | Deep validation |
 | Session Memory | 0.5-1k | Shared across agents |
@@ -680,7 +591,7 @@ agent_graph/
 | Function Analysis | 10-30s | LLM call |
 | Prototyper | 20-40s | LLM call |
 | Build | 60-120s | OSS-Fuzz compilation |
-| Enhancer (per retry) | 30-60s | LLM call + rebuild |
+| Fixer (per retry) | 30-60s | LLM call + rebuild |
 | Execution | 60-300s | Fuzzer runtime (configurable) |
 | Crash Analysis | 15-30s | LLM calls |
 | **Total (success)** | **3-8 min** | Single execution |

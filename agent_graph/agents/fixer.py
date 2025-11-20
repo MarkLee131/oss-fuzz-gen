@@ -248,10 +248,7 @@ class LangGraphFixer(LangGraphAgent):
     
     def _format_header_hints(self, header_info: dict, build_errors: list) -> str:
         """
-        Format header information as hints for the Enhancer to fix header-related errors.
-        
-        This method provides the LLM with known correct header paths extracted by
-        FunctionAnalyzer, preventing it from blindly guessing incorrect paths.
+        Format header information as hints for the Fixer to fix header-related errors.
         
         CRITICAL: This method now provides EXPLICIT PRIORITY GUIDANCE to prevent
         LLM from using internal headers extracted from source code.
@@ -280,9 +277,9 @@ class LangGraphFixer(LangGraphAgent):
         
         hint_lines = [
             "",
-            "# ⚡ Known Header Information (STRICT PRIORITY ORDER)",
+            "# Known Header Information (STRICT PRIORITY ORDER)",
             "",
-            "⚠️  **CRITICAL**: Use headers in this STRICT priority order. Lower priority sources may contain",
+            "**CRITICAL**: Use headers in this STRICT priority order. Lower priority sources may contain",
             "INTERNAL implementation headers that WILL FAIL to compile in OSS-Fuzz fuzz targets.",
             ""
         ]
@@ -300,13 +297,13 @@ class LangGraphFixer(LangGraphAgent):
                 ""
             ])
             for item in filtered_headers[:10]:  # Show up to 10 examples
-                hint_lines.append(f"  ❌ `{item['header']:40}` ← {item['reason']}")
+                hint_lines.append(f" `{item['header']:40}` ← {item['reason']}")
             hint_lines.extend([
                 "",
                 "**If you see build errors mentioning these headers:**",
-                "  1. ❌ DO NOT add them back - they are internal-only",
-                "  2. ✅ Use the PUBLIC headers below instead",
-                "  3. ✅ Public headers expose all necessary functionality",
+                "  1. DO NOT add them back - they are internal-only",
+                "  2. Use the PUBLIC headers below instead",
+                "  3. Public headers expose all necessary functionality",
                 "",
                 "---",
                 ""
