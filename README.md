@@ -40,8 +40,6 @@ python run_logicfuzz.py --agent \
   --model qwen-plus
 ```
 
-**Available Qwen models**: `qwen-turbo`, `qwen-plus`, `qwen-max`, `qwen3`
-
 ---
 
 ## 📚 Documentation
