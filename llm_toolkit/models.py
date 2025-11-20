@@ -28,8 +28,6 @@ from vertexai.preview.generative_models import (ChatSession, GenerationResponse,
 from vertexai.preview.language_models import CodeGenerationModel
 
 # Note: prompts module has been removed in LangGraph migration
-# Legacy methods (ask_llm, query_llm, chat_llm) are kept for backward compatibility
-# with non-LangGraph code but type hints are simplified to Any
 from typing import TYPE_CHECKING
 
 from utils import retryable
@@ -85,10 +83,6 @@ class LLM:
       temperature_list: Optional[list[float]] = None,
   ):
     """Prepares the LLM for fuzz target generation."""
-    if ai_binary:
-      return AIBinaryModel(name, ai_binary, max_tokens, num_samples,
-                           temperature)
-
     for subcls in cls.all_llm_subclasses():
       if getattr(subcls, 'name', None) == name:
         return subcls(
@@ -122,11 +116,6 @@ class LLM:
     """Estimates the number of tokens in |text|."""
 
   # ============================== Generation ============================== #
-  @abstractmethod
-  def chat_llm_with_tools(self, client: Any, prompt: Optional[Any],
-                          tools) -> Any:
-    """Queries the LLM in the given chat session with tools."""
-
   @abstractmethod
   def chat_llm(self, client: Any, messages: list[dict[str, str]]) -> str:
     """Queries the LLM in the given chat session and returns the response."""
@@ -444,24 +433,6 @@ class GPT(LLM):
 
     return llm_response
 
-  def chat_llm_with_tools(self, client: Any, prompt: Optional[Any],
-                          tools) -> Any:
-    """Queries LLM in a chat session with tools (legacy method)."""
-    if self.ai_binary:
-      raise ValueError(f'OpenAI does not use local AI binary: {self.ai_binary}')
-    if self.temperature_list:
-      logger.info('OpenAI does not allow temperature list: %s',
-                  self.temperature_list)
-
-    # Fix: Use prompt messages directly instead of accumulating to self.messages
-    messages_to_send = prompt.get() if prompt else []
-
-    result = self.with_retry_on_error(
-        lambda: client.responses.create(
-            model=self.name, input=messages_to_send, tools=tools),
-        [openai.OpenAIError])
-    return result
-  
   def chat_with_tools(
       self,
       messages: list[dict[str, str]],
@@ -692,6 +663,13 @@ class QwenMax(Qwen):
   """Qwen Max model."""
 
   name = 'qwen-max'
-  MAX_INPUT_TOKEN = 30720
+  MAX_INPUT_TOKEN = 258048
+
+
+class QWQ(Qwen):
+  """Qwen 3 model."""
+
+  name = 'qwq-plus'
+  MAX_INPUT_TOKEN = 32768
 
 DefaultModel = QwenMax
