@@ -742,14 +742,33 @@ class DeepSeekReasoner(DeepSeek):
   MAX_INPUT_TOKEN = 128000
 
 class Qwen(GPT):
-  """Qwen's model encapsulator using OpenAI API."""
+  """Qwen's model encapsulator using OpenAI API.
+  
+  Uses Alibaba Cloud Model Studio (DashScope) Singapore region.
+  API endpoint: https://dashscope-intl.aliyuncs.com/compatible-mode/v1
+  
+  Environment variables:
+  - DASHSCOPE_API_KEY: API key from Model Studio (required)
+  - QWEN_BASE_URL: Override base URL (optional, defaults to Singapore region)
+  """
 
   def _get_client(self):
     """Returns the Qwen client using OpenAI API format."""
-    return openai.OpenAI(
-        api_key=os.getenv('QWEN_API_KEY'),
-        base_url=os.getenv('QWEN_BASE_URL', 'https://dashscope.aliyuncs.com/compatible-mode/v1')
+    # Check for API key (prefer DASHSCOPE_API_KEY, fallback to QWEN_API_KEY)
+    api_key = os.getenv('DASHSCOPE_API_KEY') or os.getenv('QWEN_API_KEY')
+    if not api_key:
+      raise ValueError(
+          'Qwen API key not found. Please set DASHSCOPE_API_KEY environment variable. '
+          'Get your API key at: https://www.alibabacloud.com/help/en/model-studio/get-api-key'
+      )
+    
+    # Base URL: use QWEN_BASE_URL if set, otherwise default to Singapore region
+    base_url = os.getenv(
+        'QWEN_BASE_URL',
+        'https://dashscope-intl.aliyuncs.com/compatible-mode/v1'  # Singapore region
     )
+    
+    return openai.OpenAI(api_key=api_key, base_url=base_url)
 
 class QwenTurbo(Qwen):
   """Qwen Turbo model."""

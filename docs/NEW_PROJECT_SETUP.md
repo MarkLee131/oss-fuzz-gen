@@ -683,7 +683,6 @@ python main.py --rebuild
 ### Related Documentation
 
 - [Main README](../README.md) - LogicFuzz overview
-- [Usage Guide](../Usage.md) - OSS-Fuzz project quick setup
 - [Data Preparation](../data_prep/README.md) - Benchmark YAML generation
 
 ### OSS-Fuzz Resources

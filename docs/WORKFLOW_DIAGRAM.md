@@ -13,20 +13,21 @@ graph TD
     classDef core fill:#fff9c4,stroke:#fbc02d,stroke-width:2px;
     classDef memory fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px,stroke-dasharray: 5 5;
 
-    subgraph "Inputs"
+    subgraph Inputs
         Config[User Config]:::input
         FI[Analysis Data]:::input
     end
 
-    Config & FI --> Context[FuzzingContext\n(Single Source of Truth)]:::input
+    Config --> Context[FuzzingContext<br/>Single Source of Truth]:::input
+    FI --> Context
 
-    subgraph "LogicFuzz Engine"
+    subgraph LogicFuzz_Engine [LogicFuzz Engine]
         Supervisor{Supervisor}:::core
         
         Context --> Supervisor
 
-        Compilation[Phase 1: Compilation\n(Analyze, Generate, Fix)]:::core
-        Optimization[Phase 2: Optimization\n(Execute, Validate Crashes)]:::core
+        Compilation[Phase 1: Compilation<br/>Analyze, Generate, Fix]:::core
+        Optimization[Phase 2: Optimization<br/>Execute, Validate Crashes]:::core
 
         Supervisor <-->|Manage Cycle| Compilation
         Supervisor <-->|Manage Cycle| Optimization
