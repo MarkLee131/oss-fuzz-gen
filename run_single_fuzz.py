@@ -125,27 +125,15 @@ def check_targets(
     benchmark: Benchmark,
     work_dirs: WorkDirs,
     generated_targets: List[str],
-    cloud_experiment_name: str = '',
-    cloud_experiment_bucket: str = '',
     run_timeout: int = RUN_TIMEOUT,
     fixer_model_name: str = models.DefaultModel.name,
 ) -> Optional[AggregatedResult]:
   """Builds all targets in the fixed target directory."""
   target_stats = []
 
-  if cloud_experiment_name:
-    builder_runner = builder_runner_lib.CloudBuilderRunner(
-        benchmark,
-        work_dirs,
-        run_timeout,
-        fixer_model_name,
-        experiment_name=cloud_experiment_name,
-        experiment_bucket=cloud_experiment_bucket,
-    )
-  else:
-    builder_runner = builder_runner_lib.BuilderRunner(benchmark, work_dirs,
-                                                      run_timeout,
-                                                      fixer_model_name)
+  builder_runner = builder_runner_lib.BuilderRunner(benchmark, work_dirs,
+                                                    run_timeout,
+                                                    fixer_model_name)
 
   evaluator = exp_evaluator.Evaluator(builder_runner, benchmark, work_dirs)
 

@@ -120,8 +120,7 @@ def _bucket_match_target_content_signatures(
 def generate_data(project_name: str,
                   language: str,
                   sig_per_target: int = 1,
-                  max_samples: int = 1,
-                  cloud_experiment_bucket: str = ''):
+                  max_samples: int = 1):
   """Generates project-specific fuzz targets examples."""
   target_funcs = introspector.get_project_funcs(project_name)
   project_fuzz_target_dir = _get_fuzz_target_dir(project_name)
@@ -138,7 +137,7 @@ def generate_data(project_name: str,
         'Bucket: %s.', project_name, OSS_FUZZ_EXP_BUCKET)
     logger.info('Will try to build from Google Cloud or local docker image.')
     target_content_signature_dict = _match_target_content_signatures(
-        target_funcs, project_name, language, cloud_experiment_bucket)
+        target_funcs, project_name, language)
   if not target_content_signature_dict:
     return []
 
@@ -190,8 +189,7 @@ def filter_target_lines(target_content: str) -> str:
 def _match_target_content_signatures(
     target_funcs: Dict[str, List[Dict]],
     project_name: str,
-    language: str,
-    cloud_experiment_bucket: str = '') -> Dict[str, List[str]]:
+    language: str) -> Dict[str, List[str]]:
   """Returns a list of dictionary with function signatures as keys and
     its fuzz target content as values."""
   if not target_funcs:
@@ -200,8 +198,7 @@ def _match_target_content_signatures(
 
   source_content = project_src.search_source(
       project_name, [],
-      language,
-      cloud_experiment_bucket=cloud_experiment_bucket)
+      language)
 
   if not source_content[0]:
     logger.info('Error: No fuzz target found for project %s', project_name)
@@ -282,12 +279,6 @@ def _parse_arguments():
                       default=4,
                       help='Number of threads to use')
 
-  parser.add_argument('-cb',
-                      '--cloud-experiment-bucket',
-                      type=str,
-                      default='',
-                      help='A gcloud bucket to store experiment files.')
-
   parser.add_argument('-l',
                       '--language',
                       type=str,
@@ -302,12 +293,10 @@ def _parse_arguments():
 def _generate_project_training_data(project_name: str,
                                     sig_per_target,
                                     max_samples,
-                                    language,
-                                    cloud_experiment_bucket: str = ''):
+                                    language):
   """Generate project training data."""
   try:
-    return generate_data(project_name, language, sig_per_target, max_samples,
-                         cloud_experiment_bucket)
+    return generate_data(project_name, language, sig_per_target, max_samples)
   except Exception as e:
     logger.info('Project %s failed:\n%s', project_name, e)
     return None
@@ -332,7 +321,6 @@ def main():
       sig_per_target,
       max_samples,
       args.language,
-      args.cloud_experiment_bucket,
   ] for project in all_projects]
   with ThreadPool(num_threads) as p:
     for data in p.starmap(_generate_project_training_data, configs):

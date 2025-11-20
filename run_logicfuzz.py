@@ -150,16 +150,6 @@ def parse_args() -> argparse.Namespace:
       default=[],
       help=('A list of values representing the temperatures will be used by '
             'each sample LLM query.'))
-  parser.add_argument('-c',
-                      '--cloud-experiment-name',
-                      type=str,
-                      default='',
-                      help='The name of the cloud experiment.')
-  parser.add_argument('-cb',
-                      '--cloud-experiment-bucket',
-                      type=str,
-                      default='',
-                      help='A gcloud bucket to store experiment files.')
   parser.add_argument('-b', '--benchmarks-directory', type=str)
   parser.add_argument('-y',
                       '--benchmark-yaml',
@@ -231,14 +221,22 @@ def parse_args() -> argparse.Namespace:
                       '--prompt-builder',
                       help='The prompt builder to use for harness generation.',
                       default='DEFAULT')
-  parser.add_argument('--custom-pipeline', type=str, default='')
   parser.add_argument('-mr',
                       '--max-round',
                       type=int,
                       default=10,
                       help='Max trial round for agents.')
+  parser.add_argument('--list-models',
+                      action='store_true',
+                      help='List all available models and exit.')
 
   args = parser.parse_args()
+
+  if args.list_models:
+    print('Available models:')
+    for model_name in sorted(models.LLM.all_llm_names()):
+      print(f'  - {model_name}')
+    sys.exit(0)
   if args.num_samples:
     assert args.num_samples > 0, '--num-samples must take a positive integer.'
 
