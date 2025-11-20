@@ -590,10 +590,6 @@ class GPT4o(GPT):
   name = 'gpt-4o'
   MAX_INPUT_TOKEN = 128000
   _gpt_ai_model = 'gpt-4o'
-
-class ChatGPT4oLatest(GPT):
-  """OpenAI's chatgpt-4o-latest model."""
-
   name = 'chatgpt-4o-latest'
   MAX_INPUT_TOKEN = 128000
   _gpt_ai_model = 'gpt-4o'
@@ -745,143 +741,40 @@ class DeepSeekReasoner(DeepSeek):
   name = 'deepseek-reasoner'
   MAX_INPUT_TOKEN = 128000
 
-class ChatGPT(GPT):
-  """OpenAI's GPT model with chat session."""
-
-  name = 'chatgpt-3.5-turbo'
-
-  def __init__(
-      self,
-      ai_binary: str,
-      max_tokens: int = MAX_TOKENS,
-      num_samples: int = NUM_SAMPLES,
-      temperature: float = TEMPERATURE,
-      temperature_list: Optional[list[float]] = None,
-  ):
-    super().__init__(ai_binary, max_tokens, num_samples, temperature,
-                     temperature_list)
-    self.conversation_history = []
-
-  def chat_llm(self, client: Any, messages: list[dict[str, str]]) -> str:
-    """Queries the LLM in the given chat session and returns the response."""
-    if self.ai_binary:
-      raise ValueError(f'OpenAI does not use local AI binary: {self.ai_binary}')
-    if self.temperature_list:
-      logger.info('OpenAI does not allow temperature list: %s',
-                  self.temperature_list)
-
-    completion = self.with_retry_on_error(
-        lambda: client.chat.completions.create(
-            messages=messages,
-            model=self.name,
-            n=self.num_samples,
-            temperature=self.temperature), [openai.OpenAIError])
-
-    # Choose the longest response
-    longest_response = max(
-        (choice.message.content for choice in completion.choices), key=len)
-
-    return longest_response
-
-class ChatGPT4(ChatGPT):
-  """OpenAI's GPT4 model with chat session."""
-
-  name = 'chatgpt-4'
-
-class ChatGPT4o(ChatGPT):
-  """OpenAI's GPT-4o model with chat session."""
-
-  name = 'chatgpt-4o'
-
-class ChatGPT4oMini(ChatGPT):
-  """OpenAI's GPT-4o-mini model with chat session."""
-
-  name = 'chatgpt-4o-mini'
-
-class ChatGPT4Turbo(ChatGPT):
-  """OpenAI's GPT-4 Turbo model with chat session."""
-
-  name = 'chatgpt-4-turbo'
-
-class AzureGPT(GPT):
-  """Azure's GPT model."""
-
-  name = 'gpt-3.5-turbo-azure'
-
-  def _get_tiktoken_encoding(self, model_name: str):
-    """Returns the tiktoken encoding for the model."""
-    return super()._get_tiktoken_encoding(model_name.replace('-azure', ''))
+class Qwen(GPT):
+  """Qwen's model encapsulator using OpenAI API."""
 
   def _get_client(self):
-    """Returns the Azure client."""
-    return openai.AzureOpenAI(azure_endpoint=os.getenv(
-        "AZURE_OPENAI_ENDPOINT", "https://api.openai.com"),
-                              api_key=os.getenv("AZURE_OPENAI_API_KEY"),
-                              api_version=os.getenv("AZURE_OPENAI_API_VERSION",
-                                                    "2024-02-01"))
+    """Returns the Qwen client using OpenAI API format."""
+    return openai.OpenAI(
+        api_key=os.getenv('QWEN_API_KEY'),
+        base_url=os.getenv('QWEN_BASE_URL', 'https://dashscope.aliyuncs.com/compatible-mode/v1')
+    )
 
-class AzureGPT4(AzureGPT):
-  """Azure's GPTi-4 model."""
+class QwenTurbo(Qwen):
+  """Qwen Turbo model."""
 
-  name = 'gpt-4-azure'
+  name = 'qwen-turbo'
+  MAX_INPUT_TOKEN = 8000
 
-class AzureGPT4o(AzureGPT):
-  """Azure's GPTi-4 model."""
+class QwenPlus(Qwen):
+  """Qwen Plus model."""
 
-  name = 'gpt-4o-azure'
+  name = 'qwen-plus'
+  MAX_INPUT_TOKEN = 131072
 
-class Claude(LLM):
-  """Anthropic's Claude model encapsulator."""
+class QwenMax(Qwen):
+  """Qwen Max model."""
 
-  _max_output_tokens = 4096
-  _vertex_ai_model = ''
-  context_window = 200000
+  name = 'qwen-max'
+  MAX_INPUT_TOKEN = 30720
 
-  # ================================ Prompt ================================ #
-  def estimate_token_num(self, text) -> int:
-    """Estimates the number of tokens in |text|."""
-    client = anthropic.Client()
-    return client.count_tokens(text)
+class Qwen3(Qwen):
+  """Qwen 3 model."""
 
+  name = 'qwen3'
+  MAX_INPUT_TOKEN = 32768
 
-  def get_model(self) -> str:
-    return self._vertex_ai_model
-
-
-  def get_chat_client(self, model: Any) -> Any:
-    """Returns a new chat session."""
-    del model
-    # Placeholder: To Be Implemented.
-
-  def chat_llm(self, client: Any, messages: list[dict[str, str]]) -> str:
-    """Queries the LLM in the given chat session and returns the response."""
-    del client, messages
-    # Placeholder: To Be Implemented.
-    raise NotImplementedError(f"{self.__class__.__name__}.chat_llm is not implemented")
-
-  def chat_llm_with_tools(self, client: Any, prompt: Optional[Any],
-                          tools) -> Any:
-    """Queries the LLM in the given chat session with tools."""
-    # Placeholder: To Be Implemented.
-    return
-
-class ClaudeHaikuV3(Claude):
-  """Claude Haiku 3."""
-
-  name = 'vertex_ai_claude-3-haiku'
-  _vertex_ai_model = 'claude-3-haiku@20240307'
-
-class ClaudeOpusV3(Claude):
-  """Claude Opus 3."""
-
-  name = 'vertex_ai_claude-3-opus'
-  _vertex_ai_model = 'claude-3-opus@20240229'
-
-class ClaudeSonnetV3D5(Claude):
-  """Claude Sonnet 3.5."""
-
-  name = 'vertex_ai_claude-3-5-sonnet'
-  _vertex_ai_model = 'claude-3-5-sonnet@20240620'
 
 class GoogleModel(LLM):
   """Generic Google model."""

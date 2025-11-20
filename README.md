@@ -45,6 +45,8 @@ LogicFuzz is an intelligent fuzzing framework that leverages **multi-agent LLM c
 **Supported Models:**
 - OpenAI GPT (gpt-4, gpt-4o, gpt-5)
 - Vertex AI Gemini (gemini-2.0-flash-exp, gemini-2-5-pro-chat)
+- DeepSeek (deepseek-chat, deepseek-reasoner)
+- Qwen/通义千问 (qwen-turbo, qwen-plus, qwen-max, qwen3)
 
 ---
 
@@ -61,11 +63,6 @@ context.api_dependencies   # Call graph & sequences
 context.header_info        # Include dependencies
 context.source_code        # Optional source
 ```
-
-**Philosophy**: 
-- ✅ Nodes read from context, never extract
-- ✅ Explicit failures (raises ValueError, not returns None)
-- ✅ No fallbacks - missing data is a DATA problem
 
 ### 2. **Intelligent Code Context Extraction**
 ```python
@@ -100,32 +97,7 @@ format_session_memory_for_prompt(state, max_items_per_category=3)
   **Solution**: Add `-lz` to LDFLAGS in build.sh
 ```
 
-### 4. **Progressive Error Recovery**
-```
-Compilation Failed
-    ↓
-┌──────────────────────────────────┐
-│ Retry 1: Enhancer (build errors) │ ← Error context ±10 lines
-├──────────────────────────────────┤
-│ Retry 2: Enhancer (build errors) │ ← Previous fix in session memory
-├──────────────────────────────────┤
-│ Retry 3: Enhancer (build errors) │ ← All known fixes
-├──────────────────────────────────┤
-│ After 3 retries: END             │ ← Compilation failed, terminate
-└──────────────────────────────────┘
-
-Validation Failed (target function not called)
-    ↓
-┌──────────────────────────────────┐
-│ Retry 1: Enhancer (validation)   │ ← Fix function call in driver
-├──────────────────────────────────┤
-│ Retry 2: Enhancer (validation)   │ ← Second attempt
-├──────────────────────────────────┤
-│ After 2 retries: END             │ ← Validation failed, terminate
-└──────────────────────────────────┘
-```
-
-### 5. **Two-Stage Crash Validation**
+### 4. **Two-Stage Crash Validation**
 ```
 Crash Detected
     ↓
@@ -148,44 +120,13 @@ Crash Feasibility Analyzer: "Infinite loop in harness setup, not in target code"
 Enhancer: Add timeout protection in harness
 ```
 
-### 6. **Coverage-Driven Enhancement**
-```c
-// Before: Single test case
-int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
-    parse_json((char*)data, size);
-    return 0;
-}
-
-// After: Boundary exploration (Coverage Analyzer suggestions)
-int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
-    // Empty input edge case
-    parse_json("", 0);
-    
-    // Minimum valid input
-    if (size >= 1) parse_json((char*)data, 1);
-    
-    // Normal input
-    if (size > 2) parse_json((char*)data, size);
-    
-    // Maximum boundary
-    if (size >= 1024) parse_json((char*)data, 1024);
-    
-    return 0;
-}
-```
-
-**Result**: 35% average coverage increase through systematic boundary testing
-
 ---
 
 ## 📚 Documentation
 
 - **[NEW_PROJECT_SETUP.md](docs/NEW_PROJECT_SETUP.md)** - Complete guide for setting up new projects (private repos, custom codebases)
-- **[FUZZER_COOKBOOK.md](docs/FUZZER_COOKBOOK.md)** - Fuzzing patterns and best practices
-- **[FUZZING_CHEATSHEET.md](docs/FUZZING_CHEATSHEET.md)** - Quick reference for common fuzzing tasks
 - **[Usage.md](Usage.md)** - OSS-Fuzz project quick setup guide
 - **[Data Preparation](data_prep/README.md)** - Benchmark YAML generation
-- **[Agent Graph Architecture](agent_graph/README.md)** - Detailed workflow and agent implementations
 
 ---
 
@@ -195,8 +136,10 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
 
 1. **LLM API Keys** (set environment variables):
    ```bash
-   export OPENAI_API_KEY="sk-..."           # For GPT models
-   export VERTEX_AI_PROJECT_ID="your-project"  # For Gemini models
+   export OPENAI_API_KEY="sk-..."              # For GPT models
+   export VERTEX_AI_PROJECT_ID="your-project" # For Gemini models
+   export DEEPSEEK_API_KEY="sk-..."           # For DeepSeek models
+   export QWEN_API_KEY="sk-..."               # For Qwen models
    ```
 
 2. **Fuzz Introspector Server** (recommended for better context):
@@ -295,7 +238,7 @@ python run_logicfuzz.py --agent \
 
 | Parameter | Description | Default | Recommended |
 |-----------|-------------|---------|-------------|
-| `--model` | LLM model | - | `gpt-5`, `gemini-2.0-flash-exp` |
+| `--model` | LLM model | - | `gpt-5`, `gemini-2.0-flash-exp`, `qwen3` |
 | `-e, --fuzz-introspector-endpoint` | FI server URL | None | `http://0.0.0.0:8080/api` |
 | `--num-samples` | Trials per function | 5 | 5-10 |
 | `--max-round` | Max optimization iterations | 5 | 5-10 |
@@ -526,6 +469,13 @@ python run_logicfuzz.py --agent \
   --model gemini-2.0-flash-exp \
   -e http://0.0.0.0:8080/api \
   -w ./results/gemini2
+
+# Qwen 3
+python run_logicfuzz.py --agent \
+  -y conti-benchmark/conti-cmp/mosh.yaml \
+  --model qwen3 \
+  -e http://0.0.0.0:8080/api \
+  -w ./results/qwen3
 ```
 
 ### 6. Local Development (No FI Server)
