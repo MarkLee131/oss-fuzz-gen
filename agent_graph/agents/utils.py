@@ -6,6 +6,7 @@ and LangGraphAgent hierarchies.
 """
 
 import re
+import html
 
 
 def parse_tag(response: str, tag: str) -> str:
@@ -27,7 +28,7 @@ def parse_tag(response: str, tag: str) -> str:
     for pattern in patterns:
         match = re.search(pattern, response, re.DOTALL)
         if match:
-            return match.group(1).strip()
+            return html.unescape(match.group(1).strip())
     
     return ''
 
