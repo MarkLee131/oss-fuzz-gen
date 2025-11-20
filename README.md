@@ -518,31 +518,7 @@ python run_logicfuzz.py --agent \
 # Strategy: More samples = more diverse fuzz targets
 ```
 
-### 5. Model Comparison
-```bash
-# GPT-5
-python run_logicfuzz.py --agent \
-  -y conti-benchmark/conti-cmp/mosh.yaml \
-  --model gpt-5 \
-  -e http://0.0.0.0:8080/api \
-  -w ./results/gpt5
-
-# Gemini 2.0 Flash
-python run_logicfuzz.py --agent \
-  -y conti-benchmark/conti-cmp/mosh.yaml \
-  --model gemini-2.0-flash-exp \
-  -e http://0.0.0.0:8080/api \
-  -w ./results/gemini2
-
-# Qwen 3
-python run_logicfuzz.py --agent \
-  -y conti-benchmark/conti-cmp/mosh.yaml \
-  --model qwen3 \
-  -e http://0.0.0.0:8080/api \
-  -w ./results/qwen3
-```
-
-### 6. Local Development (No FI Server)
+### 5. Local Development (No FI Server)
 ```bash
 # Works without Fuzz Introspector (reduced context quality)
 python run_logicfuzz.py --agent \
@@ -600,24 +576,6 @@ LogicFuzz is built on these core principles:
 - Two-stage validation (Crash Analyzer + Crash Feasibility Analyzer)
 - False positive filtering with single fix attempt
 - Security-relevant crash prioritization
-
----
-
-## 🔮 Recent Improvements & Future Directions
-
-### ✅ Recently Completed
-- **Removed Conversation History**: Session memory only (90% memory reduction)
-- **Streamlined Optimization**: Single-pass execution (no coverage iteration)
-- **Aggressive Termination**: Strict retry limits (faster execution)
-- **Qwen Model Support**: Added qwen-turbo, qwen-plus, qwen-max, qwen3
-
-### 🚧 Future Directions
-- **Parallel Agent Execution**: Run Function Analyzer + Prototyper simultaneously
-- **Long-Term Memory**: Cross-project API pattern learning
-- **Fine-Grained Parameter Modeling**: Symbolic constraints for input generation
-- **Adaptive Temperature**: Adjust LLM temperature based on success rate
-- **Cost Optimization**: Model routing (GPT-5 for complex, Gemini Flash for simple)
-
 ---
 
 ## 📊 Performance Notes
