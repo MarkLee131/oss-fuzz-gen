@@ -205,7 +205,58 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
    bash report/launch_local_introspector.sh
    ```
 
-### Basic Usage
+### 🐳 Docker Deployment
+
+LogicFuzz provides Docker support for easy deployment and reproducibility.
+
+#### Build Docker Image
+
+```bash
+docker build -t logicfuzz:latest .
+```
+
+#### Run Docker Container
+
+```bash
+# Basic usage
+docker run --rm \
+  --privileged \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  -v $(pwd)/results:/experiment/results \
+  -e OPENAI_API_KEY="sk-..." \
+  logicfuzz:latest \
+  -b comparison \
+  -m gpt-5 \
+  --run-timeout 300
+
+# With pre-built OSS-Fuzz projects (data-dir.zip)
+docker run --rm \
+  --privileged \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  -v $(pwd)/data-dir.zip:/experiment/data-dir.zip \
+  -v $(pwd)/results:/experiment/results \
+  -e OPENAI_API_KEY="sk-..." \
+  logicfuzz:latest \
+  -b comparison \
+  -m gpt-5
+```
+
+**Key Parameters:**
+
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `-b, --benchmark-set` | Benchmark set to run | `comparison` |
+| `-m, --model` | LLM model name | `gpt-5` |
+| `-to, --run-timeout` | Fuzzing timeout (seconds) | 300 |
+| `-ns, --num-samples` | Number of LLM samples | 10 |
+| `-mr, --max-round` | Max optimization rounds | 10 |
+
+**Notes:**
+- `--privileged` and Docker socket mount are required for OSS-Fuzz builds
+- Mount `/experiment/results` to persist results
+- Set `OPENAI_API_KEY` or `VERTEX_AI_PROJECT_ID` for LLM access
+
+### Basic Usage (Local Installation)
 
 ```bash
 # Simplest: Auto-select first function from YAML

@@ -72,7 +72,7 @@ const SELECTORS = {
 };
 
 const COLUMN_NAMES = {
-	NEW_COVERED_LINES: 'OSS-Fuzz-Gen new covered lines',
+	NEW_COVERED_LINES: 'logicfuzz new covered lines',
 	EXISTING_COVERED_LINES: 'Existing covered lines',
 	TOTAL_PROJECT_LINES: 'Total project lines',
 	SUCCESSFUL_BENCHMARKS: 'Successful benchmarks',

@@ -66,6 +66,8 @@ class CustomLoggerAdapter(logging.LoggerAdapter):
         for agent_name, chat_history in result.chat_history.items())
     self.write_to_file(chat_history_path, chat_history)
 
+
+  # TODO: remove since we are not using GCS anymore
   def download_gcs_file(self, local_path: str, gs_url: str) -> bool:
     """Downloads a file from Google Cloud storage to a local file."""
     parsed_url = urlparse(gs_url)

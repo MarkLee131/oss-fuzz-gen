@@ -13,8 +13,6 @@ from datetime import timedelta
 from multiprocessing import Pool, Process
 from typing import Any
 
-from google.cloud import logging as cloud_logging
-
 import run_single_fuzz
 from data_prep import introspector
 from experiment import benchmark as benchmarklib
@@ -344,14 +342,6 @@ def _print_experiment_results(results: list[Result],
 
 def _setup_logging(verbose: str = 'info', is_cloud: bool = False) -> None:
   """Set up logging level."""
-
-  if is_cloud:
-    try:
-      client = cloud_logging.Client()
-      client.setup_logging()
-    except Exception as e:
-      # For local runs we continue
-      logger.warning('Error setting up cloud logging client: %s', e)
 
   if verbose == "debug":
     log_level = logging.DEBUG
