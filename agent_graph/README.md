@@ -14,13 +14,9 @@ LogicFuzz uses **LangGraph** to implement a stateful, multi-agent workflow with 
 
 ```mermaid
 graph LR
-    State[State<br/>TypedDict] --> Supervisor[Supervisor<br/>Router]
-    Supervisor --> Agents[Agent Nodes 8<br/>LLM + Non-LLM]
-    Agents -->|State updates flow back| State
-    
-    style State fill:#f9f,stroke:#333,stroke-width:2px
-    style Supervisor fill:#bbf,stroke:#333,stroke-width:2px
-    style Agents fill:#bfb,stroke:#333,stroke-width:2px
+    State["State<br/>(TypedDict)"] --> Supervisor["Supervisor<br/>(Router)"]
+    Supervisor --> Agents["Agent Nodes<br/>(LLM + Non-LLM)"]
+    Agents -->|"State updates flow back"| State
 ```
 
 ---
@@ -33,27 +29,27 @@ graph LR
 
 ```mermaid
 graph TD
-    Start[START] --> FuncAnalyzer[Function Analyzer]
-    FuncAnalyzer -->|"Analyze target function API<br/>(Identify constraints, Archetype)"| Prototyper[Prototyper]
+    Start["START"] --> FuncAnalyzer["Function Analyzer"]
+    FuncAnalyzer -->|"Analyze target function API<br/>(Identify constraints, Archetype)"| Prototyper["Prototyper"]
     
-    Prototyper -->|"Generate initial fuzz target"| BuildNode[Build Node]
+    Prototyper -->|"Generate initial fuzz target"| BuildNode["Build Node"]
     
-    BuildNode --> CheckCompile{Compile Success?}
+    BuildNode --> CheckCompile{"Compile Success?"}
     
     %% Compilation Failure Loop
-    CheckCompile -- NO --> FixerBuild[Fixer]
+    CheckCompile -- NO --> FixerBuild["Fixer"]
     FixerBuild -- "Generate fix" --> BuildNode
     
     %% Validation Failure Loop
-    CheckCompile -- YES --> CheckValidation{Target Function Called?}
-    CheckValidation -- NO --> FixerVal[Fixer]
+    CheckCompile -- YES --> CheckValidation{"Target Function Called?"}
+    CheckValidation -- NO --> FixerVal["Fixer"]
     FixerVal -- "Fix validation error" --> BuildNode
     
     %% Success
-    CheckValidation -- YES --> Optimize[Switch to Optimization]
+    CheckValidation -- YES --> Optimize["Switch to Optimization"]
     
     %% Failures (simplified, max retries lead to END)
-    FixerBuild -.->|"Max 3 retries"| EndFail[END (fail)]
+    FixerBuild -.->|"Max 3 retries"| EndFail["END (fail)"]
     FixerVal -.->|"Max 2 retries"| EndFail
 ```
 
@@ -80,19 +76,19 @@ graph TD
 
 ```mermaid
 graph TD
-    Execution[Execution Node] -->|"Run fuzzer (single pass)"| CheckCrash{Crash Found?}
+    Execution["Execution Node"] -->|"Run fuzzer (single pass)"| CheckCrash{"Crash Found?"}
     
-    CheckCrash -- NO --> EndSuccess[END Success<br/>(Log coverage)]
-    CheckCrash -- YES --> CrashAnalyzer[Crash Analyzer]
+    CheckCrash -- NO --> EndSuccess["END Success<br/>(Log coverage)"]
+    CheckCrash -- YES --> CrashAnalyzer["Crash Analyzer"]
     
-    CrashAnalyzer -->|"Classify crash type"| Feasibility[Crash Feasibility Analyzer]
+    CrashAnalyzer -->|"Classify crash type"| Feasibility["Crash Feasibility Analyzer"]
     
-    Feasibility --> CheckFeasible{Feasible?}
+    Feasibility --> CheckFeasible{"Feasible?"}
     
-    CheckFeasible -- YES --> EndBug[END True Bug]
-    CheckFeasible -- NO --> Fixer[Fixer]
+    CheckFeasible -- YES --> EndBug["END True Bug"]
+    CheckFeasible -- NO --> Fixer["Fixer"]
     
-    Fixer -->|"Fix false positive<br/>(1 attempt only)"| EndFixed[END Success]
+    Fixer -->|"Fix false positive<br/>(1 attempt only)"| EndFixed["END Success"]
 ```
 
 **Key Mechanisms:**
