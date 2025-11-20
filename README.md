@@ -130,6 +130,8 @@ Enhancer: Fix harness (1 attempt) → END
 
 ## 📚 Documentation
 
+- **[WORKFLOW_DIAGRAM.md](docs/WORKFLOW_DIAGRAM.md)** - Visual diagrams of the complete workflow
+- **[agent_graph/README.md](agent_graph/README.md)** - Detailed architecture and agent implementations
 - **[NEW_PROJECT_SETUP.md](docs/NEW_PROJECT_SETUP.md)** - Complete guide for setting up new projects (private repos, custom codebases)
 - **[Usage.md](Usage.md)** - OSS-Fuzz project quick setup guide
 - **[Data Preparation](data_prep/README.md)** - Benchmark YAML generation
@@ -148,11 +150,29 @@ Enhancer: Fix harness (1 attempt) → END
    export QWEN_API_KEY="sk-..."               # For Qwen models
    ```
 
-2. **Fuzz Introspector Server** (recommended for better context):
+2. **Fuzz Introspector Server** (optional, recommended for better context):
    ```bash
-   # Terminal 1: Start FI server
+   # Terminal 1: Start FI server (optional)
    bash report/launch_local_introspector.sh
    ```
+
+### What LogicFuzz Does (Simple Explanation)
+
+LogicFuzz automatically generates fuzz targets through two phases:
+
+1. **Phase 1 - COMPILATION** (1-5 minutes):
+   - Analyzes your target function's API
+   - Generates a fuzz driver that calls the function
+   - Compiles it with OSS-Fuzz (auto-fixes errors, max 3 retries)
+   - Validates that target function is actually called
+
+2. **Phase 2 - OPTIMIZATION** (1-5 minutes):
+   - Runs the fuzzer once (default: 60 seconds)
+   - If crash found → Validates if it's a real bug (two-stage analysis)
+   - If no crash → Logs coverage and terminates
+
+**Total time per function**: 2-10 minutes  
+**Output**: Compiled fuzz target + coverage metrics + crashes (if found)
 
 ### 🐳 Docker Deployment
 
@@ -208,36 +228,48 @@ docker run --rm \
 ### Basic Usage (Local Installation)
 
 ```bash
-# Simplest: Auto-select first function from YAML
+# 1. Simplest: Run on first function in YAML (2-5 minutes)
 python run_logicfuzz.py --agent \
   -y conti-benchmark/conti-cmp/cjson.yaml \
   --model gpt-5
 
-# Specify function explicitly
+# What happens:
+# ✓ Function Analyzer analyzes API
+# ✓ Prototyper generates fuzz_driver.cc
+# ✓ Build compiles with OSS-Fuzz
+# ✓ Execution runs fuzzer (60s default)
+# ✓ Results saved to ./results/
+
+# 2. Target specific function (recommended)
 python run_logicfuzz.py --agent \
   -y conti-benchmark/conti-cmp/libxml2.yaml \
   -f xmlParseDocument \
   --model gpt-5
 
-# With Fuzz Introspector context (best results)
+# 3. With Fuzz Introspector (better API context)
 python run_logicfuzz.py --agent \
   -y conti-benchmark/conti-cmp/mosh.yaml \
   --model gpt-5 \
-  -e http://0.0.0.0:8080/api \
-  --num-samples 5 \
-  --max-round 10
+  -e http://0.0.0.0:8080/api
 
-# Production settings (parallel execution)
+# 4. Extended fuzzing (5 samples × 5 min each = 25 min)
 python run_logicfuzz.py --agent \
   -y conti-benchmark/conti-cmp/expat.yaml \
   --model gpt-5 \
+  --num-samples 5 \
+  --run-timeout 300
+
+# 5. Production: Batch processing with logging
+python run_logicfuzz.py --agent \
+  -y conti-benchmark/conti-cmp/libpng.yaml \
+  --model gpt-5 \
   -e http://0.0.0.0:8080/api \
   --num-samples 10 \
-  --temperature 0.4 \
   --run-timeout 300 \
-  --max-round 10 \
   -w ./results \
   2>&1 | tee logicfuzz-$(date +%m%d).log
+
+# Note: --max-round is deprecated (no iteration loops in new version)
 ```
 
 ### Key Parameters
@@ -245,12 +277,16 @@ python run_logicfuzz.py --agent \
 | Parameter | Description | Default | Recommended |
 |-----------|-------------|---------|-------------|
 | `--model` | LLM model | - | `gpt-5`, `gemini-2.0-flash-exp`, `qwen3` |
-| `-e, --fuzz-introspector-endpoint` | FI server URL | None | `http://0.0.0.0:8080/api` |
-| `--num-samples` | Trials per function | 5 | 5-10 |
-| `--max-round` | Max optimization iterations | 5 | 5-10 |
-| `--temperature` | LLM temperature | 0.4 | 0.3-0.5 |
-| `--run-timeout` | Fuzzer runtime (seconds) | 60 | 60-300 |
+| `-e, --fuzz-introspector-endpoint` | FI server URL | None | `http://0.0.0.0:8080/api` (optional) |
+| `--num-samples` | Trials per function | 5 | 5-10 (more = more diversity) |
+| `--temperature` | LLM temperature | 0.4 | 0.3-0.5 (higher = more creative) |
+| `--run-timeout` | Fuzzer runtime (seconds) | 60 | 60-300 (longer = more coverage) |
 | `-w, --work-dir` | Output directory | `./results` | - |
+| `-y, --benchmark-yaml` | Benchmark YAML file | - | Required |
+| `-f, --function` | Target function name | Auto (first) | Recommended to specify |
+
+**Deprecated Parameters** (no longer needed in optimized version):
+- `--max-round` - Removed (no coverage iteration loops)
 
 ---
 
@@ -260,68 +296,74 @@ LogicFuzz uses a **Supervisor-Agent Pattern** with **LangGraph-based multi-agent
 
 ### 🧠 Streamlined Two-Phase Workflow
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    PHASE 1: COMPILATION                     │
-│        Goal: Get fuzz target to compile successfully        │
-└─────────────────────────────────────────────────────────────┘
-                             ↓
-              Function Analyzer (API analysis)
-                             ↓
-              Prototyper (Generate fuzz target)
-                             ↓
-                 Build Node (OSS-Fuzz build)
-                             ↓
-                    ┌────────────────┐
-                    │ Build Success? │
-                    └────────────────┘
-                      ↙            ↘
-                 YES                  NO
-                  ↓                    ↓
-        Target function called?    Enhancer (fix errors)
-              ↙        ↘               ↓
-          YES           NO          Retry (max 3)
-           ↓             ↓               ↓
-      Switch to     Enhancer (fix)   Still failing?
-    Optimization    (max 2 retries)      ↓
-                         ↓           END (fail)
-                    Switch to 
-                   Optimization
+```mermaid
+graph TD
+    %% Styles
+    classDef control fill:#e1f5fe,stroke:#01579b,stroke-width:2px;
+    classDef generate fill:#fff9c4,stroke:#fbc02d,stroke-width:2px;
+    classDef execute fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px;
+    classDef analyze fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px;
+    classDef memory fill:#ffe0b2,stroke:#f57c00,stroke-width:2px,stroke-dasharray: 5 5;
 
-┌─────────────────────────────────────────────────────────────┐
-│                  PHASE 2: OPTIMIZATION                       │
-│         Goal: Execute fuzzer and validate crashes            │
-└─────────────────────────────────────────────────────────────┘
-                             ↓
-              Execution Node (Run fuzzer)
-                             ↓
-                    ┌────────────────┐
-                    │  Crash Found?  │
-                    └────────────────┘
-                      ↙            ↘
-                 YES                  NO
-                  ↓                    ↓
-          Crash Analyzer         Log coverage
-        (Classify crash type)        ↓
-                  ↓                 END ✓
-    Crash Feasibility Analyzer
-      (Validate true bug)
-                  ↓
-          ┌──────────────┐
-          │  Feasible?   │
-          └──────────────┘
-            ↙          ↘
-        YES              NO
-         ↓                ↓
-     END 🎉         Enhancer (1 fix)
-   (True bug!)            ↓
-                        END ✓
+    subgraph "Input & Data Prep"
+        User[User / Config] -->|Benchmark YAML| WorkflowStart
+        FI[Fuzz Introspector] -->|Analysis Data| FC
+        FC[FuzzingContext] -->|Single Source of Truth| WorkflowStart
+    end
 
-Key Differences from Previous Version:
-✅ No coverage iteration loops (removed Coverage Analyzer from main flow)
-✅ Single-pass optimization (1 execution → done or fix → done)
-✅ Crash-focused (only analyze if crash found)
-✅ Fast termination (no redundant cycles)
+    subgraph "LogicFuzz Workflow (LangGraph)"
+        WorkflowStart((Start)) --> Supervisor
+        
+        %% Control Layer
+        Supervisor{Supervisor Node}:::control
+        
+        %% Phase 1: Compilation
+        subgraph "Phase 1: Compilation"
+            FA[Function Analyzer]:::generate
+            Proto[Prototyper]:::generate
+            Build[Build Node]:::execute
+            Fixer[Fixer / Enhancer]:::generate
+        end
+
+        %% Phase 2: Optimization
+        subgraph "Phase 2: Optimization"
+            Exec[Execution Node]:::execute
+            CA[Crash Analyzer]:::analyze
+            CFA[Crash Feasibility Analyzer]:::analyze
+            CovA[Coverage Analyzer]:::analyze
+        end
+
+        %% Routing Logic
+        Supervisor -->|Analysis Needed| FA
+        Supervisor -->|Generate Target| Proto
+        Supervisor -->|Compile| Build
+        Supervisor -->|Fix Errors| Fixer
+        Supervisor -->|Run Fuzzer| Exec
+        Supervisor -->|Analyze Crash| CA
+        Supervisor -->|Validate Bug| CFA
+        Supervisor -->|Check Coverage| CovA
+        Supervisor -->|Success/Fail| End((End))
+
+        %% Feedback Loops (Return to Supervisor)
+        FA --> Supervisor
+        Proto --> Supervisor
+        Build --> Supervisor
+        Fixer --> Supervisor
+        Exec --> Supervisor
+        CA --> Supervisor
+        CFA --> Supervisor
+        CovA --> Supervisor
+    end
+
+    subgraph "Knowledge Base"
+        SessionMem[(Session Memory)]:::memory
+        
+        %% Memory Interactions
+        FA -.->|Writes Constraints| SessionMem
+        Fixer -.->|Reads Fixes| SessionMem
+        Proto -.->|Reads Constraints| SessionMem
+        SessionMem -.->|Injects Context| Supervisor
+    end
 ```
 
 ### 🤖 Agent Ecosystem (6 LLM Agents + 2 Execution Nodes)
@@ -486,29 +528,32 @@ python run_logicfuzz.py --agent \
   --num-samples 10
 ```
 
-### 3. Coverage Optimization Focus
+### 3. Extended Fuzzing Time
 ```bash
-# Extended optimization iterations for maximum coverage
+# Longer fuzzing time for deeper exploration
 python run_logicfuzz.py --agent \
   -y conti-benchmark/conti-cmp/expat.yaml \
   -f XML_ResumeParser \
   --model gpt-5 \
   -e http://0.0.0.0:8080/api \
-  --max-round 15 \
   --run-timeout 600 \
   --num-samples 5
+
+# Note: No --max-round needed (single-pass optimization)
 ```
 
 ### 4. Bug Hunting Mode
 ```bash
-# Focus on crash discovery with extended fuzzing time
+# Focus on crash discovery with extended fuzzing time + multiple samples
 python run_logicfuzz.py --agent \
   -y conti-benchmark/conti-cmp/libpng.yaml \
   --model gpt-5 \
   -e http://0.0.0.0:8080/api \
   --run-timeout 1800 \
-  --max-round 20 \
+  --num-samples 10 \
   --temperature 0.6
+
+# Strategy: More samples = more diverse fuzz targets
 ```
 
 ### 5. Model Comparison
@@ -620,9 +665,3 @@ LogicFuzz is built on these core principles:
 \* "Total coverage gain" is calculated using a denominator of the "Total project lines". "Total relative gain" is the increase in coverage compared to the old number of covered lines.
 
 \* Additional code from the project-under-test maybe included when compiling the new fuzz targets and result in high percentage gains.
-
----
-
-## 📄 License & Citation
-
-This project is licensed under the Apache 2.0 License. If you use LogicFuzz in your research, please cite our work.

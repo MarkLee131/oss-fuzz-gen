@@ -6,51 +6,74 @@ This document contains visual diagrams of the LogicFuzz workflow architecture.
 
 ## High-Level Architecture
 
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                        LogicFuzz Architecture                        │
-└─────────────────────────────────────────────────────────────────────┘
+```mermaid
+graph TD
+    %% Styles
+    classDef control fill:#e1f5fe,stroke:#01579b,stroke-width:2px;
+    classDef generate fill:#fff9c4,stroke:#fbc02d,stroke-width:2px;
+    classDef execute fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px;
+    classDef analyze fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px;
+    classDef memory fill:#ffe0b2,stroke:#f57c00,stroke-width:2px,stroke-dasharray: 5 5;
 
-┌──────────────────┐         ┌──────────────────────────────────────┐
-│  User Input      │         │         FuzzingContext               │
-│  - YAML config   │────────▶│  (Single Source of Truth)            │
-│  - Function sig  │         │  - FuzzIntrospector data             │
-│  - Model         │         │  - API dependencies                  │
-└──────────────────┘         │  - Header info                       │
-                             │  - Source code (optional)            │
-                             └──────────────────────────────────────┘
-                                             │
-                                             ▼
-                             ┌──────────────────────────────────────┐
-                             │      LangGraph StateGraph            │
-                             │  ┌────────────────────────────────┐  │
-                             │  │       Supervisor Node          │  │
-                             │  │  (Phase-aware routing logic)   │  │
-                             │  └────────────────────────────────┘  │
-                             │                 │                     │
-                             │      ┌──────────┴──────────┐          │
-                             │      ▼                     ▼          │
-                             │  ┌─────────┐         ┌─────────┐     │
-                             │  │ Phase 1 │         │ Phase 2 │     │
-                             │  │Compile  │────────▶│Optimize │     │
-                             │  └─────────┘         └─────────┘     │
-                             └──────────────────────────────────────┘
-                                             │
-                                             ▼
-                             ┌──────────────────────────────────────┐
-                             │         Session Memory               │
-                             │  - API constraints                   │
-                             │  - Known fixes                       │
-                             │  - Build context                     │
-                             └──────────────────────────────────────┘
-                                             │
-                                             ▼
-                             ┌──────────────────────────────────────┐
-                             │            Results                   │
-                             │  - Compiled fuzz target              │
-                             │  - Coverage metrics                  │
-                             │  - Crashes found (feasible)          │
-                             └──────────────────────────────────────┘
+    subgraph "Input & Data Prep"
+        User[User / Config] -->|Benchmark YAML| WorkflowStart
+        FI[Fuzz Introspector] -->|Analysis Data| FC
+        FC[FuzzingContext] -->|Single Source of Truth| WorkflowStart
+    end
+
+    subgraph "LogicFuzz Workflow (LangGraph)"
+        WorkflowStart((Start)) --> Supervisor
+        
+        %% Control Layer
+        Supervisor{Supervisor Node}:::control
+        
+        %% Phase 1: Compilation
+        subgraph "Phase 1: Compilation"
+            FA[Function Analyzer]:::generate
+            Proto[Prototyper]:::generate
+            Build[Build Node]:::execute
+            Fixer[Fixer / Enhancer]:::generate
+        end
+
+        %% Phase 2: Optimization
+        subgraph "Phase 2: Optimization"
+            Exec[Execution Node]:::execute
+            CA[Crash Analyzer]:::analyze
+            CFA[Crash Feasibility Analyzer]:::analyze
+            CovA[Coverage Analyzer]:::analyze
+        end
+
+        %% Routing Logic
+        Supervisor -->|Analysis Needed| FA
+        Supervisor -->|Generate Target| Proto
+        Supervisor -->|Compile| Build
+        Supervisor -->|Fix Errors| Fixer
+        Supervisor -->|Run Fuzzer| Exec
+        Supervisor -->|Analyze Crash| CA
+        Supervisor -->|Validate Bug| CFA
+        Supervisor -->|Check Coverage| CovA
+        Supervisor -->|Success/Fail| End((End))
+
+        %% Feedback Loops (Return to Supervisor)
+        FA --> Supervisor
+        Proto --> Supervisor
+        Build --> Supervisor
+        Fixer --> Supervisor
+        Exec --> Supervisor
+        CA --> Supervisor
+        CFA --> Supervisor
+        CovA --> Supervisor
+    end
+
+    subgraph "Knowledge Base"
+        SessionMem[(Session Memory)]:::memory
+        
+        %% Memory Interactions
+        FA -.->|Writes Constraints| SessionMem
+        Fixer -.->|Reads Fixes| SessionMem
+        Proto -.->|Reads Constraints| SessionMem
+        SessionMem -.->|Injects Context| Supervisor
+    end
 ```
 
 ---
