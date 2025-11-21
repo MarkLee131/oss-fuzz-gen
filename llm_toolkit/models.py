@@ -14,23 +14,8 @@ import time
 import traceback
 from abc import abstractmethod
 from typing import Any, Callable, Optional, Type
-
-import anthropic
 import openai
 import tiktoken
-import vertexai
-from google.api_core.exceptions import (GoogleAPICallError, InternalServerError,
-                                        InvalidArgument, ResourceExhausted,
-                                        ServiceUnavailable, TooManyRequests)
-from vertexai import generative_models
-from vertexai.preview.generative_models import (ChatSession, GenerationResponse,
-                                                GenerativeModel)
-from vertexai.preview.language_models import CodeGenerationModel
-
-# Note: prompts module has been removed in LangGraph migration
-from typing import TYPE_CHECKING
-
-from utils import retryable
 
 logger = logging.getLogger(__name__)
 
@@ -324,7 +309,6 @@ class LLM:
           except Exception as save_err:
             logging.warning(f'Failed to save error prompt: {save_err}')
         
-        # Token limit errors are NOT retryable - fail immediately
         if is_token_error:
           logging.error(
               'Token limit error is not retryable. Failing immediately.')
@@ -645,7 +629,6 @@ class Qwen(GPT):
           'Get your API key at: https://www.alibabacloud.com/help/en/model-studio/get-api-key'
       )
     
-    # Base URL: use QWEN_BASE_URL if set, otherwise default to Singapore region
     base_url = os.getenv(
         'QWEN_BASE_URL',
         'https://dashscope-intl.aliyuncs.com/compatible-mode/v1'  # Singapore region
@@ -653,18 +636,17 @@ class Qwen(GPT):
     
     return openai.OpenAI(api_key=api_key, base_url=base_url)
 
-class QwenTurbo(Qwen):
+class QwenCoder(Qwen):
   """Qwen Turbo model."""
 
-  name = 'qwen-turbo'
-  MAX_INPUT_TOKEN = 8000
+  name = 'qwen3-coder-plus'
+  MAX_INPUT_TOKEN = 20000
 
 class QwenMax(Qwen):
-  """Qwen Max model."""
+  """Qwen Max model.""" 
 
   name = 'qwen-max'
   MAX_INPUT_TOKEN = 258048
-
 
 class QWQ(Qwen):
   """Qwen 3 model."""

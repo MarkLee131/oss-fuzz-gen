@@ -229,8 +229,9 @@ class APIContextExtractor:
     def _extract_usage_examples(self, func_sig: str, context: Dict):
         """从现有代码中提取用法示例（优化采样策略）"""
         logger.debug(f"Extracting usage examples for {func_sig}")
+        test_examples_added = 0
         
-        # 方法 0 (HIGHEST PRIORITY): 从测试文件提取用法（最干净的API使用示例）
+        # (Highest priority): Extract usage examples from test files (cleanest API usage examples)
         try:
             # Extract simple function name from signature for test xref query
             # e.g., "void curl_easy_perform(CURL *)" -> "curl_easy_perform"
@@ -248,7 +249,8 @@ class APIContextExtractor:
                     if details:
                         logger.debug(f"Found {len(details)} detailed test examples")
                         for i, detail_lines in enumerate(details[:3], 1):  # Limit to 3
-                            if detail_lines:  # detail_lines is a list of code lines
+                            # detail_lines is a list of code lines
+                            if detail_lines and any(line.strip() for line in detail_lines):
                                 source_code = '\n'.join(detail_lines)
                                 context['usage_examples'].append({
                                     'source': source_code,
@@ -258,12 +260,16 @@ class APIContextExtractor:
                                     'source_type': 'test_file',  # HIGHEST quality marker
                                     'priority': 1000  # Far higher than other sources
                                 })
-                        logger.info(f"✓ Added {len(details[:3])} high-quality test examples")
-                        return  # Test files are the cleanest examples - use them exclusively
+                                test_examples_added += 1
+                        if test_examples_added:
+                            logger.info(
+                                f"✓ Added {test_examples_added}/"
+                                f"{min(len(details), 3)} high-quality test examples"
+                            )
                     
-                    # Fallback: use 'source' (plain text snippets)
+                    # Fallback: use 'source' (plain text snippets) when details are empty
                     source_lines = test_xrefs.get('source', [])
-                    if source_lines:
+                    if test_examples_added < 3 and source_lines:
                         # source_lines is a list of strings, need to group them
                         source_code = '\n'.join(source_lines[:50])  # Limit total lines
                         if source_code.strip():
@@ -275,12 +281,17 @@ class APIContextExtractor:
                                 'source_type': 'test_file',
                                 'priority': 1000
                             })
-                            logger.info(f"✓ Added test file example ({len(source_lines)} lines)")
-                            return
+                            test_examples_added += 1
+                            logger.info(
+                                f"✓ Added test file example ({len(source_lines)} lines)"
+                            )
+                    # If we already have enough high-quality examples, skip fallbacks
+                    if test_examples_added >= 3:
+                        return
         except Exception as e:
             logger.debug(f"Could not get test xrefs: {e}")
         
-        # 方法 1 (Fallback): 使用 Sample XRefs API（预处理的高质量示例）
+        # (Fallback): Use Sample XRefs API (pre-processed high-quality examples)
         try:
             sample_xrefs = introspector.query_introspector_sample_xrefs(
                 self.project_name, func_sig
@@ -288,38 +299,35 @@ class APIContextExtractor:
             if sample_xrefs:
                 logger.debug(f"Found {len(sample_xrefs)} sample cross-references")
                 
-                # Sample xrefs 已经是预处理的代码片段
-                for i, source_code in enumerate(sample_xrefs[:3]):  # 限制3个
+                # Sample xrefs are already pre-processed code snippets
+                needed = max(0, 3 - len(context['usage_examples']))
+                for i, source_code in enumerate(sample_xrefs):
+                    if i >= needed:
+                        break
                     context['usage_examples'].append({
                         'source': source_code,
-                        'file': '',  # Sample xrefs 不包含文件信息
+                        'file': '',  # Sample xrefs do not contain file information
                         'function': f'example_{i+1}',
                         'line': 0,
                         'source_type': 'sample_xref'
                     })
                 logger.debug(f"Added {len(context['usage_examples'])} sample xref examples")
-                return  # 如果有 sample xrefs，优先使用
+                return  # If there are sample xrefs, use them first
         except Exception as e:
             logger.debug(f"Could not get sample xrefs: {e}")
         
-        # Note: 方法2 (call_sites) 已移除
-        # 理由：
-        #  - test_xrefs 和 sample_xrefs 已提供足够高质量的示例
-        #  - call_sites 需要二次查询、优先级排序、snippet提取，复杂度高
-        #  - 质量不如前两者（包含内部实现、业务逻辑）
-        # 特殊用例（如 function_analyzer 的迭代学习）仍可直接调用底层 API
     
     def _identify_initialization_patterns(self, context: Dict):
-        """识别需要初始化的类型和初始化方法"""
+        """Identify types that need initialization and infer initialization methods"""
         logger.debug("Identifying initialization patterns")
         
         for param in context['parameters']:
             param_type = clean_type_name(param['type'])
             param_name = param['name']
             
-            # 检查是否需要初始化
+            # Check if initialization is required
             if check_requires_initialization(param_type, param):
-                # 推断初始化方法
+                # Infer initialization method
                 init_method = self._infer_initialization_method(param_type)
                 
                 context['initialization_patterns'].append({
@@ -333,20 +341,20 @@ class APIContextExtractor:
     
     
     def _infer_initialization_method(self, param_type: str) -> str:
-        """推断初始化方法"""
+        """Infer initialization method"""
         base_name = get_base_name_from_type(param_type)
         
-        # 检查是否存在初始化函数
+        # Check if initialization function exists
         for suffix in INIT_SUFFIXES:
             init_func = base_name + suffix
             if self._function_exists(init_func):
                 return f"{init_func}(&var)"
         
-        # 默认：使用 memset
+        # Default: use memset
         return f"memset(&var, 0, sizeof({param_type}))"
     
     def _get_initialization_reason(self, param_type: str) -> str:
-        """获取需要初始化的原因"""
+        """Get the reason why initialization is required"""
         type_lower = param_type.lower()
         
         for kw in INIT_REQUIRED_KEYWORDS:
@@ -639,4 +647,3 @@ def format_api_context_for_prompt(context: Dict) -> str:
         return "## API Context\n\n" + "\n".join(sections)
     
     return ""
-
