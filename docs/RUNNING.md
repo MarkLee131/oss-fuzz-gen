@@ -75,6 +75,60 @@ docker run --rm \
 *   `--privileged` and Docker socket mount are required for OSS-Fuzz builds.
 *   Mount `/experiment/results` to persist results.
 
+### Split Deployment (LogicFuzz + Fuzz Introspector)
+
+Run Fuzz Introspector in its own container so LogicFuzz can be upgraded or restarted independently.
+
+1. Build the dedicated image:
+    ```bash
+    docker build -f Dockerfile.fuzz-introspector -t logicfuzz-fi .
+    ```
+2. Launch the FI server (benchmark mode):
+    ```bash
+    docker run --rm -p 8080:8080 \
+      -v $(pwd)/conti-benchmark:/opt/logicfuzz/conti-benchmark \
+      logicfuzz-fi --source benchmark --benchmark-set comparison
+    ```
+   or reuse an already-populated data directory:
+    ```bash
+    docker run --rm -p 8080:8080 \
+      -v /path/to/data-dir:/opt/logicfuzz/data-dir \
+      logicfuzz-fi --source data-dir --data-dir data-dir
+    ```
+3. Point LogicFuzz to the running server:
+    ```bash
+    python run_logicfuzz.py --agent ... \
+      -e http://localhost:8080/api
+    ```
+
+#### docker compose example
+
+```yaml
+version: "3.9"
+services:
+  logicfuzz:
+    build: .
+    privileged: true
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - FI_ENDPOINT=http://fuzz-introspector:8080/api
+    command: ["python", "run_logicfuzz.py", "--agent", "-y", "conti-benchmark/conti-cmp/cjson.yaml", "--fuzz-introspector-endpoint", "http://fuzz-introspector:8080/api"]
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./results:/experiment/results
+  fuzz-introspector:
+    build:
+      context: .
+      dockerfile: Dockerfile.fuzz-introspector
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./conti-benchmark:/opt/logicfuzz/conti-benchmark
+      - ./data-dir:/opt/logicfuzz/data-dir
+```
+
+The compose file above is only an example—adjust benchmark/data directories and model arguments to match your workflow. Rebuilding the FI database (by updating `data-dir` or the benchmark set) only requires restarting the `fuzz-introspector` service.
+
 ## 🎓 Advanced Usage
 
 ### Batch Processing
