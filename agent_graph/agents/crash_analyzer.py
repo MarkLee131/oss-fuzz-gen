@@ -108,12 +108,13 @@ class LangGraphCrashAnalyzer(LangGraphAgent):
             }
         
         # Create work directories
-        work_dirs = state.get("work_dirs")
-        if not work_dirs:
+        work_dirs_dict = state.get("work_dirs")
+        if not work_dirs_dict:
             logger.error('No work_dirs in state', trial=self.trial)
             return {"errors": [{"message": "No work_dirs found"}]}
         
-        WorkDirs(work_dirs, keep=True)
+        # Deserialize work_dirs from dict (state stores it as dict for serialization)
+        work_dirs = WorkDirs.from_dict(work_dirs_dict)
         
         # Generate project name for GDB container
         generated_target_name = os.path.basename(benchmark.target_path)
@@ -124,14 +125,14 @@ class LangGraphCrashAnalyzer(LangGraphAgent):
             generated_oss_fuzz_project)
         
         # Write fuzz target and build script to files
-        fuzz_target_path = os.path.join(work_dirs, 'fuzz_targets',
+        fuzz_target_path = os.path.join(work_dirs.fuzz_targets,
                                        f'{self.trial:02d}.fuzz_target')
         os.makedirs(os.path.dirname(fuzz_target_path), exist_ok=True)
         with open(fuzz_target_path, 'w') as ft_file:
             ft_file.write(fuzz_target_source)
         
         if build_script_source:
-            build_script_path = os.path.join(work_dirs, 'fuzz_targets',
+            build_script_path = os.path.join(work_dirs.fuzz_targets,
                                            f'{self.trial:02d}.build_script')
             with open(build_script_path, 'w') as ft_file:
                 ft_file.write(build_script_source)
