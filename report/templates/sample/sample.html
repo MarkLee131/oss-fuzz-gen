@@ -4,173 +4,179 @@
 
 {% if sample_css_content and sample_css_content.strip() and '{' in sample_css_content %}
 <style type="text/css">
-{{ sample_css_content | safe }}
+  {
+      {
+      sample_css_content | safe
+    }
+  }
 </style>
 {% endif %}
 
 {% if sample_js_content %}
 <script type="text/javascript">
-{{ sample_js_content | safe }}
+  { { sample_js_content | safe } }
 </script>
 {% endif %}
 
 <div class="space-y-6">
   <div class="border rounded-lg p-6">
-      <div class="flex items-center gap-4 mb-4">
-          <h1 class="text-2xl font-bold">
-            <span class="prettify-benchmark-name">{{ benchmark.id }}</span>
-            <span class="text-gray-500">/ {{ sample.id }}</span>
-          </h1>
-          {{ macros.crash_badge(sample.result.crashes) }}
-          {{ macros.vulnerability_badge(sample.result.crashes and not sample.result.is_semantic_error) }}
-      </div>
-      <div class="flex flex-col gap-2 mt-8">
-        {% if crash_info is defined and crash_info.artifact_folder %}
-        <div class="border rounded-lg p-4 shadow-sm mb-4">
-          <div class="flex items-center gap-3">
-            <div class="flex-1">
-              <p class="text-sm font-medium mb-2">Artifacts Directory</p>
-              <div class="flex items-center gap-2">
-                {% set artifact_path_id = 'artifact-path-' ~ benchmark.id ~ '-' ~ sample.id %}
-                <code class="text-sm break-all ml-1" id="{{ artifact_path_id }}">{{ crash_info.artifact_folder.local_path }}</code>
-                <button
-                  onclick="copyTextFromElement('{{ artifact_path_id }}', this)"
-                  class="inline-flex items-center justify-center p-1.5 rounded"
-                  title="Copy path"
-                  aria-label="Copy path">
-                  {{ macros.icon_copy('w-4 h-4') }}
-                </button>
-              </div>
+    <div class="flex items-center gap-4 mb-4">
+      <h1 class="text-2xl font-bold">
+        <span class="prettify-benchmark-name">{{ benchmark.id }}</span>
+        <span class="text-gray-500">/ {{ sample.id }}</span>
+      </h1>
+      {{ macros.crash_badge(sample.result.crashes) }}
+      {{ macros.vulnerability_badge(sample.result.crashes and not sample.result.is_semantic_error) }}
+    </div>
+    <div class="flex flex-col gap-2 mt-8">
+      {% if crash_info is defined and crash_info.artifact_folder %}
+      <div class="border rounded-lg p-4 shadow-sm mb-4">
+        <div class="flex items-center gap-3">
+          <div class="flex-1">
+            <p class="text-sm font-medium mb-2">Artifacts Directory</p>
+            <div class="flex items-center gap-2">
+              {% set artifact_path_id = ('artifact-path-' ~ benchmark.id ~ '-' ~ sample.id) | replace('/', '-') |
+              replace('.', '-') %}
+              <code class="text-sm break-all ml-1"
+                id="{{ artifact_path_id }}">{{ crash_info.artifact_folder.local_path }}</code>
+              <button onclick="copyTextFromElement('{{ artifact_path_id }}', this)"
+                class="inline-flex items-center justify-center p-1.5 rounded" title="Copy path" aria-label="Copy path">
+                {{ macros.icon_copy('w-4 h-4') }}
+              </button>
             </div>
           </div>
         </div>
+      </div>
+      {% endif %}
+
+
+      {% if sample.result.semantic_error or (crash_info is defined and crash_info) %}
+      <div class="border rounded-lg p-6 shadow-sm">
+        {% if crash_info is defined and crash_info.crash_symptom %}
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          <div class="p-4 rounded-lg">
+            <p class="text-sm uppercase tracking-wide">Sanitizer</p>
+            <p class="font-medium mt-1"><span id="sym-sanitizer"></span></p>
+          </div>
+          <div class="p-4 rounded-lg">
+            <p class="text-sm uppercase tracking-wide">Bug Type</p>
+            <p class="font-medium mt-1"><span id="sym-bugtype"></span></p>
+          </div>
+          <div class="p-4 rounded-lg">
+            <p class="text-sm uppercase tracking-wide">Crash Address</p>
+            <p class="font-medium mt-1 font-mono"><span id="sym-address"></span></p>
+          </div>
+        </div>
+        <script>
+          (function () {
+            var symptom = {{ crash_info.crash_symptom | tojson | safe
+          }};
+          var sanitizer = '';
+          var bugType = '';
+          var address = '';
+          if (symptom && typeof symptom === 'string') {
+            var mSan = symptom.match(/ERROR:\s*([A-Za-z0-9_-]+)\s*:/i);
+            if (mSan) sanitizer = mSan[1];
+            var mType = symptom.match(/AddressSanitizer:\s*(.+?)\s+on\b/i);
+            if (mType) {
+              bugType = mType[1].trim();
+            } else {
+              var mTypeFallback = symptom.match(/ERROR:\s*AddressSanitizer:\s*([A-Za-z0-9 _-]+)/i);
+              if (mTypeFallback) bugType = mTypeFallback[1].trim();
+            }
+            var mAddr = symptom.match(/address\s+([^\s]+)/i);
+            if (mAddr) address = mAddr[1];
+          }
+          var el;
+          el = document.getElementById('sym-sanitizer'); if (el) el.textContent = sanitizer || 'AddressSanitizer';
+          el = document.getElementById('sym-bugtype'); if (el) el.textContent = bugType || 'N/A';
+          el = document.getElementById('sym-address'); if (el) el.textContent = address || '';
+          }) ();
+        </script>
         {% endif %}
 
+        {% if crash_info.execution_stats %}
+        <div class="mb-6 text-sm">
+          <span class="font-mono">
+            {% for key, value in crash_info.execution_stats.items() %}
+            <span class="text-gray-600">{{ key }}:</span>
+            <span class="font-semibold">{{ value }}</span>{% if not loop.last %}<span
+              class="text-gray-300 mx-2">|</span>{% endif %}
+            {% endfor %}
+          </span>
+        </div>
+        {% endif %}
 
-        {% if sample.result.semantic_error or (crash_info is defined and crash_info) %}
-        <div class="border rounded-lg p-6 shadow-sm">
-          {% if crash_info is defined and crash_info.crash_symptom %}
-          <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-            <div class="p-4 rounded-lg">
-              <p class="text-sm uppercase tracking-wide">Sanitizer</p>
-              <p class="font-medium mt-1"><span id="sym-sanitizer"></span></p>
-            </div>
-            <div class="p-4 rounded-lg">
-              <p class="text-sm uppercase tracking-wide">Bug Type</p>
-              <p class="font-medium mt-1"><span id="sym-bugtype"></span></p>
-            </div>
-            <div class="p-4 rounded-lg">
-              <p class="text-sm uppercase tracking-wide">Crash Address</p>
-              <p class="font-medium mt-1 font-mono"><span id="sym-address"></span></p>
-            </div>
-          </div>
-          <script>
-          (function() {
-            var symptom = {{ crash_info.crash_symptom | tojson | safe }};
-            var sanitizer = '';
-            var bugType = '';
-            var address = '';
-            if (symptom && typeof symptom === 'string') {
-              var mSan = symptom.match(/ERROR:\s*([A-Za-z0-9_-]+)\s*:/i);
-              if (mSan) sanitizer = mSan[1];
-              var mType = symptom.match(/AddressSanitizer:\s*(.+?)\s+on\b/i);
-              if (mType) {
-                bugType = mType[1].trim();
-              } else {
-                var mTypeFallback = symptom.match(/ERROR:\s*AddressSanitizer:\s*([A-Za-z0-9 _-]+)/i);
-                if (mTypeFallback) bugType = mTypeFallback[1].trim();
-              }
-              var mAddr = symptom.match(/address\s+([^\s]+)/i);
-              if (mAddr) address = mAddr[1];
-            }
-            var el;
-            el = document.getElementById('sym-sanitizer'); if (el) el.textContent = sanitizer || 'AddressSanitizer';
-            el = document.getElementById('sym-bugtype'); if (el) el.textContent = bugType || 'N/A';
-            el = document.getElementById('sym-address'); if (el) el.textContent = address || '';
-          })();
-          </script>
-          {% endif %}
-
-          {% if crash_info.execution_stats %}
-          <div class="mb-6 text-sm">
-              <span class="font-mono">
-                  {% for key, value in crash_info.execution_stats.items() %}
-                      <span class="text-gray-600">{{ key }}:</span>
-                      <span class="font-semibold">{{ value }}</span>{% if not loop.last %}<span class="text-gray-300 mx-2">|</span>{% endif %}
-                  {% endfor %}
-              </span>
-          </div>
-          {% endif %}
-
-          {% if crash_info.crash_details %}
-          {% if crash_info.stack_traces %}
-          <script type="application/json" id="stackTracesData" style="display: none;">{{ crash_info.stack_traces | tojson }}</script>
-          {% endif %}
-          <script>
+        {% if crash_info.crash_details %}
+        {% if crash_info.stack_traces %}
+        <script type="application/json" id="stackTracesData"
+          style="display: none;">{{ crash_info.stack_traces | tojson }}</script>
+        {% endif %}
+        <script>
           function processStackTracesForElement(elementId) {
-              const element = document.getElementById(elementId);
-              if (element) {
-                const textContent = element.textContent || element.innerText;
-                let htmlContent = textContent;
+            const element = document.getElementById(elementId);
+            if (element) {
+              const textContent = element.textContent || element.innerText;
+              let htmlContent = textContent;
 
-                const stackTracesElement = document.getElementById('stackTracesData');
+              const stackTracesElement = document.getElementById('stackTracesData');
 
-                htmlContent = htmlContent.replace(/(    )(#\d+)(\s+)(0x[a-fA-F0-9]+)(\s+in\s+)(.+?)(\s+)(\/[^\s]+)/g, function(match, indent, frameNum, space1, memAddr, inText, funcName, space2, filePath) {
-                  let formattedPath = filePath;
+              htmlContent = htmlContent.replace(/(    )(#\d+)(\s+)(0x[a-fA-F0-9]+)(\s+in\s+)(.+?)(\s+)(\/[^\s]+)/g, function (match, indent, frameNum, space1, memAddr, inText, funcName, space2, filePath) {
+                let formattedPath = filePath;
 
-                  if (stackTracesElement) {
-                    const stackTraces = JSON.parse(stackTracesElement.textContent);
-                    for (const frameId in stackTraces) {
-                      const frameData = stackTraces[frameId];
+                if (stackTracesElement) {
+                  const stackTraces = JSON.parse(stackTracesElement.textContent);
+                  for (const frameId in stackTraces) {
+                    const frameData = stackTraces[frameId];
 
-                      if (match.includes(frameData.memory_address)) {
-                        if (frameData.url) {
-                          formattedPath = '<a href="' + frameData.url + '" target="_blank" class="text-blue-500 hover:text-blue-700 underline">' + filePath + '</a>';
-                          break;
-                        }
+                    if (match.includes(frameData.memory_address)) {
+                      if (frameData.url) {
+                        formattedPath = '<a href="' + frameData.url + '" target="_blank" class="text-blue-500 hover:text-blue-700 underline">' + filePath + '</a>';
+                        break;
                       }
+                    }
 
-                      const filePathBase = filePath.split(':')[0];
-                      const framePathBase = frameData.path.split(':')[0];
-                      if (match.includes(frameData.function) && filePathBase === framePathBase) {
-                        if (frameData.url) {
-                          formattedPath = '<a href="' + frameData.url + '" target="_blank" class="text-blue-500 hover:text-blue-700 underline">' + filePath + '</a>';
-                          break;
-                        }
+                    const filePathBase = filePath.split(':')[0];
+                    const framePathBase = frameData.path.split(':')[0];
+                    if (match.includes(frameData.function) && filePathBase === framePathBase) {
+                      if (frameData.url) {
+                        formattedPath = '<a href="' + frameData.url + '" target="_blank" class="text-blue-500 hover:text-blue-700 underline">' + filePath + '</a>';
+                        break;
                       }
+                    }
 
-                      if (frameId === frameNum && match.includes(frameData.function)) {
-                        if (frameData.url) {
-                          formattedPath = '<a href="' + frameData.url + '" target="_blank" class="text-blue-500 hover:text-blue-700 underline">' + filePath + '</a>';
-                          break;
-                        }
+                    if (frameId === frameNum && match.includes(frameData.function)) {
+                      if (frameData.url) {
+                        formattedPath = '<a href="' + frameData.url + '" target="_blank" class="text-blue-500 hover:text-blue-700 underline">' + filePath + '</a>';
+                        break;
                       }
                     }
                   }
+                }
 
-                  return indent +
-                         '<span class="text-blue-600 font-semibold">' + frameNum + '</span>' +
-                         space1 +
-                         '<span class="text-gray-600 font-semibold">' + memAddr + '</span>' +
-                         inText +
-                         '<span class="text-indigo-600">' + funcName + '</span>' +
-                         space2 +
-                         formattedPath;
-                });
+                return indent +
+                  '<span class="text-blue-600 font-semibold">' + frameNum + '</span>' +
+                  space1 +
+                  '<span class="text-gray-600 font-semibold">' + memAddr + '</span>' +
+                  inText +
+                  '<span class="text-indigo-600">' + funcName + '</span>' +
+                  space2 +
+                  formattedPath;
+              });
 
-                element.innerHTML = htmlContent;
-              }
+              element.innerHTML = htmlContent;
             }
+          }
 
-            function processStackTraces() {
-              processStackTracesForElement('crashDetailsPreview');
-            }
+          function processStackTraces() {
+            processStackTracesForElement('crashDetailsPreview');
+          }
 
-            function processRunLogsStackTraces() {
-              processStackTracesForElement('runLogsPreview');
-            }
-          </script>
-          <div x-data="{
+          function processRunLogsStackTraces() {
+            processStackTracesForElement('runLogsPreview');
+          }
+        </script>
+        <div x-data="{
             detailsOpen: false,
             ansiProcessed: false,
             toggleDetails() {
@@ -183,37 +189,37 @@
               }
             }
           }" class="border rounded-lg">
-            <button @click="toggleDetails()"
-                    class="w-full p-4 flex justify-between items-center">
-                <span class="font-medium">Crash Details</span>
-                {{ macros.icon_chevron_down('w-4 h-4', 'detailsOpen') }}
-            </button>
-            <div x-show="detailsOpen" class="p-4 border-t">
-              <pre id="crashDetailsPreview" class="p-4 rounded-md overflow-x-auto font-mono whitespace-pre-wrap">{{ crash_info.crash_details }}</pre>
-            </div>
+          <button @click="toggleDetails()" class="w-full p-4 flex justify-between items-center">
+            <span class="font-medium">Crash Details</span>
+            {{ macros.icon_chevron_down('w-4 h-4', 'detailsOpen') }}
+          </button>
+          <div x-show="detailsOpen" class="p-4 border-t">
+            <pre id="crashDetailsPreview"
+              class="p-4 rounded-md overflow-x-auto font-mono whitespace-pre-wrap">{{ crash_info.crash_details }}</pre>
           </div>
-          {% endif %}
-
         </div>
         {% endif %}
 
+      </div>
+      {% endif %}
+
     </div>
 
-  {% if triage.result %}
-  <div class="border rounded-lg p-6">
+    {% if triage.result %}
+    <div class="border rounded-lg p-6">
       <h2 class="text-xl font-bold mb-4">Triage</h2>
       <pre class="bg-gray-50 dark:bg-gray-800 p-4 rounded-md overflow-x-auto">{{ triage.result }}</pre>
-  </div>
-  {% endif %}
+    </div>
+    {% endif %}
 
-  {% if triage.triager_prompt %}
-  <div class="border rounded-lg p-6">
+    {% if triage.triager_prompt %}
+    <div class="border rounded-lg p-6">
       <h3 class="text-lg font-bold mb-4">Triager Prompt</h3>
       <pre class="bg-gray-50 dark:bg-gray-800 p-4 rounded-md overflow-x-auto">{{ triage.triager_prompt }}</pre>
-  </div>
-  {% endif %}
+    </div>
+    {% endif %}
 
-  <div x-data="{
+    <div x-data="{
       codeOpen: true,
       agentsOpen: true,
       logsOpen: false,
@@ -222,62 +228,61 @@
       coverageOpen: false
   }" class="space-y-2">
       <div class="border rounded-lg">
-          {{ macros.collapsible_section('Final Code', 'codeOpen') }}
-          <div x-show="codeOpen"
-               class="p-4 border-t">
-              {% for target in targets %}
+        {{ macros.collapsible_section('Final Code', 'codeOpen') }}
+        <div x-show="codeOpen" class="p-4 border-t">
+          {% for target in targets %}
 
-                <h3>Code #{{ loop.index - 1}}</h3>
+          <h3>Code #{{ loop.index - 1}}</h3>
 
-                {% if target.code is defined and target.code %}
-                {{ macros.code_block(target.code, benchmark.language|lower if benchmark.language else 'plaintext') }}
-                {% endif %}
+          {% if target.code is defined and target.code %}
+          {{ macros.code_block(target.code, benchmark.language|lower if benchmark.language else 'plaintext') }}
+          {% endif %}
 
-                {% if target.build_script_code is defined and target.build_script_code %}
-                <h3>Build Script</h3>
-                {{ macros.code_block(target.build_script_code, 'bash') }}
-                {% endif %}
-                {% endfor %}
-          </div>
+          {% if target.build_script_code is defined and target.build_script_code %}
+          <h3>Build Script</h3>
+          {{ macros.code_block(target.build_script_code, 'bash') }}
+          {% endif %}
+          {% endfor %}
+        </div>
       </div>
 
       <div class="border rounded-lg">
-          {{ macros.collapsible_section('Agents', 'agentsOpen') }}
-          {% if agent_cycles %}
-            <div x-show="agentsOpen"
-                class="p-4 border-t">
+        {{ macros.collapsible_section('Agents', 'agentsOpen') }}
+        {% if agent_cycles %}
+        <div x-show="agentsOpen" class="p-4 border-t">
 
-                {{ macros.expand_collapse_buttons('agent-sections-expand-all', 'agent-sections-collapse-all', 'Expand All', 'Collapse All') }}
+          {{ macros.expand_collapse_buttons('agent-sections-expand-all', 'agent-sections-collapse-all', 'Expand All',
+          'Collapse All') }}
 
-                {% set color_classes = [
-                  'border-blue-300',
-                  'border-green-300',
-                  'border-purple-300',
-                  'border-red-300',
-                  'border-indigo-300',
-                  'border-pink-300',
-                  'border-teal-300'
-                ] %}
-                {% for cycle_data in agent_cycles %}
-                  {{ macros.agent_cycle_section(cycle_data, loop.index, color_classes, default_lang) }}
-                {% endfor %}
-            </div>
-          {% endif %}
+          {% set color_classes = [
+          'border-blue-300',
+          'border-green-300',
+          'border-purple-300',
+          'border-red-300',
+          'border-indigo-300',
+          'border-pink-300',
+          'border-teal-300'
+          ] %}
+          {% for cycle_data in agent_cycles %}
+          {{ macros.agent_cycle_section(cycle_data, loop.index, color_classes, default_lang) }}
+          {% endfor %}
+        </div>
+        {% endif %}
       </div>
 
       <div class="border rounded-lg">
         {{ macros.collapsible_section('Raw Logs', 'logsOpen') }}
-        <div x-show="logsOpen"
-             class="p-4 border-t">
-              {% for part in logs %}
-                <div id="logs" class="{% if part.chat_prompt %}chat_prompt bg-gray-50{% elif part.chat_response %}chat_response bg-gray-100{% endif %} p-4 rounded-md mb-4 overflow-x-auto">{{ part.content|syntax_highlight(default_lang)|safe }}</div>
-              {% endfor %}
+        <div x-show="logsOpen" class="p-4 border-t">
+          {% for part in logs %}
+          <div id="logs"
+            class="{% if part.chat_prompt %}chat_prompt bg-gray-50{% elif part.chat_response %}chat_response bg-gray-100{% endif %} p-4 rounded-md mb-4 overflow-x-auto">
+            {{ part.content|syntax_highlight(default_lang)|safe }}</div>
+          {% endfor %}
         </div>
       </div>
 
       {% if sample.result.coverage_report_path %}
-      <div class="border rounded-lg"
-           x-data="{
+      <div class="border rounded-lg" x-data="{
               coverageOpen: false,
               iframeHeight: '500px',
               initIframe() {
@@ -295,23 +300,16 @@
                       observer.observe(iframe);
                   });
               }
-           }"
-           x-init="initIframe">
-          {{ macros.collapsible_section('Coverage Report (embedded)', 'coverageOpen') }}
-          <div x-show="coverageOpen"
-               x-cloak
-               class="p-4 border-t">
-              <iframe x-ref="coverageIframe"
-                      src="{{ sample.result.coverage_report_path }}report.html"
-                      class="w-full border-0 rounded-md"
-                      :style="'height:' + iframeHeight"
-                      frameborder="0"
-                      scrolling="yes"
-                      title="Coverage Report"></iframe>
-          </div>
+           }" x-init="initIframe">
+        {{ macros.collapsible_section('Coverage Report (embedded)', 'coverageOpen') }}
+        <div x-show="coverageOpen" x-cloak class="p-4 border-t">
+          <iframe x-ref="coverageIframe" src="{{ sample.result.coverage_report_path }}report.html"
+            class="w-full border-0 rounded-md" :style="'height:' + iframeHeight" frameborder="0" scrolling="yes"
+            title="Coverage Report"></iframe>
+        </div>
       </div>
       {% endif %}
+    </div>
   </div>
-</div>
 
-{% endblock %}
+  {% endblock %}
