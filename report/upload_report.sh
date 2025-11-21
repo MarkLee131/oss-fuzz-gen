@@ -1,23 +1,20 @@
 #!/bin/bash
 
 ## Usage:
-##   bash report/upload_report.sh results_dir [gcs_dir]
+##   bash report/upload_report.sh results_dir benchmark_set model
 ##
 ##   results_dir is the local directory with the experiment results.
-##   gcs_dir is the name of the directory for the report in gs://oss-fuzz-gcb-experiment-run-logs/Result-reports/.
-##     Defaults to '$(whoami)-%YY-%MM-%DD'.
+##   benchmark_set and model help label the generated report.
 ##   additional_args are passed through to report.web (e.g., --with-csv)
 
-# TODO(dongge): Re-write this script in Python as it gets more complex.
-
 RESULTS_DIR=$1
-GCS_DIR=$2
-BENCHMARK_SET=$3
-MODEL=$4
+BENCHMARK_SET=$2
+MODEL=$3
 # All remaining arguments are additional args for report.web
-shift 4
+shift 3
 REPORT_ADDITIONAL_ARGS="$@"
-DATE=$(date '+%Y-%m-%d')
+REPORT_LABEL="${REPORT_LABEL:-}"
+LOCAL_BASE_URL="${LOCAL_BASE_URL:-}"
 
 # Sleep 5 minutes for the experiment to start.
 sleep 300
@@ -28,12 +25,6 @@ then
   exit 1
 fi
 
-if [[ $GCS_DIR = '' ]]
-then
-  echo "This script needs to take gcloud Bucket directory as the second argument. Consider using $(whoami)-${DATE:?}."
-  exit 1
-fi
-
 # The LLM used to generate and fix fuzz targets.
 if [[ $MODEL = '' ]]
 then
@@ -41,46 +32,30 @@ then
   exit 1
 fi
 
-mkdir results-report
+mkdir -p results-report
 
 update_report() {
   # Generate the report
-  if [[ $GCS_DIR != '' ]]; then
-    CLOUD_BASE_URL="https://llm-exp.oss-fuzz.com/Result-reports/${GCS_DIR}"
-    $PYTHON -m report.web -r "${RESULTS_DIR:?}" -b "${BENCHMARK_SET:?}" -m "$MODEL" -o results-report --base-url "$CLOUD_BASE_URL" --gcs-dir "${GCS_DIR}" $REPORT_ADDITIONAL_ARGS
+  if [[ -z "$LOCAL_BASE_URL" ]]; then
+    BASE_URL="file://$(realpath results-report)"
   else
-    $PYTHON -m report.web -r "${RESULTS_DIR:?}" -b "${BENCHMARK_SET:?}" -m "$MODEL" -o results-report $REPORT_ADDITIONAL_ARGS
+    BASE_URL="$LOCAL_BASE_URL"
   fi
+  if [[ -n "$REPORT_LABEL" ]]; then
+    echo "Generating report for ${REPORT_LABEL}"
+  fi
+  $PYTHON -m report.web -r "${RESULTS_DIR:?}" -b "${BENCHMARK_SET:?}" -m "$MODEL" -o results-report --base-url "$BASE_URL" $REPORT_ADDITIONAL_ARGS
 
   cd results-report || exit 1
 
-  # Upload the report to GCS.
-  echo "Uploading the report."
-  BUCKET_PATH="gs://oss-fuzz-gcb-experiment-run-logs/Result-reports/${GCS_DIR:?}"
-  # Upload HTMLs.
-  gsutil -q -m -h "Content-Type:text/html" \
-         -h "Cache-Control:public, max-age=3600" \
-         cp -r . "$BUCKET_PATH"
-  # Find all JSON files and upload them, removing the leading './'
-  find . -name '*json' | while read -r file; do
-    file_path="${file#./}"  # Remove the leading "./".
-    gsutil -q -m -h "Content-Type:application/json" \
-        -h "Cache-Control:public, max-age=3600" cp "$file" "$BUCKET_PATH/$file_path"
-  done
+  echo "Report available locally at $(realpath .)."
 
   cd ..
 
-  # Upload the raw results into the same GCS directory.
-  echo "Uploading the raw results."
-  gsutil -q -m cp -r "${RESULTS_DIR:?}" \
-         "gs://oss-fuzz-gcb-experiment-run-logs/Result-reports/${GCS_DIR:?}"
+  echo "Raw results remain at $(realpath "${RESULTS_DIR}")"
 
-  echo "See the published report at https://llm-exp.oss-fuzz.com/Result-reports/${GCS_DIR:?}/"
-
-  # Upload training data.
-  echo "Uploading training data."
+  echo "Preparing training data."
   rm -rf 'training_data'
-  gsutil -q rm -r "gs://oss-fuzz-gcb-experiment-run-logs/Result-reports/${GCS_DIR:?}/training_data" || true
 
   $PYTHON -m data_prep.parse_training_data \
     --experiment-dir "${RESULTS_DIR:?}" --save-dir 'training_data'
@@ -90,8 +65,8 @@ update_report() {
     --experiment-dir "${RESULTS_DIR:?}" --save-dir 'training_data'
   $PYTHON -m data_prep.parse_training_data --coverage --group \
     --experiment-dir "${RESULTS_DIR:?}" --save-dir 'training_data'
-  gsutil -q cp -r 'training_data' \
-    "gs://oss-fuzz-gcb-experiment-run-logs/Result-reports/${GCS_DIR:?}"
+
+  echo "Training data saved locally at $(realpath training_data)."
 }
 
 while [[ ! -f /experiment_ended ]]; do
@@ -102,4 +77,5 @@ done
 
 echo "Experiment finished."
 update_report
-echo "Final report uploaded."
+echo "Final report generated locally."
+

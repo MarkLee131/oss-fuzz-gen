@@ -1,18 +1,3 @@
-// Copyright 2025 Google LLC
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
-const GCS_URL_ELEMENT_ID = 'gcs-url-text';
 const AGENT_SECTION_SELECTOR = '.agent-section';
 const EXPAND_ALL_BUTTON_ID = 'agent-sections-expand-all';
 const COLLAPSE_ALL_BUTTON_ID = 'agent-sections-collapse-all';
@@ -31,19 +16,20 @@ function toggleAgentSections(open) {
 }
 
 /**
- * Copies the GCS URL to clipboard and displays a visual confirmation.
- * @param {HTMLElement} button - The button element that triggered the copy action.
+ * Copies text content from the provided element ID.
+ * @param {string} elementId - The ID containing the text to copy.
+ * @param {HTMLElement} button - The button that triggered the action.
  */
-function copyGcsUrl(button) {
-    const gcsUrlElement = document.getElementById(GCS_URL_ELEMENT_ID);
-    if (!gcsUrlElement) {
-        console.error('GCS URL element not found');
+function copyTextFromElement(elementId, button) {
+    const element = document.getElementById(elementId);
+    if (!element) {
+        console.error(`Element not found: ${elementId}`);
         return;
     }
 
-    const gcsUrl = gcsUrlElement.textContent;
+    const text = element.textContent;
 
-    navigator.clipboard.writeText(gcsUrl).then(() => {
+    navigator.clipboard.writeText(text).then(() => {
         if (!button) {
             return;
         }
@@ -61,12 +47,12 @@ function copyGcsUrl(button) {
             pathElement.setAttribute('d', originalPath);
         }, 2000);
     }).catch(err => {
-        console.error('Failed to copy GCS URL:', err);
-        alert('Failed to copy URL to clipboard');
+        console.error('Failed to copy text:', err);
+        alert('Failed to copy text to clipboard');
     });
 }
 
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function () {
     if (typeof hljs !== 'undefined') {
         hljs.highlightAll();
     }

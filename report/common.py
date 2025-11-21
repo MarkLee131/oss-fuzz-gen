@@ -10,7 +10,6 @@ import re
 from typing import List, Optional
 
 import yaml
-from google.cloud import storage
 
 import run_single_fuzz
 from data_prep import project_src
@@ -126,86 +125,30 @@ class LogPart:
   content: str = ''
 
 class FileSystem:
-  """
-  FileSystem provides a wrapper over standard library and GCS client and
-  automatically chooses which to use based on the provided path.
-  """
-
-  _gcs_client = None
-
-  @classmethod
-  def _get_gcs_client(cls):
-    """
-    Returns a cached storage client (a new one is created on first call.
-
-    A new client does authentication on first call, so caching the client will
-    same multiple authentication round trips to GCP.
-    """
-    if cls._gcs_client is None:
-      cls._gcs_client = storage.Client()
-
-    return cls._gcs_client
+  """Wrapper over the standard library filesystem helpers."""
 
   def __init__(self, path: str):
     logging.debug('file operation %s', path)
     self._path = path
-    self._gcs_bucket: Optional[storage.Bucket] = None
-
-    if path.startswith('gs://'):
-      path = path.removeprefix('gs://')
-      self._gcs_bucket = FileSystem._get_gcs_client().bucket(path.split('/')[0])
-      self._path = '/'.join(path.split('/')[1:])
 
   def listdir(self) -> List[str]:
     """listdir returns a list of files and directories in path."""
-    if self._gcs_bucket is not None:
-      # Make sure the path ends with a /, otherwise GCS just returns the
-      # directory as a prefix and not list the contents.
-      prefix = self._path
-      if not self._path.endswith('/'):
-        prefix = f'{self._path}/'
-
-      # Unfortunately GCS doesn't work like a normal file system and the client
-      # library doesn't even pretend there is a directory hierarchy.
-      # The list API does return a list of prefixes that we can join with the
-      # list of objects to get something close to listdir(). But client library
-      # is pretty weird and it stores the prefixes on the iterator...
-      # https://github.com/googleapis/python-storage/blob/64edbd922a605247203790a90f9536d54e3a705a/google/cloud/storage/client.py#L1356
-      it = self._gcs_bucket.list_blobs(prefix=prefix, delimiter='/')
-      paths = [f.name for f in it] + [p.removesuffix('/') for p in it.prefixes]
-      r = [p.removeprefix(prefix) for p in paths]
-      return r
-
     return os.listdir(self._path)
 
   def exists(self) -> bool:
     """exists returns true if the path is a file or directory."""
-    if self._gcs_bucket is not None:
-      return self.isfile() or self.isdir()
-
     return os.path.exists(self._path)
 
   def isfile(self) -> bool:
     """isfile returns true if the path is a file."""
-    if self._gcs_bucket is not None:
-      return self._gcs_bucket.blob(self._path).exists()
-
     return os.path.isfile(self._path)
 
   def isdir(self) -> bool:
-    """isfile returns true if the path is a directory."""
-    if self._gcs_bucket is not None:
-      return len(self.listdir()) > 0
-
+    """isdir returns true if the path is a directory."""
     return os.path.isdir(self._path)
 
   def makedirs(self):
     """makedirs create parent(s) and directory in specified path."""
-    if self._gcs_bucket is not None:
-      # Do nothing. GCS doesn't have directories and files can be created with
-      # any path.
-      return
-
     os.makedirs(self._path)
 
   def open(self, *args, **kwargs) -> io.IOBase:
@@ -214,23 +157,10 @@ class FileSystem:
 
     It has identical function signature to standard library open().
     """
-    if self._gcs_bucket is not None:
-      return self._gcs_bucket.blob(self._path).open(*args, **kwargs)
-
     return open(self._path, *args, **kwargs)
 
   def getsize(self) -> int:
     """getsize returns the byte size of the file at the specified path."""
-    if self._gcs_bucket is not None:
-      blob = self._gcs_bucket.get_blob(self._path)
-      if blob is None:
-        raise FileNotFoundError(
-            'GCS blob not found gs://{self._gcs_bucket.bucket}/{self._path}.')
-
-      # size can be None if use Bucket.blob() instead of Bucket.get_blob(). The
-      # type checker doesn't know this and insists we check if size is None.
-      return blob.size if blob.size is not None else 0
-
     return os.path.getsize(self._path)
 
 class Results:
@@ -577,16 +507,10 @@ class Results:
     if not cur_dir.startswith('output-'):
       return False
 
-    # Skip checking sub-directories in GCS. It's a lot of filesystem operations
-    # to go over the network.
-    if cur_dir.startswith('gs://'):
-      return True
-
     # Check sub-directories.
     # TODO(donggeliu): Make this consistent with agent output.
     # We used to expect 'fixed_targets' and 'raw_targets' here, but the agent
-    # workflow doesn't populate them. As a result, these directories don't get
-    # uploaded to GCS.
+    # workflow doesn't populate them, so the presence of 'status' is enough.
     expected_dirs = ['status']
     return all(
         FileSystem(os.path.join(self._results_dir, cur_dir,

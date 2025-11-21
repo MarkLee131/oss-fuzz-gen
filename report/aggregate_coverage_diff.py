@@ -7,36 +7,43 @@
 
 import json
 import logging
-import re
+import os
 import sys
 import traceback
 
-from google.cloud import storage
-
 from experiment import evaluator, textcov
+
+def _iter_textcov_files(textcov_root: str):
+  """Yield all textcov report file paths under |textcov_root|."""
+  if not os.path.isdir(textcov_root):
+    logging.warning('Missing textcov reports at %s', textcov_root)
+    return
+
+  for dirpath, _, filenames in os.walk(textcov_root):
+    for filename in filenames:
+      yield os.path.join(dirpath, filename)
+
 
 def compute_coverage_diff(project: str, coverage_links: list[str]):
   existing_textcov = evaluator.load_existing_textcov(project)
   coverage_summary = evaluator.load_existing_coverage_summary(project)
 
-  # Can't use an anonymous client here as the coverage links may be on private
-  # buckets.
-  storage_client = storage.Client()
   new_textcov = textcov.Textcov()
 
   for coverage_link in coverage_links:
-    path = coverage_link.removeprefix('gs://').split('/')
-    bucket = storage_client.bucket(path[0])
-    textcovs_path = '/'.join(path[1:] + ['textcov_reports'])
+    if coverage_link.startswith('gs://'):
+      logging.warning('Skipping remote coverage report %s; GCS is unsupported.',
+                      coverage_link)
+      continue
 
-    blobs = storage_client.list_blobs(bucket,
-                                      prefix=f'{textcovs_path}/',
-                                      delimiter='/')
-    for blob in blobs:
-      logging.info('Loading %s', blob.name)
-      with blob.open() as f:
-        # TODO: skip other functions defined the target.
-        new_textcov.merge(textcov.Textcov.from_file(f))
+    textcov_root = os.path.join(coverage_link, 'textcov_reports')
+    for report_path in _iter_textcov_files(textcov_root):
+      logging.info('Loading %s', report_path)
+      with open(report_path, 'r', encoding='utf-8') as f:
+        try:
+          new_textcov.merge(textcov.Textcov.from_file(f))
+        except Exception:
+          logging.warning('Failed to load %s', report_path)
 
   new_textcov.subtract_covered_lines(existing_textcov)
   try:

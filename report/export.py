@@ -10,15 +10,10 @@ from report.parse_logs import RunLogsParser
 class BaseExporter:
   """Base class for exporters."""
 
-  def __init__(self,
-               results: Results,
-               output_dir: str,
-               base_url: str = '',
-               gcs_dir: str = ''):
+  def __init__(self, results: Results, output_dir: str, base_url: str = ''):
     self._results = results
     self._output_dir = output_dir
     self._base_url = base_url.rstrip('/')
-    self._gcs_dir = gcs_dir
     self._headers = [
         "Project", "Function Signature", "Sample", "Crash Type", "Compiles",
         "Crashes", "Coverage", "Line Coverage Diff", "Reproducer Path"
@@ -43,15 +38,10 @@ class CSVExporter(BaseExporter):
 
   def _get_reproducer_url(self, benchmark_id: str,
                           crash_reproduction_path: str) -> str:
-    """Get the reproducer URL, using GCS bucket URL for cloud builds."""
+    """Get the reproducer URL for local builds."""
     if not crash_reproduction_path:
       return ""
 
-    if self._gcs_dir:
-      return (f"https://console.cloud.google.com/storage/browser/"
-              f"oss-fuzz-gcb-experiment-run-logs/Result-reports/"
-              f"{self._gcs_dir}/results/{benchmark_id}/artifacts/"
-              f"{crash_reproduction_path}")
     return self._get_full_url(
         f'results/{benchmark_id}/artifacts/{crash_reproduction_path}')
 

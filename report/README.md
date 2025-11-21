@@ -2,30 +2,23 @@
 
 ## Experiment Report
 
-*  While the experiment is running, `upload_report.sh` periodically generates
-   an experiment report and uploads it to
-   `gs://oss-fuzz-gcb-experiment-run-logs/Result-reports/`.
-*  After the experiment a final report is generated and uploaded to GCS.
-*  These reports are accessible to collaborators via
-   `https://llm-exp.oss-fuzz.com/Result-reports/{experiment_name}`
+* `upload_report.sh` periodically (re)generates a static HTML report inside
+  `results-report/` while an experiment is running.
+* Reports can be viewed directly from the filesystem (`file://`) or hosted with
+  `python report/web.py --serve --results-dir results --output-dir results-report`.
+* Raw experiment artifacts remain under `results/` so they can be inspected or
+  reprocessed locally.
 
 ## Trends Report
 
-1. After each experiment is finished, `docker_run.py` uploads a summary json
-   file to `gs://oss-fuzz-gcb-experiment-run-logs/trend-reports/`.
-2. Upload of the summary json triggers a
-   [Cloud Run Function](https://pantheon.corp.google.com/functions/details/us-central1/llm-trends-report-index?env=gen1&project=oss-fuzz)
-   which updates
-   `gs://oss-fuzz-gcb-experiment-run-logs/trend-reports/index.json`.
-3. The
-   [trends report web page](https://llm-exp.oss-fuzz.com/trend-reports/index.html)
-   loads the index and discovers available summary json files.
+The previous Cloud Functions that uploaded summaries to Google Cloud Storage
+have been removed. Historical trends can now be produced entirely offline by
+using the locally generated data inside `results/` and `training_data/`.
 
 # Updating the Code
 
-*  The Cloud Run Functions are updated manually by running
-   `deploy_functions.sh`.
-*  The web page files in `gs://oss-fuzz-gcb-experiment-run-logs/trend-reports/`
-   are updated via a
-   [Cloud Run Function](https://pantheon.corp.google.com/functions/details/us-central1/llm-trends-report-web?env=gen1&project=oss-fuzz).
+* `report/web.py` renders the static site; update templates in
+  `report/templates/` when adjusting the UI.
+* `report/upload_report.sh` is responsible for recurring report generation and
+  training-data extraction during long experiments.
 

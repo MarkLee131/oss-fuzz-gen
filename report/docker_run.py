@@ -38,7 +38,7 @@ def _parse_args(cmd) -> argparse.Namespace:
       '--frequency-label',
       type=str,
       default=FREQUENCY_LABEL,
-      help=(f'Used as part of Cloud Build tags and GCS report directory, '
+      help=(f'Used when labeling experiments locally, '
             f'default: {FREQUENCY_LABEL}.'))
   parser.add_argument(
       '-to',
@@ -51,8 +51,7 @@ def _parse_args(cmd) -> argparse.Namespace:
       '--sub-dir',
       type=str,
       default=SUB_DIR,
-      help=
-      f'The subdirectory for the generated report in GCS, default: {SUB_DIR}.')
+      help=f'The subdirectory label for organizing reports, default: {SUB_DIR}.')
   parser.add_argument('-m',
                       '--model',
                       type=str,
@@ -105,7 +104,6 @@ def _parse_args(cmd) -> argparse.Namespace:
       default="false",
       help=
       'Redirects experiments stdout/stderr to file. Set to "true" to enable.')
-
   args, additional_args = parser.parse_known_args(cmd)
 
   # Arguments after the first element ("--") separator.
@@ -122,22 +120,6 @@ def _run_command(command: list[str], shell=False):
   """Runs a command and return its exit code."""
   process = subprocess.run(command, shell=shell, check=False)
   return process.returncode
-
-def _authorize_gcloud():
-  """Authorizes to gcloud"""
-  # When running the docker container locally we need to activate the service
-  # account from the env variable.
-  # When running on GCP this step is unnecessary.
-  google_creds = os.environ.get('GOOGLE_APPLICATION_CREDENTIALS', '')
-  if google_creds:
-    logging.info("GOOGLE APPLICATION CREDENTIALS set: %s.", google_creds)
-    _run_command([
-        'gcloud', 'auth', 'activate-service-account',
-        'LLM-EVAL@oss-fuzz.iam.gserviceaccount.com', '--key-file', google_creds
-    ])
-  else:
-    # TODO: Set GOOGLE_APPLICATION_CREDENTIALS and ensure cloud build uses it.
-    logging.info("GOOGLE APPLICATION CREDENTIALS is not set.")
 
 def _log_common_args(args):
   """Prints args useful for logging"""
@@ -171,7 +153,6 @@ def run_on_data_from_scratch(cmd=None):
       "/venv/bin/python3") else "python3"
   os.environ["PYTHON"] = python_path
 
-  _authorize_gcloud()
   _log_common_args(args)
 
   # Launch starter, which set ups a Fuzz Introspector instance, which
@@ -182,26 +163,20 @@ def run_on_data_from_scratch(cmd=None):
 
   date = datetime.datetime.now().strftime('%Y-%m-%d')
 
-  # Experiment name is used to label the Cloud Builds and as part of the
-  # GCS directory that build logs are stored in.
-  #
-  # Example directory: 2023-12-02-daily-comparison
   experiment_name = f"{date}-{args.frequency_label}-{args.benchmark_set}"
-
-  # Report directory uses the same name as experiment.
-  # See upload_report.sh on how this is used.
-  gcs_report_dir = f"{args.sub_dir}/{experiment_name}"
-
-  # Trends report use a similarly named path.
-  gcs_trend_report_path = f"{args.sub_dir}/{experiment_name}.json"
+  report_label = f"{args.sub_dir}/{experiment_name}"
+  logging.info("Report label is %s.", report_label)
 
   local_results_dir = 'results'
 
-  # Generate a report and upload it to GCS
+  # Generate a report locally
+  upload_env = os.environ.copy()
+  upload_env["REPORT_LABEL"] = report_label
   report_process = subprocess.Popen([
-      "bash", "report/upload_report.sh", local_results_dir, gcs_report_dir,
-      args.benchmark_set, args.model
-  ] + args.additional_args)
+      "bash", "report/upload_report.sh", local_results_dir, args.benchmark_set,
+      args.model
+  ] + args.additional_args,
+                                     env=upload_env)
 
   # Launch run_logicfuzz.py
   # some notes:
@@ -242,9 +217,7 @@ def run_on_data_from_scratch(cmd=None):
   vary_temperature = [0.5, 0.6, 0.7, 0.8, 0.9] if args.vary_temperature else []
   cmd += [
       "--run-timeout",
-      str(args.run_timeout), "--cloud-experiment-name", experiment_name,
-      "--cloud-experiment-bucket", "oss-fuzz-gcb-experiment-run-logs",
-      "--work-dir",
+      str(args.run_timeout), "--work-dir",
       local_results_dir, "--num-samples",
       str(args.num_samples), "--delay",
       str(args.delay), "--context", "--temperature-list",
@@ -279,28 +252,8 @@ def run_on_data_from_scratch(cmd=None):
   except Exception:
     pass
 
-  # Wait for the report process to finish uploading.
+  # Wait for the report process to finish writing locally.
   report_process.wait()
-
-  trends_cmd = [
-      python_path, "-m", "report.trends_report.upload_summary", "--results-dir",
-      local_results_dir, "--output-path",
-      f"gs://oss-fuzz-gcb-experiment-run-logs/trend-reports/"
-      f"{gcs_trend_report_path}", "--name", experiment_name, "--date", date,
-      "--url", f"https://llm-exp.oss-fuzz.com/Result-reports/{gcs_report_dir}",
-      "--run-timeout",
-      str(args.run_timeout), "--num-samples",
-      str(args.num_samples), "--llm-fix-limit",
-      str(args.llm_fix_limit), "--model", args.model, "--tags",
-      args.frequency_label, args.sub_dir, "--commit-hash",
-      subprocess.check_output(["git", "rev-parse",
-                               "HEAD"]).decode().strip(), "--commit-date",
-      subprocess.check_output(["git", "show", "--no-patch", "--format=%cs"
-                              ]).decode().strip(), "--git-branch",
-      subprocess.check_output(["git", "branch", "--show"]).decode().strip()
-  ]
-
-  subprocess.run(trends_cmd, check=False)
 
   # Exit with the return value of `./run_logicfuzz`.
   return ret_val
@@ -314,7 +267,6 @@ def run_standard(cmd=None):
       "/venv/bin/python3") else "python3"
   os.environ["PYTHON"] = python_path
 
-  _authorize_gcloud()
   _log_common_args(args)
 
   if args.local_introspector:
@@ -338,32 +290,24 @@ def run_standard(cmd=None):
   date = datetime.datetime.now().strftime('%Y-%m-%d')
   local_results_dir = 'results'
 
-  # Experiment name is used to label the Cloud Builds and as part of the
-  # GCS directory that build logs are stored in.
-  #
-  # Example directory: 2023-12-02-daily-comparison
   experiment_name = f"{date}-{args.frequency_label}-{args.benchmark_set}"
+  report_label = f"{args.sub_dir}/{experiment_name}"
+  logging.info("Report label is %s.", report_label)
 
-  # Report directory uses the same name as experiment.
-  # See upload_report.sh on how this is used.
-  gcs_report_dir = f"{args.sub_dir}/{experiment_name}"
-
-  # Trends report use a similarly named path.
-  gcs_trend_report_path = f"{args.sub_dir}/{experiment_name}.json"
-
-  # Generate a report and upload it to GCS
+  # Generate a report locally
+  upload_env = os.environ.copy()
+  upload_env["REPORT_LABEL"] = report_label
   report_process = subprocess.Popen([
-      "bash", "report/upload_report.sh", local_results_dir, gcs_report_dir,
-      args.benchmark_set, args.model
-  ] + args.additional_args)
+      "bash", "report/upload_report.sh", local_results_dir, args.benchmark_set,
+      args.model
+  ] + args.additional_args,
+                                     env=upload_env)
 
   # Prepare the command to run experiments
   run_cmd = [
       python_path, "run_logicfuzz.py", "--benchmarks-directory",
       f"conti-benchmark/{args.benchmark_set}", "--run-timeout",
-      str(args.run_timeout), "--cloud-experiment-name", experiment_name,
-      "--cloud-experiment-bucket", "oss-fuzz-gcb-experiment-run-logs",
-      "--work-dir",
+      str(args.run_timeout), "--work-dir",
       local_results_dir, "--num-samples",
       str(args.num_samples), "--delay",
       str(args.delay), "--context", "--introspector-endpoint",
@@ -404,28 +348,8 @@ def run_standard(cmd=None):
     except Exception:
       pass
 
-  # Wait for the report process to finish uploading.
+  # Wait for the report process to finish writing locally.
   report_process.wait()
-
-  trends_cmd = [
-      python_path, "-m", "report.trends_report.upload_summary", "--results-dir",
-      local_results_dir, "--output-path",
-      f"gs://oss-fuzz-gcb-experiment-run-logs/trend-reports/"
-      f"{gcs_trend_report_path}", "--name", experiment_name, "--date", date,
-      "--url", f"https://llm-exp.oss-fuzz.com/Result-reports/{gcs_report_dir}",
-      "--benchmark-set", args.benchmark_set, "--run-timeout",
-      str(args.run_timeout), "--num-samples",
-      str(args.num_samples), "--llm-fix-limit",
-      str(args.llm_fix_limit), "--model", args.model, "--tags",
-      args.frequency_label, args.sub_dir, "--commit-hash",
-      subprocess.check_output(["git", "rev-parse",
-                               "HEAD"]).decode().strip(), "--commit-date",
-      subprocess.check_output(["git", "show", "--no-patch", "--format=%cs"
-                              ]).decode().strip(), "--git-branch",
-      subprocess.check_output(["git", "branch", "--show"]).decode().strip()
-  ]
-
-  subprocess.run(trends_cmd, check=False)
 
   # Exit with the return value of `./run_logicfuzz`.
   return ret_val
