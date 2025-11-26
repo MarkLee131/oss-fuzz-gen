@@ -30,7 +30,7 @@ This script:
 - Runs one LogicFuzz experiment against `conti-benchmark/cjson.yaml` using the model specified via `LOGICFUZZ_MODEL` (default: `qwen3-coder-plus`).
 
 ## 3. Run experiments inside the container
-`report/docker_run.py` is a thin wrapper around `run_logicfuzz.py`. It expects an already running Fuzz Introspector service (typically started from `Dockerfile.fuzz-introspector`) and executes the workflow. Reports remain as raw artifacts under `results/` and can be visualized later with `python -m report.web`.
+`report/docker_run.py` is a thin wrapper around `run_logicfuzz.py`. It expects an already running Fuzz Introspector service (started from a separate container) and executes the workflow. Reports remain as raw artifacts under `results/` and can be visualized later with `python -m report.web`.
 
 ```bash
 # 1) Configure your LLM API keys following the example config file
@@ -44,14 +44,15 @@ cp logicfuzz.env.example logicfuzz.env
 WORK_DIR="results/$(date +%Y%m%d-%H%M%S)"
 mkdir -p "$WORK_DIR"
 
-# 3) Start Fuzz Introspector in a separate container (see section 5), e.g.
-#    (this will build a DB from the entire `conti-benchmark/` tree)
-# docker run --rm -p 8080:8080 \
-#   -v "$PWD"/conti-benchmark:/opt/logicfuzz/conti-benchmark \
-#   logicfuzz-introspector \
-#     --source benchmark
+# 3) Start Fuzz Introspector in its own container using the *same* `logicfuzz`
+#    image (this builds a DB from the entire `conti-benchmark/` tree)
+docker run --rm -p 8080:8080 \
+  -v "$PWD":/experiment \
+  -w /experiment \
+  logicfuzz \
+  bash report/launch_introspector.sh --source benchmark
 
-# 4) Launch LogicFuzz inside the runner container, passing env from logicfuzz.env
+# 4) Launch LogicFuzz in a separate container, passing env from logicfuzz.env.
 #    Most options are preset in scripts/docker_run_experiment.sh; override via
 #    LOGICFUZZ_MODEL, BENCHMARK_YAML, WORK_DIR, etc. if needed.
 docker run --rm \
@@ -70,7 +71,7 @@ docker run --rm \
 Key facts:
 - The repo must be mounted at `/experiment`; results are written to `/experiment/results/*` so they persist on the host.
 - If you omit `-y/--benchmark-yaml`, `-b/--benchmarks-directory`, and `-g/--generate-benchmarks`, the wrapper auto-selects `conti-benchmark` by injecting `-b conti-benchmark` before invoking `run_logicfuzz.py`, and `run_logicfuzz.py` will recursively load all YAMLs under that directory.
-- Always point `--introspector-endpoint` (`-e`) to the external FI service started from `Dockerfile.fuzz-introspector`.
+- Always point `--introspector-endpoint` (`-e`) to the external FI service started from a separate container (using the same `logicfuzz` image).
 - Add `--redirect-outs true` to tee stdout/stderr into `results/logs-from-run.txt`.
 
 ## 4. Using the “data-dir” workflow (non OSS-Fuzz projects)
@@ -85,31 +86,7 @@ When `/experiment/data-dir` exists (or `/experiment/data-dir.zip` is mounted), t
 
 Use this mode when onboarding internal/private projects that are not part of upstream OSS-Fuzz but already have collected coverage + build artifacts.
 
-## 5. Build the stand-alone Fuzz Introspector image
-```bash
-docker build -t logicfuzz-introspector -f Dockerfile.fuzz-introspector .
-```
-The entrypoint is `bash /opt/logicfuzz/report/launch_introspector.sh`, so all CLI flags supported by that script are available.
-
-### Example: start FI from the shipped benchmarks
-```bash
-docker run --rm -p 8080:8080 \
-  -v "$PWD"/conti-benchmark:/opt/logicfuzz/conti-benchmark \
-  logicfuzz-introspector \
-    --source benchmark \
-    --benchmark-set comparison
-```
-
-### Example: reuse an existing `data-dir`
-```bash
-docker run --rm -p 8080:8080 \
-  -v /path/to/data-dir:/opt/logicfuzz/data-dir \
-  logicfuzz-introspector \
-    --source data-dir \
-    --data-dir /opt/logicfuzz/data-dir
-```
-
-## 6. Verifying outputs
+## 5. Verifying outputs
 - Experiment artifacts: `results/output-*/` (on host because of the bind mount).
 - HTML reports: run `python -m report.web -r results -b <benchmark_set> -m <model> -o report/html-report/<label>/` when you need them.
 - FI service health: curl `http://127.0.0.1:8080/api/healthz`.
