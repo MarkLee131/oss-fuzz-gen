@@ -18,6 +18,17 @@ docker build -t logicfuzz -f Dockerfile .
 ```
 The image ships with a virtualenv in `/venv` and copies the entire tree under `/experiment`. Pass `INSTALL_HOST_CLI=false` when you do not need the bundled Docker/gcloud tooling.
 
+If you prefer a single command end‑to‑end setup, you can use the helper script:
+
+```bash
+bash scripts/docker_quickstart.sh
+```
+
+This script:
+- Builds both `logicfuzz` (runner) and `logicfuzz-introspector` images.
+- Starts a Fuzz Introspector container on port 8080.
+- Runs one LogicFuzz experiment against `conti-benchmark/cjson.yaml` using the model specified via `LOGICFUZZ_MODEL` (default: `qwen3-coder-plus`).
+
 ## 3. Run experiments inside the container
 `report/docker_run.py` is a thin wrapper around `run_logicfuzz.py`. It expects an already running Fuzz Introspector service (typically started from `Dockerfile.fuzz-introspector`) and executes the workflow. Reports remain as raw artifacts under `results/` and can be visualized later with `python -m report.web`.
 
@@ -37,6 +48,8 @@ mkdir -p "$WORK_DIR"
 #     --benchmark-set comparison
 
 # 4) Launch LogicFuzz inside the runner container, passing env from logicfuzz.env
+#    Most options are preset in scripts/docker_run_experiment.sh; override via
+#    LOGICFUZZ_MODEL, BENCHMARK_YAML, WORK_DIR, etc. if needed.
 docker run --rm \
   --privileged \
   --network host \
@@ -45,15 +58,7 @@ docker run --rm \
   -v "$PWD":/experiment \
   -w /experiment \
   logicfuzz \
-  python3 report/docker_run.py \
-    --redirect-outs true \
-    --model qwen3-coder-plus \
-    -y conti-benchmark/cjson.yaml \
-    --work-dir "$WORK_DIR" \
-    --num-samples 2 \
-    --run-timeout 60 \
-    --introspector-endpoint http://127.0.0.1:8080/api \
-    --context
+  bash scripts/docker_run_experiment.sh
 ```
   
 > `--privileged` is needed because LogicFuzz spawns nested Docker builds
