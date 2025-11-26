@@ -388,21 +388,3 @@ Archetype coverage:
 4. **Evidence-Based**: Derived from analysis of thousands of production drivers
 5. **Mistake-Aware**: Documents common errors with examples
 6. **Composable**: Archetypes can be combined (e.g., object_lifecycle + exception_handling)
-
----
-
-## Version History
-
-- **v2.0** (2024-11-19): Reorganized into 10 archetypes by pattern category
-  - Removed `simple_function_call` (rarely exists in practice)
-  - Renamed for clarity (e.g., `file_path_api` → `temporary_file`)
-  - Organized by resource management, control flow, API sequencing, etc.
-  
-- **v1.0** (2024-10-29): Initial version with 11 archetypes
-  - Based on FUZZER_TAXONOMY and FUZZER_COOKBOOK
-
----
-
-**Version**: 2.0
-**Last Updated**: 2024-11-19
-**Maintained by**: LogicFuzz Team
