@@ -702,7 +702,7 @@ def _parse_arguments() -> argparse.Namespace:
   parser.add_argument(
       '--base-url',
       help='Base URL for serving the generated report.',
-      default='')
+                      default='')
 
   return parser.parse_args()
 

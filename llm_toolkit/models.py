@@ -614,9 +614,6 @@ class DeepSeekReasoner(DeepSeek):
 
 class Qwen(GPT):
   """Qwen's model encapsulator using OpenAI API.
-  
-  Uses Alibaba Cloud Model Studio (DashScope) Singapore region.
-  API endpoint: https://dashscope-intl.aliyuncs.com/compatible-mode/v1
   """
   name = 'qwen-plus'
   def _get_client(self):

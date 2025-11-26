@@ -10,18 +10,20 @@ import os
 import subprocess
 import sys
 
+from llm_toolkit import models
+import run_single_fuzz
+
 # Configure logging to display all messages at or above INFO level
 logging.basicConfig(level=logging.INFO)
 
 BENCHMARK_SET = 'comparison'
-FREQUENCY_LABEL = 'daily'
-RUN_TIMEOUT = 300
-SUB_DIR = 'default'
-MODEL = 'gpt-5'
+RUN_TIMEOUT = run_single_fuzz.RUN_TIMEOUT
+MODEL = models.DefaultModel.name
 DELAY = 0
-NUM_SAMPLES = 10
-LLM_FIX_LIMIT = 5
+NUM_SAMPLES = run_single_fuzz.NUM_SAMPLES
 MAX_ROUND = 10
+TEMPERATURE = run_single_fuzz.TEMPERATURE
+WORK_DIR = run_single_fuzz.RESULTS_DIR
 DATA_DIR = '/experiment/data-dir/'
 
 def _parse_args(cmd) -> argparse.Namespace:
@@ -34,24 +36,11 @@ def _parse_args(cmd) -> argparse.Namespace:
       default=BENCHMARK_SET,
       help=f'Experiment benchmark set, default: {BENCHMARK_SET}.')
   parser.add_argument(
-      '-l',
-      '--frequency-label',
-      type=str,
-      default=FREQUENCY_LABEL,
-      help=(f'Used when labeling experiments locally, '
-            f'default: {FREQUENCY_LABEL}.'))
-  parser.add_argument(
       '-to',
       '--run-timeout',
       type=int,
       default=RUN_TIMEOUT,
       help=f'Fuzzing timeout in seconds, default: {RUN_TIMEOUT} seconds.')
-  parser.add_argument(
-      '-sd',
-      '--sub-dir',
-      type=str,
-      default=SUB_DIR,
-      help=f'The subdirectory label for organizing reports, default: {SUB_DIR}.')
   parser.add_argument('-m',
                       '--model',
                       type=str,
@@ -63,6 +52,12 @@ def _parse_args(cmd) -> argparse.Namespace:
       type=int,
       default=DELAY,
       help=f'Delay each benchmark experiment by N seconds, default: {DELAY}.')
+  parser.add_argument(
+      '-w',
+      '--work-dir',
+      type=str,
+      default=WORK_DIR,
+      help=f'Path to store experiment outputs, default: {WORK_DIR}.')
   parser.add_argument(
       '-i',
       '--local-introspector',
@@ -78,18 +73,23 @@ def _parse_args(cmd) -> argparse.Namespace:
       default=NUM_SAMPLES,
       help=f'The number of samples to request from LLM, default: {NUM_SAMPLES}')
   parser.add_argument(
-      '-nf',
-      '--llm-fix-limit',
-      type=int,
-      default=LLM_FIX_LIMIT,
-      help=f'The number of fixes to request from LLM, default: {LLM_FIX_LIMIT}')
+      '-t',
+      '--temperature',
+      type=float,
+      default=TEMPERATURE,
+      help='Temperature to use for samples, default matches run_logicfuzz.')
   parser.add_argument(
-      '-vt',
-      '--vary-temperature',
+      '-tr',
+      '--temperature-list',
+      nargs='*',
+      type=float,
+      default=[],
+      help='Optional list of temperatures to cycle through for samples.')
+  parser.add_argument(
+      '-bd',
+      '--benchmarks-directory',
       type=str,
-      default="true",
-      help=
-      'Use different temperatures for each sample. Set to "false" to disable.')
+      help='Path to benchmark directory. Defaults to conti benchmark set.')
   # Note: Agent mode (LangGraph) is now the default and only mode.
   # The --agent flag has been removed.
   parser.add_argument('-mr',
@@ -107,11 +107,13 @@ def _parse_args(cmd) -> argparse.Namespace:
   args, additional_args = parser.parse_known_args(cmd)
 
   # Arguments after the first element ("--") separator.
-  args.additional_args = additional_args[1:]
+  if additional_args and additional_args[0] == '--':
+    args.additional_args = additional_args[1:]
+  else:
+    args.additional_args = additional_args
 
   # Parse boolean arguments
   args.local_introspector = args.local_introspector.lower() == "true"
-  args.vary_temperature = args.vary_temperature.lower() == "true"
   args.redirect_outs = args.redirect_outs.lower() == "true"
 
   return args
@@ -124,13 +126,10 @@ def _run_command(command: list[str], shell=False):
 def _log_common_args(args):
   """Prints args useful for logging"""
   logging.info("Benchmark set is %s.", args.benchmark_set)
-  logging.info("Frequency label is %s.", args.frequency_label)
   logging.info("Run timeout is %s.", args.run_timeout)
-  logging.info(
-      "Sub-directory is %s. Please consider using sub-directory to classify"
-      " your experiment.", args.sub_dir)
   logging.info("LLM is %s.", args.model)
   logging.info("DELAY is %s.", args.delay)
+  logging.info("Work dir is %s.", args.work_dir)
 
 def main(cmd=None):
   """Main entrypoint"""
@@ -162,18 +161,18 @@ def run_on_data_from_scratch(cmd=None):
                         shell=True)
 
   date = datetime.datetime.now().strftime('%Y-%m-%d')
-
-  experiment_name = f"{date}-{args.frequency_label}-{args.benchmark_set}"
-  report_label = f"{args.sub_dir}/{experiment_name}"
+  benchmark_label = args.benchmarks_directory or args.benchmark_set
+  experiment_name = f"{date}-{benchmark_label}"
+  report_label = experiment_name
   logging.info("Report label is %s.", report_label)
 
-  local_results_dir = 'results'
+  local_results_dir = args.work_dir
 
   # Generate a report locally
   upload_env = os.environ.copy()
   upload_env["REPORT_LABEL"] = report_label
   report_process = subprocess.Popen([
-      "bash", "report/upload_report.sh", local_results_dir, args.benchmark_set,
+      "bash", "report/upload_report.sh", local_results_dir, benchmark_label,
       args.model
   ] + args.additional_args,
                                      env=upload_env)
@@ -213,16 +212,19 @@ def run_on_data_from_scratch(cmd=None):
   cmd.append(introspector_endpoint)
   cmd.append('-mr')
   cmd.append(str(args.max_round))
-
-  vary_temperature = [0.5, 0.6, 0.7, 0.8, 0.9] if args.vary_temperature else []
   cmd += [
       "--run-timeout",
       str(args.run_timeout), "--work-dir",
       local_results_dir, "--num-samples",
       str(args.num_samples), "--delay",
-      str(args.delay), "--context", "--temperature-list",
-      *[str(temp) for temp in vary_temperature], "--model", args.model
+      str(args.delay), "--context", "--model", args.model, "--temperature",
+      str(args.temperature)
   ]
+  if args.temperature_list:
+    cmd.append("--temperature-list")
+    cmd.extend(str(temp) for temp in args.temperature_list)
+  if args.additional_args:
+    cmd.extend(args.additional_args)
   # Note: Agent mode is now the default, no need to append --agent flag
 
   # Run the experiment and redirect to file if indicated.
@@ -281,41 +283,40 @@ def run_standard(cmd=None):
 
   logging.info("NUM_SAMPLES is %s.", args.num_samples)
 
-  if args.llm_fix_limit:
-    os.environ["LLM_FIX_LIMIT"] = str(args.llm_fix_limit)
-    logging.info("LLM_FIX_LIMIT is set to %s.", args.llm_fix_limit)
-
-  vary_temperature = [0.5, 0.6, 0.7, 0.8, 0.9] if args.vary_temperature else []
-
   date = datetime.datetime.now().strftime('%Y-%m-%d')
-  local_results_dir = 'results'
+  local_results_dir = args.work_dir
+  benchmark_label = args.benchmarks_directory or args.benchmark_set
 
-  experiment_name = f"{date}-{args.frequency_label}-{args.benchmark_set}"
-  report_label = f"{args.sub_dir}/{experiment_name}"
+  experiment_name = f"{date}-{benchmark_label}"
+  report_label = experiment_name
   logging.info("Report label is %s.", report_label)
 
   # Generate a report locally
   upload_env = os.environ.copy()
   upload_env["REPORT_LABEL"] = report_label
   report_process = subprocess.Popen([
-      "bash", "report/upload_report.sh", local_results_dir, args.benchmark_set,
+      "bash", "report/upload_report.sh", local_results_dir, benchmark_label,
       args.model
   ] + args.additional_args,
                                      env=upload_env)
 
   # Prepare the command to run experiments
+  benchmark_directory = (args.benchmarks_directory or
+                         f"conti-benchmark/{args.benchmark_set}")
   run_cmd = [
       python_path, "run_logicfuzz.py", "--benchmarks-directory",
-      f"conti-benchmark/{args.benchmark_set}", "--run-timeout",
+      benchmark_directory, "--run-timeout",
       str(args.run_timeout), "--work-dir",
       local_results_dir, "--num-samples",
       str(args.num_samples), "--delay",
       str(args.delay), "--context", "--introspector-endpoint",
-      introspector_endpoint, "--temperature-list",
-      *[str(temp) for temp in vary_temperature], "--model", args.model,
-      "--max-round",
-      str(args.max_round)
+      introspector_endpoint, "--model", args.model, "--max-round",
+      str(args.max_round), "--temperature",
+      str(args.temperature)
   ]
+  if args.temperature_list:
+    run_cmd.append("--temperature-list")
+    run_cmd.extend(str(temp) for temp in args.temperature_list)
   # Note: Agent mode is now the default, no need to append --agent flag
 
   if args.additional_args:
