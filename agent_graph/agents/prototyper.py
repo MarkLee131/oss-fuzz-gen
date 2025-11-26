@@ -63,9 +63,6 @@ class LangGraphPrototyper(LangGraphAgent):
         # Retrieve skeleton from long-term memory based on archetype
         # (skeleton already contains header information injected by Function Analyzer)
         skeleton_code = self._retrieve_skeleton(function_analysis)
-
-        # Retrieve similar fuzz driver examples from vector database (if available)
-        driver_examples = self._retrieve_driver_examples(benchmark, function_analysis)
         
         # Format SRS specification (use structured data if available, otherwise raw analysis)
         srs_specification = self._format_srs_specification(function_analysis)
@@ -79,10 +76,6 @@ class LangGraphPrototyper(LangGraphAgent):
             additional_context=additional_context,
             skeleton_code=skeleton_code
         )
-
-        # Append vector-retrieved driver examples to the prompt when available.
-        if driver_examples:
-            base_prompt = f"{base_prompt}\n\n{driver_examples}"
         
         # 注入session_memory，让Prototyper能看到archetype和API约束
         prompt = build_prompt_with_session_memory(
@@ -101,7 +94,7 @@ class LangGraphPrototyper(LangGraphAgent):
             current_iteration=state.get("current_iteration", 0)
         )
         
-        # 合并更新到session_memory
+        # Update to session_memory
         updated_session_memory = merge_session_memory_updates(state, session_memory_updates)
         
         # Extract code from <fuzz_target> tags
@@ -111,7 +104,7 @@ class LangGraphPrototyper(LangGraphAgent):
         if not fuzz_target_code:
             fuzz_target_code = response
         
-        # 🔥 NEW: Validate generated code for internal API usage
+        # Validate generated code for internal API usage
         validation_warnings = self._validate_api_usage(
             fuzz_target_code,
             benchmark.get('project', 'unknown')
@@ -366,121 +359,6 @@ class LangGraphPrototyper(LangGraphAgent):
             logger.warning(f'Failed to retrieve skeleton: {e}', trial=self.trial)
             return ""
 
-    def _retrieve_driver_examples(self, benchmark: dict, function_analysis: dict) -> str:
-        """
-        Retrieve similar fuzz driver examples from the vector database for this target.
-        
-        Returns formatted markdown text or an empty string if the vector DB is
-        unavailable, empty, or no good matches are found.
-        """
-        try:
-            from long_term_memory.vec_db.driver_retriever import DriverCodeRetriever
-        except Exception as e:
-            # Vector DB not installed or optional dependency missing – keep old behavior.
-            logger.info(f'Vector DB retriever unavailable: {e}', trial=self.trial)
-            return ""
-
-        function_name = benchmark.get('function_name') if isinstance(benchmark, dict) else None
-        function_signature = benchmark.get('function_signature') if isinstance(benchmark, dict) else None
-
-        # Prefer archetype from structured SRS data if available
-        srs_data = (function_analysis or {}).get('srs_data', {})
-        archetype_info = srs_data.get('archetype', {}) if isinstance(srs_data, dict) else {}
-        api_type = archetype_info.get('primary_pattern') or None
-
-        # Build natural language description for retrieval, focusing on API semantics
-        description_parts = ["fuzz driver for a semantically similar API"]
-        if function_name:
-            description_parts.append(f"API name: {function_name}")
-        if function_signature:
-            description_parts.append(f"signature: {function_signature}")
-
-        # Enrich the description with SRS-level semantics when available
-        if isinstance(srs_data, dict):
-            metadata = srs_data.get('metadata', {}) or {}
-            category = metadata.get('category')
-            state_model = metadata.get('state_model')
-            recommended = metadata.get('recommended_approach')
-            if api_type:
-                description_parts.append(f"archetype pattern: {api_type}")
-            if category:
-                description_parts.append(f"category: {category}")
-            if state_model:
-                description_parts.append(f"state model: {state_model}")
-            if recommended:
-                description_parts.append(f"recommended approach: {recommended}")
-
-            # Add a few top functional requirements as plain-text hints
-            frs = srs_data.get('functional_requirements', []) or []
-            for fr in frs[:3]:
-                req = fr.get('requirement')
-                if req:
-                    description_parts.append(f"functional requirement: {req}")
-
-        description = " | ".join(description_parts)
-
-        # Database directory can be overridden via env; default to ./chroma_db
-        persist_directory = os.getenv("LOGICFUZZ_VECDB_DIR", "./chroma_db")
-
-        try:
-            retriever = DriverCodeRetriever(
-                persist_directory=persist_directory,
-                collection_name="driver_code",
-            )
-
-            results = retriever.search_by_description(
-                description=description,
-                n=3,
-                # 不按项目做硬分区，让跨项目的“语义相似 API”也能互相借鉴
-                project=None,
-                # 只在 API archetype 维度上进行温和过滤，保持语义一致性
-                api_type=api_type,
-                threshold=0.6,
-            )
-        except Exception as e:
-            # Empty collection, missing DB, or any runtime failure – degrade gracefully.
-            logger.info(f'Vector DB search skipped: {e}', trial=self.trial)
-            return ""
-
-        if not results:
-            return ""
-
-        # Format top-k examples as compact C snippets to guide the LLM
-        lines = [
-            "# Reference fuzz driver examples from existing corpus",
-            "",
-            "These examples are **real fuzz drivers** from previous runs. "
-            "Preserve their overall structure (initialization, call pattern, cleanup), "
-            "but adapt identifiers and headers to this project."
-        ]
-
-        for idx, entry in enumerate(results, 1):
-            code = entry.get("code_content") or ""
-            if not code:
-                continue
-
-            # Truncate each example to avoid blowing up token usage
-            max_chars = 4000
-            snippet = code[:max_chars]
-            if len(code) > max_chars:
-                snippet += f"\n/* ... truncated {len(code) - max_chars} chars ... */"
-
-            example_project = entry.get("project", project)
-            api_name = entry.get("api_name", function_name or "?")
-            example_type = entry.get("api_type", api_type or "unknown")
-            similarity = float(entry.get("similarity", 0.0))
-
-            lines.append(
-                f"## Example {idx}: {example_project}::{api_name} "
-                f"(type={example_type}, similarity={similarity:.2f})"
-            )
-            lines.append("```c")
-            lines.append(snippet)
-            lines.append("```")
-            lines.append("")
-
-        return "\n".join(lines)
-    
     def _format_header_section(self, header_info: dict, archetype: str = None) -> str:
         """
         Format header information as C/C++ comments for skeleton injection.
