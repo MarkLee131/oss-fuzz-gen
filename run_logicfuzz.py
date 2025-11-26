@@ -126,7 +126,7 @@ def run_experiments(benchmark: benchmarklib.Benchmark, args) -> Result:
     traceback.print_exc()
     return Result(benchmark, f'Exception while running experiment: {e}')
 
-def parse_args() -> argparse.Namespace:
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
   """Parses command line arguments."""
   parser = argparse.ArgumentParser(
       description='Run all experiments that evaluates all target functions.')
@@ -230,7 +230,7 @@ def parse_args() -> argparse.Namespace:
                       action='store_true',
                       help='List all available models and exit.')
 
-  args = parser.parse_args()
+  args = parser.parse_args(argv)
 
   if args.list_models:
     print('Available models:')

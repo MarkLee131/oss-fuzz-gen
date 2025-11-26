@@ -21,21 +21,23 @@ docker run --rm -it \
   -v "$PWD":/experiment \
   -w /experiment \
   logicfuzz \
-  python3 report/docker_run.py --help
+  --help
 ```
-Use the `--help` output to confirm the flag set mirrors `run_logicfuzz.py`. Start a real experiment by swapping in your desired arguments—for example:
+The image’s `ENTRYPOINT` already runs `python3 report/docker_run.py`, so you only pass flags. Use the `--help` output to confirm the flag set mirrors `run_logicfuzz.py`. Start a real experiment by swapping in your desired arguments—for example:
 ```bash
 docker run --rm -it \
   -v "$PWD":/experiment \
   -w /experiment \
   logicfuzz \
-  python3 report/docker_run.py \
     --model qwen3-coder-plus \
-    --benchmark-set conti-benchmark/cjson.yaml \
+    -y conti-benchmark/cjson.yaml \
     --work-dir results/$(date +%Y%m%d-%H%M%S) \
-    --num-samples 1
+    --num-samples 1 \
+    --context
 ```
-Pass any extra `run_logicfuzz.py` parameters after `--additional-args -- ...`.
+所有实验参数现在都直接传递给 `run_logicfuzz.py`；不需要再使用单独的 `--benchmark-set` 包装参数。想运行整个目录就传 `--benchmarks-directory conti-benchmark/cjson`，想只跑一个 YAML 就用 `-y conti-benchmark/cjson.yaml`。如果完全不指定，容器会回退到 `conti-benchmark/comparison`。
+
+容器仍会默认拉起本地 Fuzz Introspector (`http://127.0.0.1:8080`)；若你已经有现成实例，可加 `--local-introspector false` 禁用。
 
 ## 4. Build the Fuzz Introspector image
 ```bash
@@ -55,6 +57,4 @@ The container automatically calls `report/launch_introspector.sh`. Mount the sam
 ## 6. Verify results
 - Experiment logs appear under `results/` inside the repo (and under `/experiment/results` in the runner container). Each run uses the label shown at startup.
 - Introspector exports live under `report/` using the paths configured in `report/upload_report.sh`. Share the same host directory so both containers see the outputs.
-
-Done! If a command fails, read the message, fix the issue (usually a missing dependency or wrong path), and rerun the same step.
 

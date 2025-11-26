@@ -9,7 +9,9 @@ import logging
 import os
 import subprocess
 import sys
+from typing import List
 
+import run_logicfuzz
 from llm_toolkit import models
 import run_single_fuzz
 
@@ -17,86 +19,29 @@ import run_single_fuzz
 logging.basicConfig(level=logging.INFO)
 
 BENCHMARK_SET = 'comparison'
-RUN_TIMEOUT = run_single_fuzz.RUN_TIMEOUT
-MODEL = models.DefaultModel.name
-DELAY = 0
-NUM_SAMPLES = run_single_fuzz.NUM_SAMPLES
-MAX_ROUND = 10
-TEMPERATURE = run_single_fuzz.TEMPERATURE
-WORK_DIR = run_single_fuzz.RESULTS_DIR
 DATA_DIR = '/experiment/data-dir/'
 
+def _needs_benchmark_selection(cmd: List[str]) -> bool:
+  """Returns True if user did not pass any benchmark selector flag."""
+  benchmark_flags = {
+      "-y", "--benchmark-yaml", "-b", "--benchmarks-directory", "-g",
+      "--generate-benchmarks"
+  }
+  return not any(token in benchmark_flags for token in cmd)
+
+
 def _parse_args(cmd) -> argparse.Namespace:
-  """Parses the command line arguments."""
-  parser = argparse.ArgumentParser(description='Run experiments')
-  parser.add_argument(
-      '-b',
-      '--benchmark-set',
-      type=str,
-      default=BENCHMARK_SET,
-      help=f'Experiment benchmark set, default: {BENCHMARK_SET}.')
-  parser.add_argument(
-      '-to',
-      '--run-timeout',
-      type=int,
-      default=RUN_TIMEOUT,
-      help=f'Fuzzing timeout in seconds, default: {RUN_TIMEOUT} seconds.')
-  parser.add_argument('-m',
-                      '--model',
-                      type=str,
-                      default=MODEL,
-                      help=f'Large Language Model name, default: {MODEL}.')
-  parser.add_argument(
-      '-d',
-      '--delay',
-      type=int,
-      default=DELAY,
-      help=f'Delay each benchmark experiment by N seconds, default: {DELAY}.')
-  parser.add_argument(
-      '-w',
-      '--work-dir',
-      type=str,
-      default=WORK_DIR,
-      help=f'Path to store experiment outputs, default: {WORK_DIR}.')
+  """Parses docker-specific arguments and forwards the rest."""
+  parser = argparse.ArgumentParser(
+      description=("Wrapper around run_logicfuzz.py. All unrecognized flags "
+                   "are forwarded directly to run_logicfuzz.py."))
   parser.add_argument(
       '-i',
       '--local-introspector',
       type=str,
-      default="false",
-      help=
-      'If set to "true" will use a local version of fuzz introspector\'s webapp'
-  )
-  parser.add_argument(
-      '-ns',
-      '--num-samples',
-      type=int,
-      default=NUM_SAMPLES,
-      help=f'The number of samples to request from LLM, default: {NUM_SAMPLES}')
-  parser.add_argument(
-      '-t',
-      '--temperature',
-      type=float,
-      default=TEMPERATURE,
-      help='Temperature to use for samples, default matches run_logicfuzz.')
-  parser.add_argument(
-      '-tr',
-      '--temperature-list',
-      nargs='*',
-      type=float,
-      default=[],
-      help='Optional list of temperatures to cycle through for samples.')
-  parser.add_argument(
-      '-bd',
-      '--benchmarks-directory',
-      type=str,
-      help='Path to benchmark directory. Defaults to conti benchmark set.')
-  # Note: Agent mode (LangGraph) is now the default and only mode.
-  # The --agent flag has been removed.
-  parser.add_argument('-mr',
-                      '--max-round',
-                      type=int,
-                      default=MAX_ROUND,
-                      help=f'Max trial round for agents, default: {MAX_ROUND}.')
+      default="true",
+      help=('Controls the bundled local Fuzz Introspector (default: "true"). '
+            'Set to "false" only if you already run one on localhost:8080.'))
   parser.add_argument(
       '-rd',
       '--redirect-outs',
@@ -104,17 +49,19 @@ def _parse_args(cmd) -> argparse.Namespace:
       default="false",
       help=
       'Redirects experiments stdout/stderr to file. Set to "true" to enable.')
-  args, additional_args = parser.parse_known_args(cmd)
+  args, run_logicfuzz_args = parser.parse_known_args(cmd)
 
-  # Arguments after the first element ("--") separator.
-  if additional_args and additional_args[0] == '--':
-    args.additional_args = additional_args[1:]
-  else:
-    args.additional_args = additional_args
+  run_logicfuzz_args = list(run_logicfuzz_args)
+  if _needs_benchmark_selection(run_logicfuzz_args):
+    default_dir = os.path.join("conti-benchmark", BENCHMARK_SET)
+    logging.info(
+        "No benchmark selector provided; defaulting to '--benchmarks-directory %s'.",
+        default_dir)
+    run_logicfuzz_args.extend(["--benchmarks-directory", default_dir])
 
-  # Parse boolean arguments
   args.local_introspector = args.local_introspector.lower() == "true"
   args.redirect_outs = args.redirect_outs.lower() == "true"
+  args.run_logicfuzz_args = run_logicfuzz_args
 
   return args
 
@@ -124,12 +71,27 @@ def _run_command(command: list[str], shell=False):
   return process.returncode
 
 def _log_common_args(args):
-  """Prints args useful for logging"""
-  logging.info("Benchmark set is %s.", args.benchmark_set)
+  """Prints args useful for logging."""
+  benchmark_source = (args.benchmark_yaml or args.benchmarks_directory or
+                      f"generated({args.generate_benchmarks})")
+  logging.info("Benchmark source is %s.", benchmark_source)
   logging.info("Run timeout is %s.", args.run_timeout)
   logging.info("LLM is %s.", args.model)
   logging.info("DELAY is %s.", args.delay)
   logging.info("Work dir is %s.", args.work_dir)
+
+
+def _derive_benchmark_label(args: argparse.Namespace) -> str:
+  """Returns a short label for reports/introspector env."""
+  if args.benchmark_yaml:
+    return os.path.splitext(os.path.basename(args.benchmark_yaml))[0]
+  if args.benchmarks_directory:
+    return os.path.basename(os.path.normpath(args.benchmarks_directory))
+  if args.generate_benchmarks_projects:
+    return args.generate_benchmarks_projects.replace(',', '_')
+  if args.generate_benchmarks:
+    return args.generate_benchmarks.replace(',', '_')
+  return BENCHMARK_SET
 
 def main(cmd=None):
   """Main entrypoint"""
@@ -146,13 +108,14 @@ def main(cmd=None):
 def run_on_data_from_scratch(cmd=None):
   """Creates experiment for projects that are not in OSS-Fuzz upstream"""
   args = _parse_args(cmd)
+  run_args = run_logicfuzz.parse_args(args.run_logicfuzz_args)
 
   # Uses python3 by default and /venv/bin/python3 for Docker containers.
   python_path = "/venv/bin/python3" if os.path.exists(
       "/venv/bin/python3") else "python3"
   os.environ["PYTHON"] = python_path
 
-  _log_common_args(args)
+  _log_common_args(run_args)
 
   # Launch starter, which set ups a Fuzz Introspector instance, which
   # will be used for creating benchmarks and extract context.
@@ -161,20 +124,20 @@ def run_on_data_from_scratch(cmd=None):
                         shell=True)
 
   date = datetime.datetime.now().strftime('%Y-%m-%d')
-  benchmark_label = args.benchmarks_directory or args.benchmark_set
+  benchmark_label = _derive_benchmark_label(run_args)
   experiment_name = f"{date}-{benchmark_label}"
   report_label = experiment_name
   logging.info("Report label is %s.", report_label)
 
-  local_results_dir = args.work_dir
+  local_results_dir = run_args.work_dir
 
   # Generate a report locally
   upload_env = os.environ.copy()
   upload_env["REPORT_LABEL"] = report_label
   report_process = subprocess.Popen([
       "bash", "report/upload_report.sh", local_results_dir, benchmark_label,
-      args.model
-  ] + args.additional_args,
+      run_args.model
+  ] + args.run_logicfuzz_args,
                                      env=upload_env)
 
   # Launch run_logicfuzz.py
@@ -211,20 +174,21 @@ def run_on_data_from_scratch(cmd=None):
   cmd.append('-e')
   cmd.append(introspector_endpoint)
   cmd.append('-mr')
-  cmd.append(str(args.max_round))
+  cmd.append(str(run_args.max_round))
   cmd += [
       "--run-timeout",
-      str(args.run_timeout), "--work-dir",
+      str(run_args.run_timeout), "--work-dir",
       local_results_dir, "--num-samples",
-      str(args.num_samples), "--delay",
-      str(args.delay), "--context", "--model", args.model, "--temperature",
-      str(args.temperature)
+      str(run_args.num_samples), "--delay",
+      str(run_args.delay), "--context", "--model", run_args.model,
+      "--temperature",
+      str(run_args.temperature)
   ]
-  if args.temperature_list:
+  if run_args.temperature_list:
     cmd.append("--temperature-list")
-    cmd.extend(str(temp) for temp in args.temperature_list)
-  if args.additional_args:
-    cmd.extend(args.additional_args)
+    cmd.extend(str(temp) for temp in run_args.temperature_list)
+  if args.run_logicfuzz_args:
+    cmd.extend(args.run_logicfuzz_args)
   # Note: Agent mode is now the default, no need to append --agent flag
 
   # Run the experiment and redirect to file if indicated.
@@ -263,29 +227,30 @@ def run_on_data_from_scratch(cmd=None):
 def run_standard(cmd=None):
   """The main function."""
   args = _parse_args(cmd)
+  run_args = run_logicfuzz.parse_args(args.run_logicfuzz_args)
 
   # Uses python3 by default and /venv/bin/python3 for Docker containers.
   python_path = "/venv/bin/python3" if os.path.exists(
       "/venv/bin/python3") else "python3"
   os.environ["PYTHON"] = python_path
 
-  _log_common_args(args)
+  _log_common_args(run_args)
 
+  introspector_endpoint = run_args.introspector_endpoint
+  benchmark_label = _derive_benchmark_label(run_args)
   if args.local_introspector:
-    os.environ["BENCHMARK_SET"] = args.benchmark_set
-    introspector_endpoint = "http://127.0.0.1:8080/api"
+    os.environ["BENCHMARK_SET"] = benchmark_label
     logging.info("LOCAL_INTROSPECTOR is enabled: %s", introspector_endpoint)
     _run_command(['bash', 'report/launch_local_introspector.sh'], shell=True)
   else:
-    introspector_endpoint = "https://introspector.oss-fuzz.com/api"
-    logging.info("LOCAL_INTROSPECTOR was not specified. Defaulting to %s.",
-                 introspector_endpoint)
+    logging.info(
+        "LOCAL_INTROSPECTOR auto-launch disabled; expecting service at %s.",
+        introspector_endpoint)
 
-  logging.info("NUM_SAMPLES is %s.", args.num_samples)
+  logging.info("NUM_SAMPLES is %s.", run_args.num_samples)
 
   date = datetime.datetime.now().strftime('%Y-%m-%d')
-  local_results_dir = args.work_dir
-  benchmark_label = args.benchmarks_directory or args.benchmark_set
+  local_results_dir = run_args.work_dir
 
   experiment_name = f"{date}-{benchmark_label}"
   report_label = experiment_name
@@ -296,31 +261,12 @@ def run_standard(cmd=None):
   upload_env["REPORT_LABEL"] = report_label
   report_process = subprocess.Popen([
       "bash", "report/upload_report.sh", local_results_dir, benchmark_label,
-      args.model
-  ] + args.additional_args,
+      run_args.model
+  ] + args.run_logicfuzz_args,
                                      env=upload_env)
 
   # Prepare the command to run experiments
-  benchmark_directory = (args.benchmarks_directory or
-                         f"conti-benchmark/{args.benchmark_set}")
-  run_cmd = [
-      python_path, "run_logicfuzz.py", "--benchmarks-directory",
-      benchmark_directory, "--run-timeout",
-      str(args.run_timeout), "--work-dir",
-      local_results_dir, "--num-samples",
-      str(args.num_samples), "--delay",
-      str(args.delay), "--context", "--introspector-endpoint",
-      introspector_endpoint, "--model", args.model, "--max-round",
-      str(args.max_round), "--temperature",
-      str(args.temperature)
-  ]
-  if args.temperature_list:
-    run_cmd.append("--temperature-list")
-    run_cmd.extend(str(temp) for temp in args.temperature_list)
-  # Note: Agent mode is now the default, no need to append --agent flag
-
-  if args.additional_args:
-    run_cmd.extend(args.additional_args)
+  run_cmd = [python_path, "run_logicfuzz.py"] + args.run_logicfuzz_args
 
   # Run the experiment and redirect to file if indicated.
   if args.redirect_outs:

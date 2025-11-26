@@ -1,13 +1,11 @@
 # Build a virtualenv using the appropriate Debian release:
-# * Install python3-venv for the built-in Python3 venv module (not installed by default).
-# * Install gcloud CLI from Google Cloud's apt repository.
-
 FROM debian:12
 
 ENV DEBIAN_FRONTEND=noninteractive \
     TZ=Asia/Singapore \
     VIRTUAL_ENV=/venv \
-    PATH="/venv/bin:$PATH"
+    PATH="/venv/bin:$PATH" \
+    PYTHONPATH="/experiment"
 
 # Install base packages and create the virtualenv.
 RUN apt-get update && \
@@ -56,4 +54,4 @@ RUN pip install --upgrade pip && \
 
 COPY . .
 
-ENTRYPOINT ["python3", "./report/docker_run.py"]
+# ENTRYPOINT ["python3", "./report/docker_run.py"]
