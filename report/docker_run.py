@@ -32,6 +32,16 @@ def _needs_benchmark_selection(cmd: List[str]) -> bool:
 
 def _parse_args(cmd) -> argparse.Namespace:
   """Parses docker-specific arguments and forwards the rest."""
+  if cmd is None:
+    cmd = sys.argv[1:]
+  cmd = list(cmd)
+
+  additional_args = []
+  if '--' in cmd:
+    separator_index = cmd.index('--')
+    additional_args = cmd[separator_index + 1:]
+    cmd = cmd[:separator_index]
+
   parser = argparse.ArgumentParser(
       description=("Wrapper around run_logicfuzz.py. All unrecognized flags "
                    "are forwarded directly to run_logicfuzz.py."))
@@ -50,11 +60,6 @@ def _parse_args(cmd) -> argparse.Namespace:
       help=
       'Redirects experiments stdout/stderr to file. Set to "true" to enable.')
   args, run_logicfuzz_args = parser.parse_known_args(cmd)
-
-  # Arguments after the first element ("--") separator.
-  if additional_args and additional_args[0] == '--':
-  args.additional_args = additional_args[1:]
-  else:
     args.additional_args = additional_args
 
   # Parse boolean arguments
@@ -136,7 +141,7 @@ def run_on_data_from_scratch(cmd=None):
   report_process = subprocess.Popen([
       "bash", "report/upload_report.sh", local_results_dir, benchmark_label,
       run_args.model
-  ] + args.run_logicfuzz_args,
+  ] + args.additional_args,
                                      env=upload_env)
 
   # Launch run_logicfuzz.py
@@ -261,7 +266,7 @@ def run_standard(cmd=None):
   report_process = subprocess.Popen([
       "bash", "report/upload_report.sh", local_results_dir, benchmark_label,
       run_args.model
-  ] + args.run_logicfuzz_args,
+  ] + args.additional_args,
                                      env=upload_env)
 
   # Prepare the command to run experiments

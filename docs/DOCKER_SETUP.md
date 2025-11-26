@@ -1,60 +1,86 @@
 # Docker Environment Quickstart
 
-Follow these steps exactly and you will have both LogicFuzz containers ready. No prior Docker knowledge required.
+This guide shows how to run LogicFuzz entirely inside Docker. Two images are provided:
 
-## 1. Install the prerequisites
-- Install Docker Engine (version 24+ recommended).  
-  - Linux: follow https://docs.docker.com/engine/install/#server
-  - macOS/Windows: install Docker Desktop and ensure it is running.
-- Clone this repository and `cd` into it.
+1. `Dockerfile` &rarr; LogicFuzz experiment runner (`report/docker_run.py` wrapper).
+2. `Dockerfile.fuzz-introspector` &rarr; stand‑alone Fuzz Introspector service.
 
-## 2. Build the experiment runner image
+## 1. Prerequisites
+- Docker Engine/ Docker Desktop (24+ recommended).  
+  - Linux: https://docs.docker.com/engine/install/
+  - macOS / Windows: install Docker Desktop and keep it running.
+- A cloned LogicFuzz repository.
+- Export at least one LLM API key (OpenAI, Qwen/DashScope, Vertex AI, etc.).
+
+## 2. Build the runner image
 ```bash
-docker build -t logicfuzz:latest -f Dockerfile .
+docker build -t logicfuzz -f Dockerfile .
 ```
-This image runs the main LogicFuzz experiment workflow via `report/docker_run.py`.
+The image ships with a virtualenv in `/venv` and copies the entire tree under `/experiment`.
 
-## 3. Launch the experiment runner
-The runner image expects the repo root mounted at `/experiment`, which `report/docker_run.py` uses as its working tree.
+## 3. Run experiments inside the container
+`report/docker_run.py` is a thin wrapper around `run_logicfuzz.py`. It launches a local Fuzz Introspector (unless told otherwise), executes the workflow, and streams HTML reports via `report/upload_report.sh`.
+
 ```bash
 docker run --rm -it \
+  --privileged \
+  -v /var/run/docker.sock:/var/run/docker.sock \
   -v "$PWD":/experiment \
   -w /experiment \
+  -e OPENAI_API_KEY=$OPENAI_API_KEY \
   logicfuzz \
-  --help
-```
-The image’s `ENTRYPOINT` already runs `python3 report/docker_run.py`, so you only pass flags. Use the `--help` output to confirm the flag set mirrors `run_logicfuzz.py`. Start a real experiment by swapping in your desired arguments—for example:
-```bash
-docker run --rm -it \
-  -v "$PWD":/experiment \
-  -w /experiment \
-  logicfuzz \
-    --model qwen3-coder-plus \
-    -y conti-benchmark/cjson.yaml \
+  python3 report/docker_run.py \
+    --model qwen3 \
+    -y conti-benchmark/conti-cmp/cjson.yaml \
     --work-dir results/$(date +%Y%m%d-%H%M%S) \
-    --num-samples 1 \
+    --num-samples 2 \
     --context
 ```
-所有实验参数现在都直接传递给 `run_logicfuzz.py`；不需要再使用单独的 `--benchmark-set` 包装参数。想运行整个目录就传 `--benchmarks-directory conti-benchmark/cjson`，想只跑一个 YAML 就用 `-y conti-benchmark/cjson.yaml`。如果完全不指定，容器会回退到 `conti-benchmark/comparison`。
 
-容器仍会默认拉起本地 Fuzz Introspector (`http://127.0.0.1:8080`)；若你已经有现成实例，可加 `--local-introspector false` 禁用。
+Key facts:
+- The repo must be mounted at `/experiment`; results are written to `/experiment/results/*` so they persist on the host.
+- If you omit `-y/--benchmark-yaml`, `-b/--benchmarks-directory`, and `-g/--generate-benchmarks`, the wrapper auto-selects `conti-benchmark/comparison`.
+- Add `--local-introspector false` to re-use an existing FI endpoint (`-e/--introspector-endpoint`).
+- Add `--redirect-outs true` to tee stdout/stderr into `results/logs-from-run.txt`.
 
-## 4. Build the Fuzz Introspector image
+## 4. Using the “data-dir” workflow (non OSS-Fuzz projects)
+When `/experiment/data-dir` exists (or `/experiment/data-dir.zip` is mounted), the container switches to `run_on_data_from_scratch()`:
+
+1. Mount your prepared directory (or drop a zipped archive) that contains:
+   - `oss-fuzz2/` &rarr; custom OSS-Fuzz clone with your projects.
+   - `fuzz_introspector_db/` &rarr; prebuilt FI database.
+2. The wrapper starts `report/custom_oss_fuzz_fi_starter.sh`, launches FI at `http://127.0.0.1:8080/api`, and calls `run_logicfuzz.py -g ...` with the heuristics configured in the script (`far-reach-low-coverage, low-cov-with-fuzz-keyword, easy-params-far-reach`).
+3. Reports are uploaded with the label `<date>-<benchmark_label>` so you can host them straight from `results/`.
+
+Use this mode when onboarding internal/private projects that are not part of upstream OSS-Fuzz but already have collected coverage + build artifacts.
+
+## 5. Build the stand-alone Fuzz Introspector image
 ```bash
 docker build -t logicfuzz-introspector -f Dockerfile.fuzz-introspector .
 ```
-This image analyzes experiment outputs with Fuzz Introspector.
+The entrypoint is `bash /opt/logicfuzz/report/launch_introspector.sh`, so all CLI flags supported by that script are available.
 
-## 5. Launch the Fuzz Introspector
+### Example: start FI from the shipped benchmarks
 ```bash
-docker run --rm -it \
-  -v "$PWD":/opt/logicfuzz \
-  -w /opt/logicfuzz \
-  logicfuzz-introspector
+docker run --rm -p 8080:8080 \
+  -v "$PWD"/conti-benchmark:/opt/logicfuzz/conti-benchmark \
+  logicfuzz-introspector \
+    --source benchmark \
+    --benchmark-set comparison
 ```
-The container automatically calls `report/launch_introspector.sh`. Mount the same repo so reports and results are shared.
 
-## 6. Verify results
-- Experiment logs appear under `results/` inside the repo (and under `/experiment/results` in the runner container). Each run uses the label shown at startup.
-- Introspector exports live under `report/` using the paths configured in `report/upload_report.sh`. Share the same host directory so both containers see the outputs.
+### Example: reuse an existing `data-dir`
+```bash
+docker run --rm -p 8080:8080 \
+  -v /path/to/data-dir:/opt/logicfuzz/data-dir \
+  logicfuzz-introspector \
+    --source data-dir \
+    --data-dir /opt/logicfuzz/data-dir
+```
 
+## 6. Verifying outputs
+- Experiment artifacts: `results/output-*/` (on host because of the bind mount).
+- HTML reports: generated by `report/upload_report.sh` under `report/html-report/<label>/`.
+- FI service health: curl `http://127.0.0.1:8080/api/healthz`.
+
+If the runner container exits with a non-zero status, inspect `results/logs-from-run.txt` (when `--redirect-outs true`) or the host terminal output. Since Docker uses your host Docker daemon through `/var/run/docker.sock`, make sure Docker Desktop/Engine is running before launching LogicFuzz.

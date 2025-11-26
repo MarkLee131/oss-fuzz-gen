@@ -31,17 +31,18 @@ This guide covers how to run LogicFuzz, from basic usage to advanced configurati
 
 2.  **Fuzz Introspector Server** (optional, recommended for better context):
     ```bash
-    # Start FI server
-    bash report/launch_local_introspector.sh
+    # Start FI in benchmark mode (default set = comparison)
+    bash report/launch_introspector.sh --source benchmark --benchmark-set comparison
     ```
+    The script also supports `--source data-dir --data-dir <path>` when you already have a populated FI database.
 
 ### Basic Usage
 
 Run LogicFuzz on a specific function in a benchmark project:
 
 ```bash
-# Target specific function
-python run_logicfuzz.py --agent \
+# Target a specific function
+python run_logicfuzz.py \
   -y conti-benchmark/conti-cmp/libxml2.yaml \
   -f xmlParseDocument \
   --model gpt-5
@@ -63,17 +64,21 @@ docker build -t logicfuzz:latest .
 docker run --rm \
   --privileged \
   -v /var/run/docker.sock:/var/run/docker.sock \
-  -v $(pwd)/results:/experiment/results \
+  -v $(pwd):/experiment \
+  -w /experiment \
   -e OPENAI_API_KEY="sk-..." \
   logicfuzz:latest \
-  -b comparison \
-  -m gpt-5 \
-  --run-timeout 300
+  python3 report/docker_run.py \
+    --model gpt-5 \
+    --benchmarks-directory conti-benchmark/comparison \
+    --run-timeout 300 \
+    --local-introspector true
 ```
 
 **Notes:**
-*   `--privileged` and Docker socket mount are required for OSS-Fuzz builds.
-*   Mount `/experiment/results` to persist results.
+*   `--privileged` plus the Docker socket mount let the container call `infra/helper.py` inside OSS-Fuzz images.
+*   Mount the entire repo (not just `results/`) so `report/docker_run.py` can upload HTML reports alongside the sources.
+*   Pass `--local-introspector false` and `-e http://host.docker.internal:8080/api` when you already run FI on the host.
 
 ### Split Deployment (LogicFuzz + Fuzz Introspector)
 
@@ -97,7 +102,7 @@ Run Fuzz Introspector in its own container so LogicFuzz can be upgraded or resta
     ```
 3. Point LogicFuzz to the running server:
     ```bash
-    python run_logicfuzz.py --agent ... \
+    python run_logicfuzz.py ... \
       -e http://localhost:8080/api
     ```
 
@@ -111,11 +116,17 @@ services:
     privileged: true
     environment:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - FI_ENDPOINT=http://fuzz-introspector:8080/api
-    command: ["python", "run_logicfuzz.py", "--agent", "-y", "conti-benchmark/conti-cmp/cjson.yaml", "--fuzz-introspector-endpoint", "http://fuzz-introspector:8080/api"]
+    command:
+      [
+        "python3", "report/docker_run.py",
+        "--local-introspector", "false",
+        "-y", "conti-benchmark/conti-cmp/cjson.yaml",
+        "--introspector-endpoint", "http://fuzz-introspector:8080/api",
+        "--model", "gpt-5"
+      ]
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - ./results:/experiment/results
+      - .:/experiment
   fuzz-introspector:
     build:
       context: .
@@ -135,7 +146,7 @@ The compose file above is only an example—adjust benchmark/data directories an
 Process all functions in a benchmark YAML:
 
 ```bash
-python run_logicfuzz.py --agent \
+python run_logicfuzz.py \
   -y conti-benchmark/conti-cmp/cjson.yaml \
   --model gpt-5 \
   -e http://0.0.0.0:8080/api \
@@ -146,7 +157,7 @@ python run_logicfuzz.py --agent \
 Focus on crash discovery with extended fuzzing time and multiple samples:
 
 ```bash
-python run_logicfuzz.py --agent \
+python run_logicfuzz.py \
   -y conti-benchmark/conti-cmp/libpng.yaml \
   --model gpt-5 \
   -e http://0.0.0.0:8080/api \
@@ -159,7 +170,7 @@ python run_logicfuzz.py --agent \
 Works without Fuzz Introspector (reduced context quality):
 
 ```bash
-python run_logicfuzz.py --agent \
+python run_logicfuzz.py \
   -y conti-benchmark/conti-cmp/cjson.yaml \
   --model gpt-5 \
   --num-samples 3
@@ -172,7 +183,7 @@ python run_logicfuzz.py --agent \
 | Parameter | Description | Default | Recommended |
 |-----------|-------------|---------|-------------|
 | `--model` | LLM model name | - | `gpt-5`, `gemini-2.0-flash-exp`, `qwen3` |
-| `-e, --fuzz-introspector-endpoint` | FI server URL | None | `http://0.0.0.0:8080/api` |
+| `-e, --introspector-endpoint` | FI server URL | `http://127.0.0.1:8080/api` | `http://0.0.0.0:8080/api` |
 | `--num-samples` | Trials per function | 5 | 5-10 |
 | `--temperature` | LLM temperature | 0.4 | 0.3-0.5 |
 | `--run-timeout` | Fuzzer runtime (seconds) | 60 | 60-300 |
@@ -225,7 +236,7 @@ export QWEN_BASE_URL="https://dashscope-intl.aliyuncs.com/compatible-mode/v1"  #
 # export QWEN_BASE_URL="https://dashscope.aliyuncs.com/compatible-mode/v1"      # Beijing
 
 # 4. Run LogicFuzz
-python run_logicfuzz.py --agent \
+python run_logicfuzz.py \
   -y conti-benchmark/conti-cmp/libxml2.yaml \
   --model qwen3 \
   --num-samples 5
@@ -251,16 +262,16 @@ python run_logicfuzz.py --agent \
 
 ```bash
 # Fast iteration with Qwen Turbo
-python run_logicfuzz.py --agent -y benchmark.yaml --model qwen-turbo --num-samples 3
+python run_logicfuzz.py -y benchmark.yaml --model qwen-turbo --num-samples 3
 
 # Long context with Qwen Plus
-python run_logicfuzz.py --agent -y benchmark.yaml --model qwen-plus --num-samples 5
+python run_logicfuzz.py -y benchmark.yaml --model qwen-plus --num-samples 5
 
 # Best quality with Qwen Max
-python run_logicfuzz.py --agent -y benchmark.yaml --model qwen-max --num-samples 5
+python run_logicfuzz.py -y benchmark.yaml --model qwen-max --num-samples 5
 
 # Recommended: Qwen3 (balanced)
-python run_logicfuzz.py --agent -y benchmark.yaml --model qwen3 --num-samples 5
+python run_logicfuzz.py -y benchmark.yaml --model qwen3 --num-samples 5
 ```
 
 ### Verification
