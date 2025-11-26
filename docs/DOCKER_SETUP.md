@@ -22,17 +22,28 @@ The image ships with a virtualenv in `/venv` and copies the entire tree under `/
 `report/docker_run.py` is a thin wrapper around `run_logicfuzz.py`. It launches a local Fuzz Introspector (unless told otherwise) and executes the workflow. Reports remain as raw artifacts under `results/` and can be visualized later with `python -m report.web`.
 
 ```bash
+# 1) Configure your LLM API keys: 
+# Edit logicfuzz.env and fill in DASHSCOPE_API_KEY / OPENAI_API_KEY, etc.
+
+# 2) Prepare a results directory for this run
 WORK_DIR="results/$(date +%Y%m%d-%H%M%S)"
 mkdir -p "$WORK_DIR"
 
+# 3) (Optional but recommended) start Fuzz Introspector on the host so it can
+#    be re-used across multiple runs.
+bash report/launch_introspector.sh --source benchmark --python python3 &
+
+# 4) Launch LogicFuzz inside Docker, passing env from logicfuzz.env
 docker run --rm \
   --privileged \
+  --network host \
+  --env-file logicfuzz.env \
   -v /var/run/docker.sock:/var/run/docker.sock \
   -v "$PWD":/experiment \
   -w /experiment \
   logicfuzz \
   python3 report/docker_run.py \
-    --local-introspector true \
+    --local-introspector false \
     --redirect-outs true \
     --model qwen3-coder-plus \
     -y conti-benchmark/cjson.yaml \
