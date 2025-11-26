@@ -51,14 +51,13 @@ def _parse_args(cmd) -> argparse.Namespace:
       'Redirects experiments stdout/stderr to file. Set to "true" to enable.')
   args, run_logicfuzz_args = parser.parse_known_args(cmd)
 
-  run_logicfuzz_args = list(run_logicfuzz_args)
-  if _needs_benchmark_selection(run_logicfuzz_args):
-    default_dir = os.path.join("conti-benchmark", BENCHMARK_SET)
-    logging.info(
-        "No benchmark selector provided; defaulting to '--benchmarks-directory %s'.",
-        default_dir)
-    run_logicfuzz_args.extend(["--benchmarks-directory", default_dir])
+  # Arguments after the first element ("--") separator.
+  if additional_args and additional_args[0] == '--':
+  args.additional_args = additional_args[1:]
+  else:
+    args.additional_args = additional_args
 
+  # Parse boolean arguments
   args.local_introspector = args.local_introspector.lower() == "true"
   args.redirect_outs = args.redirect_outs.lower() == "true"
   args.run_logicfuzz_args = run_logicfuzz_args
