@@ -60,7 +60,7 @@ def _parse_args(cmd) -> argparse.Namespace:
       help=
       'Redirects experiments stdout/stderr to file. Set to "true" to enable.')
   args, run_logicfuzz_args = parser.parse_known_args(cmd)
-    args.additional_args = additional_args
+  args.additional_args = additional_args
 
   # Parse boolean arguments
   args.local_introspector = args.local_introspector.lower() == "true"

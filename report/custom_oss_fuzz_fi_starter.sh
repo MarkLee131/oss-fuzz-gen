@@ -2,6 +2,34 @@
 
 set -x
 
+bootstrap_empty_db() {
+  echo "Warning: $BASE/$DATA_DIR/fuzz_introspector_db not found."
+  echo "         Creating an empty placeholder DB so the web app can boot."
+  echo "         To see real data, mount /experiment/data-dir/fuzz_introspector_db."
+  mkdir -p db/db-projects
+  cat <<'EOF' > db/db-timestamps.json
+[]
+EOF
+  cat <<'EOF' > db/all-project-timestamps.json
+[]
+EOF
+  cat <<'EOF' > db/all-project-current.json
+[]
+EOF
+  cat <<'EOF' > db/build-status.json
+{}
+EOF
+  cat <<'EOF' > db/projects-not-in-oss-fuzz.json
+[]
+EOF
+  cat <<'EOF' > db/all-header-files.json
+[]
+EOF
+  cat <<'EOF' > db/full-oss-fuzz-project-count.json
+{}
+EOF
+}
+
 BASE=$PWD
 DATA_DIR="data-dir"
 
@@ -30,7 +58,11 @@ ${PYTHON} -m pip install -r requirements.txt
 # Copy the database we have created already
 cd app/static/assets
 rm -rf ./db
-cp -rf $BASE/$DATA_DIR/fuzz_introspector_db db
+if [ -d "$BASE/$DATA_DIR/fuzz_introspector_db" ]; then
+  cp -rf $BASE/$DATA_DIR/fuzz_introspector_db db
+else
+  bootstrap_empty_db
+fi
 cd ../../
 # Launch the server
 FUZZ_INTROSPECTOR_SHUTDOWN=1 FUZZ_INTROSPECTOR_LOCAL_OSS_FUZZ=$BASE/$DATA_DIR/oss-fuzz2 ${PYTHON} main.py >>/dev/null &

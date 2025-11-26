@@ -27,7 +27,6 @@ docker run --rm -it \
   -v /var/run/docker.sock:/var/run/docker.sock \
   -v "$PWD":/experiment \
   -w /experiment \
-  -e OPENAI_API_KEY=$OPENAI_API_KEY \
   logicfuzz \
   python3 report/docker_run.py \
     --model qwen3 \
