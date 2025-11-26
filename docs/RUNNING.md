@@ -77,7 +77,7 @@ docker run --rm \
 
 **Notes:**
 *   `--privileged` plus the Docker socket mount let the container call `infra/helper.py` inside OSS-Fuzz images.
-*   Mount the entire repo (not just `results/`) so `report/docker_run.py` can upload HTML reports alongside the sources.
+*   Mount the entire repo (not just `results/`) so `report/docker_run.py` can access benchmarks, scripts, and write results alongside the sources.
 *   Pass `--local-introspector false` and `-e http://host.docker.internal:8080/api` when you already run FI on the host.
 
 ### Split Deployment (LogicFuzz + Fuzz Introspector)

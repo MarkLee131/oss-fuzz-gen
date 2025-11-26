@@ -20,6 +20,7 @@ logging.basicConfig(level=logging.INFO)
 
 BENCHMARK_SET = 'comparison'
 DATA_DIR = '/experiment/data-dir/'
+DEFAULT_BENCHMARK_DIR = 'conti-benchmark/comparison'
 
 def _needs_benchmark_selection(cmd: List[str]) -> bool:
   """Returns True if user did not pass any benchmark selector flag."""
@@ -67,7 +68,77 @@ def _parse_args(cmd) -> argparse.Namespace:
   args.redirect_outs = args.redirect_outs.lower() == "true"
   args.run_logicfuzz_args = run_logicfuzz_args
 
+  if _needs_benchmark_selection(args.run_logicfuzz_args):
+    logging.info("No benchmark flag detected, defaulting to %s.",
+                 DEFAULT_BENCHMARK_DIR)
+    args.run_logicfuzz_args = ['-b', DEFAULT_BENCHMARK_DIR
+                               ] + args.run_logicfuzz_args
+
   return args
+
+
+def _resolve_python_path() -> str:
+  """Detects python path and exports it via PYTHON."""
+  python_path = "/venv/bin/python3" if os.path.exists(
+      "/venv/bin/python3") else "python3"
+  os.environ["PYTHON"] = python_path
+  return python_path
+
+
+def _run_logicfuzz_command(cmd: list[str], redirect_outs: bool,
+                           local_results_dir: str, env: dict | None = None):
+  """Runs LogicFuzz with optional stdout/stderr redirection."""
+  if redirect_outs:
+    with open(f"{local_results_dir}/logs-from-run.txt", "w") as outfile:
+      process = subprocess.run(cmd,
+                               stdout=outfile,
+                               stderr=outfile,
+                               env=env,
+                               check=False)
+      return process.returncode
+  process = subprocess.run(cmd, env=env, check=False)
+  return process.returncode
+
+
+def _collect_projects(data_dir: str) -> str:
+  """Discovers OSS-Fuzz builds in data directory."""
+  projects_root = os.path.join(data_dir, 'build', 'out')
+  if not os.path.isdir(projects_root):
+    logging.warning("No projects found under %s.", projects_root)
+    return ''
+  project_names = [
+      project_name for project_name in os.listdir(projects_root)
+      if os.path.isdir(os.path.join(projects_root, project_name))
+  ]
+  return ','.join(sorted(project_names))
+
+
+def _build_data_mode_cmd(python_path: str, run_args: argparse.Namespace,
+                         project_names: str, introspector_endpoint: str,
+                         passthrough_args: list[str]) -> list[str]:
+  """Assembles command for non-OSS-Fuzz data-dir runs."""
+  cmd = [python_path, 'run_logicfuzz.py', '-g']
+  cmd.append(
+      'far-reach-low-coverage,low-cov-with-fuzz-keyword,easy-params-far-reach')
+  cmd.extend(['-gp', project_names or ''])
+  cmd.extend(['-gm', str(8)])
+  cmd.extend(['-e', introspector_endpoint])
+  cmd.extend(['-mr', str(run_args.max_round)])
+  cmd += [
+      "--run-timeout",
+      str(run_args.run_timeout), "--work-dir",
+      run_args.work_dir, "--num-samples",
+      str(run_args.num_samples), "--delay",
+      str(run_args.delay), "--context", "--model", run_args.model,
+      "--temperature",
+      str(run_args.temperature)
+  ]
+  if run_args.temperature_list:
+    cmd.append("--temperature-list")
+    cmd.extend(str(temp) for temp in run_args.temperature_list)
+  if passthrough_args:
+    cmd.extend(passthrough_args)
+  return cmd
 
 def _run_command(command: list[str], shell=False):
   """Runs a command and return its exit code."""
@@ -114,11 +185,7 @@ def run_on_data_from_scratch(cmd=None):
   args = _parse_args(cmd)
   run_args = run_logicfuzz.parse_args(args.run_logicfuzz_args)
 
-  # Uses python3 by default and /venv/bin/python3 for Docker containers.
-  python_path = "/venv/bin/python3" if os.path.exists(
-      "/venv/bin/python3") else "python3"
-  os.environ["PYTHON"] = python_path
-
+  python_path = _resolve_python_path()
   _log_common_args(run_args)
 
   # Launch starter, which set ups a Fuzz Introspector instance, which
@@ -135,78 +202,16 @@ def run_on_data_from_scratch(cmd=None):
 
   local_results_dir = run_args.work_dir
 
-  # Generate a report locally
-  upload_env = os.environ.copy()
-  upload_env["REPORT_LABEL"] = report_label
-  report_process = subprocess.Popen([
-      "bash", "report/upload_report.sh", local_results_dir, benchmark_label,
-      run_args.model
-  ] + args.additional_args,
-                                     env=upload_env)
-
-  # Launch run_logicfuzz.py
-  # some notes:
-  # - we will generate benchmarks using the local FI running
-  # - we will use the oss-fuzz project of our workdir, which is
-  #   the only one that has the projets.
   environ = os.environ.copy()
-
-  # We need to make sure that we use our version of OSS-Fuzz
   environ['OSS_FUZZ_DATA_DIR'] = os.path.join(DATA_DIR, 'oss-fuzz2')
-
-  # Get project names to analyse
-  project_in_oss_fuzz = []
-  for project_name in os.listdir(
-      os.path.join(DATA_DIR, 'oss-fuzz2', 'build', 'out')):
-    project_path = os.path.join(DATA_DIR, 'oss-fuzz2', 'build', 'out',
-                                project_name)
-    if not os.path.isdir(project_path):
-      continue
-    project_in_oss_fuzz.append(project_name)
-  project_names = ','.join(project_in_oss_fuzz)
-
+  project_names = _collect_projects(environ['OSS_FUZZ_DATA_DIR'])
   introspector_endpoint = "http://127.0.0.1:8080/api"
+  logicfuzz_cmd = _build_data_mode_cmd(python_path, run_args, project_names,
+                                       introspector_endpoint,
+                                       args.run_logicfuzz_args)
 
-  cmd = [python_path, 'run_logicfuzz.py']
-  cmd.append('-g')
-  cmd.append(
-      'far-reach-low-coverage,low-cov-with-fuzz-keyword,easy-params-far-reach')
-  cmd.append('-gp')
-  cmd.append(project_names)
-  cmd.append('-gm')
-  cmd.append(str(8))
-  cmd.append('-e')
-  cmd.append(introspector_endpoint)
-  cmd.append('-mr')
-  cmd.append(str(run_args.max_round))
-  cmd += [
-      "--run-timeout",
-      str(run_args.run_timeout), "--work-dir",
-      local_results_dir, "--num-samples",
-      str(run_args.num_samples), "--delay",
-      str(run_args.delay), "--context", "--model", run_args.model,
-      "--temperature",
-      str(run_args.temperature)
-  ]
-  if run_args.temperature_list:
-    cmd.append("--temperature-list")
-    cmd.extend(str(temp) for temp in run_args.temperature_list)
-  if args.run_logicfuzz_args:
-    cmd.extend(args.run_logicfuzz_args)
-  # Note: Agent mode is now the default, no need to append --agent flag
-
-  # Run the experiment and redirect to file if indicated.
-  if args.redirect_outs:
-    with open(f"{local_results_dir}/logs-from-run.txt", "w") as outfile:
-      process = subprocess.run(cmd,
-                               stdout=outfile,
-                               stderr=outfile,
-                               env=environ,
-                               check=False)
-      ret_val = process.returncode
-  else:
-    process = subprocess.run(cmd, env=environ, check=False)
-    ret_val = process.returncode
+  ret_val = _run_logicfuzz_command(logicfuzz_cmd, args.redirect_outs,
+                                   local_results_dir, environ)
 
   os.environ["ret_val"] = str(ret_val)
 
@@ -222,9 +227,6 @@ def run_on_data_from_scratch(cmd=None):
   except Exception:
     pass
 
-  # Wait for the report process to finish writing locally.
-  report_process.wait()
-
   # Exit with the return value of `./run_logicfuzz`.
   return ret_val
 
@@ -233,11 +235,7 @@ def run_standard(cmd=None):
   args = _parse_args(cmd)
   run_args = run_logicfuzz.parse_args(args.run_logicfuzz_args)
 
-  # Uses python3 by default and /venv/bin/python3 for Docker containers.
-  python_path = "/venv/bin/python3" if os.path.exists(
-      "/venv/bin/python3") else "python3"
-  os.environ["PYTHON"] = python_path
-
+  python_path = _resolve_python_path()
   _log_common_args(run_args)
 
   introspector_endpoint = run_args.introspector_endpoint
@@ -260,29 +258,11 @@ def run_standard(cmd=None):
   report_label = experiment_name
   logging.info("Report label is %s.", report_label)
 
-  # Generate a report locally
-  upload_env = os.environ.copy()
-  upload_env["REPORT_LABEL"] = report_label
-  report_process = subprocess.Popen([
-      "bash", "report/upload_report.sh", local_results_dir, benchmark_label,
-      run_args.model
-  ] + args.additional_args,
-                                     env=upload_env)
-
   # Prepare the command to run experiments
   run_cmd = [python_path, "run_logicfuzz.py"] + args.run_logicfuzz_args
 
-  # Run the experiment and redirect to file if indicated.
-  if args.redirect_outs:
-    with open(f"{local_results_dir}/logs-from-run.txt", "w") as outfile:
-      process = subprocess.run(run_cmd,
-                               stdout=outfile,
-                               stderr=outfile,
-                               check=False)
-      ret_val = process.returncode
-  else:
-    process = subprocess.run(run_cmd, check=False)
-    ret_val = process.returncode
+  ret_val = _run_logicfuzz_command(run_cmd, args.redirect_outs,
+                                   local_results_dir)
 
   os.environ["ret_val"] = str(ret_val)
 
@@ -298,9 +278,6 @@ def run_standard(cmd=None):
                      stderr=subprocess.DEVNULL)
     except Exception:
       pass
-
-  # Wait for the report process to finish writing locally.
-  report_process.wait()
 
   # Exit with the return value of `./run_logicfuzz`.
   return ret_val

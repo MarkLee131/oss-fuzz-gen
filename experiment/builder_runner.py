@@ -1084,34 +1084,11 @@ class CloudBuilderRunner(BuilderRunner):
 
     project_name = self.benchmark.project
 
-    uid = self.experiment_name + str(uuid.uuid4())
-    run_log_name = f'{uid}.run.log'
-    run_log_path = f'gs://{self.experiment_bucket}/{run_log_name}'
-
-    build_log_name = f'{uid}.build.log'
-    build_log_path = f'gs://{self.experiment_bucket}/{build_log_name}'
-
-    corpus_name = f'{uid}.corpus.zip'
-    corpus_path = f'gs://{self.experiment_bucket}/{corpus_name}'
-
-    coverage_name = f'{uid}.coverage'
-    coverage_path = f'gs://{self.experiment_bucket}/{coverage_name}'
-
-    reproducer_name = f'{uid}.reproducer'
-    reproducer_path = f'gs://{self.experiment_bucket}/{reproducer_name}'
-
-    logger.info('Servie account key: %s',
-                os.environ.get('GOOGLE_APPLICATION_CREDENTIALS'))
     command = [
         f'./{oss_fuzz_checkout.VENV_DIR}/bin/python3',
         'infra/build/functions/target_experiment.py',
         f'--project={generated_project}',
         f'--target={self.benchmark.target_name}',
-        f'--upload_build_log={build_log_path}',
-        f'--upload_output_log={run_log_path}',
-        f'--upload_coverage={coverage_path}',
-        f'--upload_reproducer={reproducer_path}',
-        f'--upload_corpus={corpus_path}',
         f'--experiment_name={self.experiment_name}',
         f'--real_project={project_name}',
     ]
