@@ -40,17 +40,12 @@ cp logicfuzz.env.example logicfuzz.env
 # Then edit logicfuzz.env and fill in DASHSCOPE_API_KEY / OPENAI_API_KEY, etc.
 
 
-# 2) Prepare a results directory for this run
+# 2) Start Fuzz Introspector in a background Docker container (one-time)
+bash scripts/start_fi_docker.sh
+
+# 3) Prepare a results directory for this run
 WORK_DIR="results/$(date +%Y%m%d-%H%M%S)"
 mkdir -p "$WORK_DIR"
-
-# 3) Start Fuzz Introspector in its own container using the *same* `logicfuzz`
-#    image (this builds a DB from the entire `conti-benchmark/` tree)
-docker run --rm -p 8080:8080 \
-  -v "$PWD":/experiment \
-  -w /experiment \
-  logicfuzz \
-  bash report/launch_introspector.sh --source benchmark
 
 # 4) Launch LogicFuzz in a separate container, passing env from logicfuzz.env.
 #    Most options are preset in scripts/docker_run_experiment.sh; override via
