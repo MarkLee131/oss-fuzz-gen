@@ -18,9 +18,9 @@ import run_single_fuzz
 # Configure logging to display all messages at or above INFO level
 logging.basicConfig(level=logging.INFO)
 
-BENCHMARK_SET = 'comparison'
+BENCHMARK_SET = 'conti-benchmark'
 DATA_DIR = '/experiment/data-dir/'
-DEFAULT_BENCHMARK_DIR = 'conti-benchmark/comparison'
+DEFAULT_BENCHMARK_DIR = 'conti-benchmark'
 
 def _needs_benchmark_selection(cmd: List[str]) -> bool:
   """Returns True if user did not pass any benchmark selector flag."""
@@ -170,11 +170,6 @@ def _derive_benchmark_label(args: argparse.Namespace) -> str:
 
 def main(cmd=None):
   """Main entrypoint"""
-  if os.path.isfile('/experiment/data-dir.zip'):
-    subprocess.check_call(
-        'apt-get install -y zip && zip -s0 data-dir.zip --out newd.zip && unzip newd.zip && rm ./data-dir.z*',
-        shell=True,
-        cwd='/experiment')
   if os.path.isdir(DATA_DIR):
     run_on_data_from_scratch(cmd)
   else:
@@ -212,11 +207,6 @@ def run_on_data_from_scratch(cmd=None):
 
   ret_val = _run_logicfuzz_command(logicfuzz_cmd, args.redirect_outs,
                                    local_results_dir, environ)
-
-  os.environ["ret_val"] = str(ret_val)
-
-  with open("/experiment_ended", "w"):
-    pass
 
   logging.info("Shutting down introspector")
   try:
@@ -263,11 +253,6 @@ def run_standard(cmd=None):
 
   ret_val = _run_logicfuzz_command(run_cmd, args.redirect_outs,
                                    local_results_dir)
-
-  os.environ["ret_val"] = str(ret_val)
-
-  with open("/experiment_ended", "w"):
-    pass
 
   if args.local_introspector:
     logging.info("Shutting down introspector")

@@ -40,7 +40,7 @@ docker run --rm -it \
 
 Key facts:
 - The repo must be mounted at `/experiment`; results are written to `/experiment/results/*` so they persist on the host.
-- If you omit `-y/--benchmark-yaml`, `-b/--benchmarks-directory`, and `-g/--generate-benchmarks`, the wrapper auto-selects `conti-benchmark/comparison` by injecting `-b conti-benchmark/comparison` before invoking `run_logicfuzz.py`.
+- If you omit `-y/--benchmark-yaml`, `-b/--benchmarks-directory`, and `-g/--generate-benchmarks`, the wrapper auto-selects `conti-benchmark` by injecting `-b conti-benchmark` before invoking `run_logicfuzz.py`, and `run_logicfuzz.py` will recursively load all YAMLs under that directory.
 - Add `--local-introspector false` to re-use an existing FI endpoint (`-e/--introspector-endpoint`).
 - Add `--redirect-outs true` to tee stdout/stderr into `results/logs-from-run.txt`.
 

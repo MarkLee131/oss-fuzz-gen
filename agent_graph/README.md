@@ -664,9 +664,9 @@ print(f"Final phase: {result['workflow_phase']}")
 
 ## 📚 Additional Resources
 
-- **[LangGraph Documentation](https://langchain-ai.github.io/langgraph/)** - LangGraph framework docs
-- **[prompts/](../prompts/)** - All LLM system prompts
-- **[experiment/](../experiment/)** - Build & execution infrastructure
-- **[docs/NEW_PROJECT_SETUP.md](../docs/NEW_PROJECT_SETUP.md)** - Adding new projects
-- **[Usage.md](../Usage.md)** - Quick start guide
+- **LangGraph documentation**: `https://langchain-ai.github.io/langgraph/`
+- **Prompts**: see `prompts/` for all LLM system prompts.
+- **Experiment infrastructure**: see `experiment/`.
+- **New project setup**: see `docs/NEW_PROJECT_SETUP.md`.
+- **How to run LogicFuzz**: see `docs/RUNNING.md` and the top‑level `README.md`.
 

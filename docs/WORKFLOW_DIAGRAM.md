@@ -607,8 +607,8 @@ ROI: High (fast termination, low cost)
 
 For more details on specific components:
 
-- **Implementation**: See [agent_graph/README.md](../agent_graph/README.md)
-- **Prompts**: See [prompts/](../prompts/)
-- **Setup Guide**: See [docs/NEW_PROJECT_SETUP.md](NEW_PROJECT_SETUP.md)
-- **Quick Start**: See [Usage.md](../Usage.md)
+- **Implementation**: see `agent_graph/README.md`.
+- **Prompts**: see the `prompts/` directory.
+- **New project setup**: see `docs/NEW_PROJECT_SETUP.md`.
+- **How to run LogicFuzz**: see `docs/RUNNING.md` and the top‑level `README.md`.
 

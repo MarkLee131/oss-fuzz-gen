@@ -1,18 +1,16 @@
-# LogicFuzz
+**LogicFuzz – Automated Fuzz Target Generation with Multi-Agent LLMs**
 
-**Automated Fuzz Target Generation with Multi-Agent LLMs**
-
-LogicFuzz uses AI agents to automatically generate, compile, and validate fuzz targets for C/C++ projects. It streamlines the process into two phases: **Compilation** (making it build) and **Optimization** (finding bugs).
+LogicFuzz uses AI agents to automatically generate, compile, and validate fuzz targets for C/C++ projects. The workflow is split into two phases: **Compilation** (make it build) and **Optimization** (run the fuzzer and validate crashes).
 
 ---
 
 ## 🚀 Quick Start
 
 ### 1. Prerequisites
-*   **Docker** (must be installed and running)
-*   **LLM API Key** (choose one):
-    *   OpenAI (GPT-4, GPT-5)
-    *   Qwen via Alibaba Cloud DashScope (recommended for cost efficiency)
+- **Docker** (installed and running)
+- **An LLM API key**, for example:
+  - OpenAI (GPT‑4, GPT‑5)
+  - Qwen via Alibaba Cloud DashScope (cost‑efficient)
 
 ```bash
 # OpenAI
@@ -23,22 +21,26 @@ export DASHSCOPE_API_KEY="sk-..."
 export QWEN_BASE_URL="https://dashscope-intl.aliyuncs.com/compatible-mode/v1"
 ```
 
-> 📖 Get your Qwen API key: [Alibaba Cloud Model Studio](https://www.alibabacloud.com/help/en/model-studio/get-api-key)
+You can obtain a Qwen API key from Alibaba Cloud Model Studio.
 
-### 2. Run LogicFuzz
-Generate a fuzzer for a sample benchmark:
+### 2. Minimal example
+Generate fuzzers for the sample `cjson` benchmark:
 
 ```bash
-# Using OpenAI GPT-5
-python run_logicfuzz.py --agent \
+python run_logicfuzz.py \
   -y conti-benchmark/conti-cmp/cjson.yaml \
-  --model gpt-5
+  --model gpt-5.1
+```
 
-# Using Qwen Plus (cost-efficient alternative)
-python run_logicfuzz.py --agent \
+To use a different model:
+
+```bash
+python run_logicfuzz.py \
   -y conti-benchmark/conti-cmp/cjson.yaml \
   --model qwen-plus
 ```
+
+For more options (e.g., `--benchmarks-directory`, `--num-samples`, `--run-timeout`), see `docs/RUNNING.md`.
 
 ---
 
@@ -46,12 +48,7 @@ python run_logicfuzz.py --agent \
 
 | Guide | Description |
 |-------|-------------|
-| **[Running LogicFuzz](docs/RUNNING.md)** | Detailed usage, configuration options, and troubleshooting. |
-| **[New Project Setup](docs/NEW_PROJECT_SETUP.md)** | How to onboard new projects (OSS-Fuzz, private repos, custom builds). |
-| **[Architecture](docs/ARCHITECTURE.md)** | Inner workings: Supervisor-Agent pattern, Session Memory, and workflows. |
-| **[Agent Graph](agent_graph/README.md)** | Deep dive into the code implementation. |
-
----
-
-## 📄 License
-Apache 2.0 License - See [LICENSE](LICENSE) file for details.
+| **`docs/RUNNING.md`** | How to run LogicFuzz (CLI flags, Docker usage, troubleshooting). |
+| **`docs/NEW_PROJECT_SETUP.md`** | How to onboard new projects (OSS‑Fuzz, private repos, custom builds). |
+| **`docs/WORKFLOW_DIAGRAM.md`** | High‑level workflow and architecture diagrams. |
+| **`agent_graph/README.md`** | Implementation details of the LangGraph‑based agent workflow. |

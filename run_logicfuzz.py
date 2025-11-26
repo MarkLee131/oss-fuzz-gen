@@ -91,11 +91,10 @@ def prepare_experiment_targets(
     if args.generate_benchmarks:
       generate_benchmarks(args)
 
-    benchmark_yamls = [
-        os.path.join(args.benchmarks_directory, file)
-        for file in os.listdir(args.benchmarks_directory)
-        if file.endswith('.yaml') or file.endswith('yml')
-    ]
+    for root, _, files in os.walk(args.benchmarks_directory):
+      for file in files:
+        if file.endswith('.yaml') or file.endswith('yml'):
+          benchmark_yamls.append(os.path.join(root, file))
   experiment_configs = []
   for benchmark_file in benchmark_yamls:
     experiment_configs.extend(benchmarklib.Benchmark.from_yaml(benchmark_file))

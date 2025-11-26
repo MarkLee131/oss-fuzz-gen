@@ -174,11 +174,10 @@ final-oss-fuzz-projects/
 
 ## 📚 Related Documentation
 
-- **Tool Comparison:** See [docs/TOOLS_OVERVIEW.md](../../docs/TOOLS_OVERVIEW.md) for complete tool hierarchy
-- **Main Workflow:** See [README.md](../../README.md) for `run_logicfuzz.py` usage
-- **From Scratch:** See [experimental/from_scratch/README.md](../from_scratch/README.md) for local harness generation
-- **Build Generation Library:** See [experimental/build_generator/README.md](../build_generator/README.md)
-- **Build Fixing Library:** See [experimental/build_fixer/](../build_fixer/) (no README yet)
+- **Main workflow:** see `README.md` (project root) and `docs/RUNNING.md` for `run_logicfuzz.py` usage.
+- **From scratch harness generation:** see `experimental/from_scratch/README.md`.
+- **Build generation library:** see `experimental/build_generator/README.md`.
+- **Build fixing library:** see `experimental/build_fixer/` (no README yet).
 
 ---
 

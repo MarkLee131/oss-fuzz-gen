@@ -9,7 +9,7 @@
 # Alternative one-liner:
 # pkill -9 -f "port.*8080" 2>/dev/null || lsof -t -i :8080 2>/dev/null | xargs -r kill -9
 
-BENCHMARK_SET=comparison
+BENCHMARK_SET=.
 PYTHON=python
 
 set -x
