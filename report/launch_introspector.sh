@@ -1,34 +1,7 @@
-#!/bin/bash
-
-# LogicFuzz Fuzz Introspector Launcher
-# This script launches a local Fuzz Introspector server with support for different data sources
-#
-# Usage:
-#   ./launch_introspector.sh [OPTIONS]
-#
-# Options:
-#   --source [benchmark|data-dir]   Data source mode (default: benchmark)
-#   --benchmark-set NAME            Benchmark set name (default: comparison)
-#   --data-dir PATH                 Path to data directory (default: data-dir)
-#   --port PORT                     Port to run server on (default: 8080)
-#   --python CMD                    Python command (default: python)
-#   --help                          Show this help message
-#
-# Examples:
-#   # Launch with benchmark source (default)
-#   ./launch_introspector.sh
-#
-#   # Launch with data-dir source (for end-to-end workflow)
-#   ./launch_introspector.sh --source data-dir --data-dir /path/to/data-dir
-#
-#   # Launch with custom benchmark set
-#   ./launch_introspector.sh --benchmark-set my-benchmarks
-
-set -e
-
 # Default configuration
 SOURCE_MODE="benchmark"
-BENCHMARK_SET="comparison"
+# By default, build FI DB from the whole conti-benchmark directory
+BENCHMARK_SET=""
 DATA_DIR="data-dir"
 PORT=8080
 PYTHON="${PYTHON:-python}"
@@ -146,14 +119,23 @@ ${PYTHON} -m pip install -q -r requirements.txt
 if [[ "$SOURCE_MODE" == "benchmark" ]]; then
   echo "========================================"
   echo "Mode: Benchmark Source"
-  echo "Benchmark set: $BENCHMARK_SET"
+  if [[ -n "$BENCHMARK_SET" ]]; then
+    echo "Benchmark set: $BENCHMARK_SET"
+  else
+    echo "Benchmark root: conti-benchmark (all benchmarks)"
+  fi
   echo "========================================"
   
   # Create database from benchmark directory
   cd app/static/assets/db/
   
-  if [ ! -d "$BASE_DIR/conti-benchmark/${BENCHMARK_SET}" ]; then
-    echo "Error: Benchmark directory not found: $BASE_DIR/conti-benchmark/${BENCHMARK_SET}"
+  BENCHMARK_ROOT="$BASE_DIR/conti-benchmark"
+  if [[ -n "$BENCHMARK_SET" ]]; then
+    BENCHMARK_ROOT="$BENCHMARK_ROOT/$BENCHMARK_SET"
+  fi
+  
+  if [ ! -d "$BENCHMARK_ROOT" ]; then
+    echo "Error: Benchmark directory not found: $BENCHMARK_ROOT"
     exit 1
   fi
   
@@ -162,7 +144,7 @@ if [[ "$SOURCE_MODE" == "benchmark" ]]; then
       --output-dir=$PWD \
       --input-dir=$PWD \
       --base-offset=1 \
-      --includes=$BASE_DIR/conti-benchmark/${BENCHMARK_SET}
+      --includes="$BENCHMARK_ROOT"
   
   # Launch server
   cd $ROOT_FI/tools/web-fuzzing-introspection/app/
