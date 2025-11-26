@@ -19,7 +19,7 @@ docker build -t logicfuzz -f Dockerfile .
 The image ships with a virtualenv in `/venv` and copies the entire tree under `/experiment`. Pass `INSTALL_HOST_CLI=false` when you do not need the bundled Docker/gcloud tooling.
 
 ## 3. Run experiments inside the container
-`report/docker_run.py` is a thin wrapper around `run_logicfuzz.py`. It launches a local Fuzz Introspector (unless told otherwise) and executes the workflow. Reports remain as raw artifacts under `results/` and can be visualized later with `python -m report.web`.
+`report/docker_run.py` is a thin wrapper around `run_logicfuzz.py`. It expects an already running Fuzz Introspector service (typically started from `Dockerfile.fuzz-introspector`) and executes the workflow. Reports remain as raw artifacts under `results/` and can be visualized later with `python -m report.web`.
 
 ```bash
 # 1) Configure your LLM API keys: 
@@ -29,11 +29,14 @@ The image ships with a virtualenv in `/venv` and copies the entire tree under `/
 WORK_DIR="results/$(date +%Y%m%d-%H%M%S)"
 mkdir -p "$WORK_DIR"
 
-# 3) (Optional but recommended) start Fuzz Introspector on the host so it can
-#    be re-used across multiple runs.
-bash report/launch_introspector.sh --source benchmark --python python3 &
+# 3) Start Fuzz Introspector in a separate container (see section 5), e.g.
+# docker run --rm -p 8080:8080 \
+#   -v "$PWD"/conti-benchmark:/opt/logicfuzz/conti-benchmark \
+#   logicfuzz-introspector \
+#     --source benchmark \
+#     --benchmark-set comparison
 
-# 4) Launch LogicFuzz inside Docker, passing env from logicfuzz.env
+# 4) Launch LogicFuzz inside the runner container, passing env from logicfuzz.env
 docker run --rm \
   --privileged \
   --network host \
@@ -43,7 +46,6 @@ docker run --rm \
   -w /experiment \
   logicfuzz \
   python3 report/docker_run.py \
-    --local-introspector false \
     --redirect-outs true \
     --model qwen3-coder-plus \
     -y conti-benchmark/cjson.yaml \
@@ -59,7 +61,7 @@ docker run --rm \
 Key facts:
 - The repo must be mounted at `/experiment`; results are written to `/experiment/results/*` so they persist on the host.
 - If you omit `-y/--benchmark-yaml`, `-b/--benchmarks-directory`, and `-g/--generate-benchmarks`, the wrapper auto-selects `conti-benchmark` by injecting `-b conti-benchmark` before invoking `run_logicfuzz.py`, and `run_logicfuzz.py` will recursively load all YAMLs under that directory.
-- Add `--local-introspector false` to re-use an existing FI endpoint (`-e/--introspector-endpoint`).
+- Always point `--introspector-endpoint` (`-e`) to the external FI service started from `Dockerfile.fuzz-introspector`.
 - Add `--redirect-outs true` to tee stdout/stderr into `results/logs-from-run.txt`.
 
 ## 4. Using the “data-dir” workflow (non OSS-Fuzz projects)
@@ -68,8 +70,9 @@ When `/experiment/data-dir` exists (or `/experiment/data-dir.zip` is mounted), t
 1. Mount your prepared directory (or drop a zipped archive) that contains:
    - `oss-fuzz2/` &rarr; custom OSS-Fuzz clone with your projects.
    - `fuzz_introspector_db/` &rarr; prebuilt FI database.
-2. The wrapper starts `report/custom_oss_fuzz_fi_starter.sh`, launches FI at `http://127.0.0.1:8080/api`, and calls `run_logicfuzz.py -g ...` with the heuristics configured in the script (`far-reach-low-coverage, low-cov-with-fuzz-keyword, easy-params-far-reach`).
-3. Reports are labeled `<date>-<benchmark_label>` so you can host them from the generated HTML output if you choose to run `python -m report.web`.
+2. Start a dedicated FI container using the same `data-dir` (see examples in section 5), so that the FI service exposes `http://127.0.0.1:8080/api`.
+3. The wrapper calls `run_logicfuzz.py -g ...` against that endpoint with the heuristics configured in `docker_run.py` (`far-reach-low-coverage, low-cov-with-fuzz-keyword, easy-params-far-reach`).
+4. Reports are labeled `<date>-<benchmark_label>` so you can host them from the generated HTML output if you choose to run `python -m report.web`.
 
 Use this mode when onboarding internal/private projects that are not part of upstream OSS-Fuzz but already have collected coverage + build artifacts.
 

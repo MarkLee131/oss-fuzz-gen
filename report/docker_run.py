@@ -47,13 +47,6 @@ def _parse_args(cmd) -> argparse.Namespace:
       description=("Wrapper around run_logicfuzz.py. All unrecognized flags "
                    "are forwarded directly to run_logicfuzz.py."))
   parser.add_argument(
-      '-i',
-      '--local-introspector',
-      type=str,
-      default="true",
-      help=('Controls the bundled local Fuzz Introspector (default: "true"). '
-            'Set to "false" only if you already run one on localhost:8080.'))
-  parser.add_argument(
       '-rd',
       '--redirect-outs',
       type=str,
@@ -64,7 +57,6 @@ def _parse_args(cmd) -> argparse.Namespace:
   args.additional_args = additional_args
 
   # Parse boolean arguments
-  args.local_introspector = args.local_introspector.lower() == "true"
   args.redirect_outs = args.redirect_outs.lower() == "true"
   args.run_logicfuzz_args = run_logicfuzz_args
 
@@ -183,12 +175,6 @@ def run_on_data_from_scratch(cmd=None):
   python_path = _resolve_python_path()
   _log_common_args(run_args)
 
-  # Launch starter, which set ups a Fuzz Introspector instance, which
-  # will be used for creating benchmarks and extract context.
-  logging.info('Running starter script')
-  subprocess.check_call('/experiment/report/custom_oss_fuzz_fi_starter.sh',
-                        shell=True)
-
   date = datetime.datetime.now().strftime('%Y-%m-%d')
   benchmark_label = _derive_benchmark_label(run_args)
   experiment_name = f"{date}-{benchmark_label}"
@@ -200,22 +186,13 @@ def run_on_data_from_scratch(cmd=None):
   environ = os.environ.copy()
   environ['OSS_FUZZ_DATA_DIR'] = os.path.join(DATA_DIR, 'oss-fuzz2')
   project_names = _collect_projects(environ['OSS_FUZZ_DATA_DIR'])
-  introspector_endpoint = "http://127.0.0.1:8080/api"
+  introspector_endpoint = run_args.introspector_endpoint
   logicfuzz_cmd = _build_data_mode_cmd(python_path, run_args, project_names,
                                        introspector_endpoint,
                                        args.run_logicfuzz_args)
 
   ret_val = _run_logicfuzz_command(logicfuzz_cmd, args.redirect_outs,
                                    local_results_dir, environ)
-
-  logging.info("Shutting down introspector")
-  try:
-    subprocess.run(["curl", "--silent", "http://localhost:8080/api/shutdown"],
-                   check=False,
-                   stdout=subprocess.DEVNULL,
-                   stderr=subprocess.DEVNULL)
-  except Exception:
-    pass
 
   # Exit with the return value of `./run_logicfuzz`.
   return ret_val
@@ -230,14 +207,8 @@ def run_standard(cmd=None):
 
   introspector_endpoint = run_args.introspector_endpoint
   benchmark_label = _derive_benchmark_label(run_args)
-  if args.local_introspector:
-    os.environ["BENCHMARK_SET"] = benchmark_label
-    logging.info("LOCAL_INTROSPECTOR is enabled: %s", introspector_endpoint)
-    _run_command(['bash', 'report/launch_local_introspector.sh'], shell=True)
-  else:
-    logging.info(
-        "LOCAL_INTROSPECTOR auto-launch disabled; expecting service at %s.",
-        introspector_endpoint)
+  logging.info(
+      "Expecting external Fuzz Introspector service at %s.", introspector_endpoint)
 
   logging.info("NUM_SAMPLES is %s.", run_args.num_samples)
 
@@ -253,16 +224,6 @@ def run_standard(cmd=None):
 
   ret_val = _run_logicfuzz_command(run_cmd, args.redirect_outs,
                                    local_results_dir)
-
-  if args.local_introspector:
-    logging.info("Shutting down introspector")
-    try:
-      subprocess.run(["curl", "--silent", "http://localhost:8080/api/shutdown"],
-                     check=False,
-                     stdout=subprocess.DEVNULL,
-                     stderr=subprocess.DEVNULL)
-    except Exception:
-      pass
 
   # Exit with the return value of `./run_logicfuzz`.
   return ret_val
