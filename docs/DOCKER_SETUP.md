@@ -33,8 +33,12 @@ This script:
 `report/docker_run.py` is a thin wrapper around `run_logicfuzz.py`. It expects an already running Fuzz Introspector service (typically started from `Dockerfile.fuzz-introspector`) and executes the workflow. Reports remain as raw artifacts under `results/` and can be visualized later with `python -m report.web`.
 
 ```bash
-# 1) Configure your LLM API keys: 
-# Edit logicfuzz.env and fill in DASHSCOPE_API_KEY / OPENAI_API_KEY, etc.
+# 1) Configure your LLM API keys following the example config file
+
+cp logicfuzz.env.example logicfuzz.env
+
+# Then edit logicfuzz.env and fill in DASHSCOPE_API_KEY / OPENAI_API_KEY, etc.
+
 
 # 2) Prepare a results directory for this run
 WORK_DIR="results/$(date +%Y%m%d-%H%M%S)"
