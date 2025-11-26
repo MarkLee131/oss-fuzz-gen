@@ -57,36 +57,15 @@ LogicFuzz can also run fully in Docker for reproducibility.
 docker build -t logicfuzz:latest .
 ```
 
-### Run experiments in Docker
+### Run experiments in Docker (split deployment)
 
-```bash
-docker run --rm \
-  --privileged \
-  -v /var/run/docker.sock:/var/run/docker.sock \
-  -v "$(pwd)":/experiment \
-  -w /experiment \
-  -e OPENAI_API_KEY="sk-..." \
-  logicfuzz:latest \
-  python3 report/docker_run.py \
-    --model gpt-5 \
-    --benchmarks-directory conti-benchmark \
-    --run-timeout 300 \
-    --local-introspector true
-```
-
-Notes:
-- `--privileged` plus the Docker socket mount let the container call `infra/helper.py` inside OSS‑Fuzz images.
-- Mount the entire repo at `/experiment` so `report/docker_run.py` can access benchmarks, scripts, and write results.
-- Pass `--local-introspector false` and `-e http://host.docker.internal:8080/api` when you already run Fuzz Introspector on the host.
-
-### Split deployment (LogicFuzz + Fuzz Introspector)
-
-Run Fuzz Introspector in its own container so LogicFuzz can be upgraded or restarted independently.
+Run Fuzz Introspector in its own container so LogicFuzz can be upgraded or restarted independently.  
+This is the only supported Docker deployment mode (the runner container never launches FI itself).
 
 1. Build image:
 
     ```bash
-    docker build -f Dockerfile.fuzz-introspector -t logicfuzz-fi .
+    docker build -f Dockerfile.fuzz-introspector -t logicfuzz-introspector .
     ```
 
 2. Launch the FI server (benchmark mode):
@@ -94,9 +73,8 @@ Run Fuzz Introspector in its own container so LogicFuzz can be upgraded or resta
     ```bash
     docker run --rm -p 8080:8080 \
       -v "$(pwd)"/conti-benchmark:/opt/logicfuzz/conti-benchmark \
-      logicfuzz-fi \
-        --source benchmark \
-        --benchmark-set .
+      logicfuzz-introspector \
+        --source benchmark
     ```
 
    Or reuse an existing data directory:
@@ -109,11 +87,12 @@ Run Fuzz Introspector in its own container so LogicFuzz can be upgraded or resta
         --data-dir data-dir
     ```
 
-3. Point LogicFuzz to the running server:
+3. Point LogicFuzz to the running server (see `docs/DOCKER_SETUP.md` for the
+   latest Docker‑based command). A typical local, non‑Docker example:
 
     ```bash
     python run_logicfuzz.py \
-      -y conti-benchmark/conti-cmp/cjson.yaml \
+      -y conti-benchmark/cjson.yaml \
       --model gpt-5 \
       -e http://localhost:8080/api
     ```
@@ -156,7 +135,7 @@ The compose file above is an example only—adjust benchmark/data directories an
 
 | Flag | Description | Typical value |
 |------|-------------|---------------|
-| `--model` | LLM model name | `gpt-5`, `gemini-2.0-flash-exp`, `qwen3`, etc. |
+| `--model` | LLM model name | `gpt-5.1`, `qwen3-coder-plus`, etc. |
 | `-e, --introspector-endpoint` | Fuzz Introspector API URL | `http://127.0.0.1:8080/api` or `http://0.0.0.0:8080/api` |
 | `--num-samples` | Trials per function | 3–10 |
 | `--temperature` | LLM sampling temperature | 0.3–0.5 |

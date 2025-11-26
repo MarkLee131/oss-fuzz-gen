@@ -45,11 +45,11 @@ WORK_DIR="results/$(date +%Y%m%d-%H%M%S)"
 mkdir -p "$WORK_DIR"
 
 # 3) Start Fuzz Introspector in a separate container (see section 5), e.g.
+#    (this will build a DB from the entire `conti-benchmark/` tree)
 # docker run --rm -p 8080:8080 \
 #   -v "$PWD"/conti-benchmark:/opt/logicfuzz/conti-benchmark \
 #   logicfuzz-introspector \
-#     --source benchmark \
-#     --benchmark-set comparison
+#     --source benchmark
 
 # 4) Launch LogicFuzz inside the runner container, passing env from logicfuzz.env
 #    Most options are preset in scripts/docker_run_experiment.sh; override via
