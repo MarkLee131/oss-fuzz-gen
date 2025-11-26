@@ -263,7 +263,6 @@ class SRSKnowledge:
             Complete SRS JSON dictionary
         """
         return {
-            "srs_version": "1.0",
             "target_function": self.target_function,
             "archetype": self.archetype,
             "functional_requirements": self.functional_requirements,
