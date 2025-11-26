@@ -41,7 +41,7 @@ def compute_coverage_diff(project: str, coverage_links: list[str]):
       logging.info('Loading %s', report_path)
       with open(report_path, 'r', encoding='utf-8') as f:
         try:
-        new_textcov.merge(textcov.Textcov.from_file(f))
+          new_textcov.merge(textcov.Textcov.from_file(f))
         except Exception:
           logging.warning('Failed to load %s', report_path)
 
