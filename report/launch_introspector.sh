@@ -220,6 +220,11 @@ echo "  curl http://127.0.0.1:${PORT}/api/shutdown"
 echo "  # or"
 echo "  kill $SERVER_PID"
 echo "========================================"
+echo "Waiting for Fuzz Introspector server to exit (press Ctrl+C to stop)..."
+
+# Keep the script (and thus the Docker container) alive as long as the
+# Fuzz Introspector server process is running.
+wait "$SERVER_PID"
 
 exit 0
 
